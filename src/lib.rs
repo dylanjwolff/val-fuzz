@@ -9,6 +9,7 @@ pub mod smtlibv2lexer;
 pub mod smtlibv2listener;
 pub mod smtlibv2parser;
 
+use std::convert::TryInto;
 use crate::smtlibv2parser::CommandContext;
 use crate::smtlibv2parser::Qual_identiferContext;
 use crate::smtlibv2parser::Spec_constantContextAttrs;
@@ -46,6 +47,7 @@ pub fn exec() {
         match file_res {
             Ok(file) => {
                 let filepath = file.path();
+                println!("starting file {:?}", filepath);
                 test_file(&filepath);
             }
             Err(_) => (),
@@ -153,11 +155,18 @@ pub fn test_file(source_filepath: &PathBuf) {
 
     let mut iterations = 0;
     let num_bavs = bav_names.len();
+
+    println!("starting {} iterations", 2_u64.pow(num_bavs.try_into().unwrap()));
     for truths in 0..num_bavs + 1 {
         let mut unordered_tvs = vec![true; truths];
         unordered_tvs.extend(vec![false; num_bavs - truths]);
         let truth_value_assigments = unordered_tvs.iter().permutations(num_bavs).unique();
+        let mut inner_iterations = 0;
         for truth_values in truth_value_assigments {
+            if inner_iterations > 1000 {
+                break;
+            }
+
             let cmd_string = format!(
                 "(assert {})",
                 bam_string(&mut bav_names.iter(), &mut truth_values.iter())
@@ -174,6 +183,7 @@ pub fn test_file(source_filepath: &PathBuf) {
             let filename = (iterations).to_string() + "_" + source_filename;
             fs::write(&filename, ast_string(&script));
             solve(&filename);
+            inner_iterations = inner_iterations + 1;
             iterations = iterations + 1;
         }
     }
@@ -181,15 +191,15 @@ pub fn test_file(source_filepath: &PathBuf) {
 
 fn solve(filename: &str) {
     let cvc4_res = Command::new("cvc4")
-        .args(&[filename, "--produce-model"])
+        .args(&[filename, "--produce-model", "--tlimit", "5000"])
         .output();
 
-    let z3_res = Command::new("z3").args(&[filename]).output();
+    let z3_res = Command::new("z3").args(&[filename, "-T:5"]).output();
 
     let cvc4_stdout_res = cvc4_res
         .and_then(|out| {
             if !out.status.success() && out.stderr.len() > 0 {
-                println!("cvc4 error on file {}", filename);
+                println!("cvc4 error on file {} : {}", filename, from_utf8(&out.stderr[..]).unwrap());
                 Err(std::io::Error::last_os_error()) // really sloppy hack for now, needs to be fixed
             } else {
                 Ok(out)

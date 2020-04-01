@@ -1,0 +1,126 @@
+warning: unused import: `rsmt2::SmtConf`
+  --> src/lib.rs:25:5
+   |
+25 | use rsmt2::SmtConf;
+   |     ^^^^^^^^^^^^^^
+   |
+   = note: `#[warn(unused_imports)]` on by default
+
+warning: variant is never constructed: `Dec`
+   --> src/lib.rs:276:5
+    |
+276 |     Dec(f64),
+    |     ^^^^^^^^
+    |
+    = note: `#[warn(dead_code)]` on by default
+
+warning: variant is never constructed: `Str`
+   --> src/lib.rs:277:5
+    |
+277 |     Str(String),
+    |     ^^^^^^^^^^^
+
+warning: variant is never constructed: `Bin`
+   --> src/lib.rs:279:5
+    |
+279 |     Bin(), // Will add support later
+    |     ^^^^^
+
+warning: variant is never constructed: `Hex`
+   --> src/lib.rs:280:5
+    |
+280 |     Hex(), // ditto
+    |     ^^^^^
+
+warning: unused `std::result::Result` that must be used
+   --> src/lib.rs:184:13
+    |
+184 |             fs::write(&filename, ast_string(&script));
+    |             ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+    |
+    = note: `#[warn(unused_must_use)]` on by default
+    = note: this `Result` may be an `Err` variant, which should be handled
+
+warning: unused `std::result::Result` that must be used
+   --> src/lib.rs:229:17
+    |
+229 |                 fs::remove_file(filename);
+    |                 ^^^^^^^^^^^^^^^^^^^^^^^^^^
+    |
+    = note: this `Result` may be an `Err` variant, which should be handled
+
+    Finished dev [unoptimized + debuginfo] target(s) in 0.03s
+     Running `target/debug/main`
+STARTING RUN
+starting file "samples/simple-uf.smtv1.smt2"
+line 10:20 missing ')' at '('
+starting 1 iterations
+line 1:8 mismatched input ')' expecting {'(', String, QuotedSymbol, 'not', 'Bool', 'continued-execution', 'error', 'false', 'immediate-exit', 'incomplete', 'logic', 'memout', 'sat', 'success', 'theory', 'true', 'unknown', 'unsupported', 'unsat', Numeral, Binary, HexDecimal, Decimal, UndefinedSymbol}
+starting file "samples/extract-concat-5.smtv1.smt2"
+line 6:20 missing ')' at '('
+starting 1 iterations
+line 1:8 mismatched input ')' expecting {'(', String, QuotedSymbol, 'not', 'Bool', 'continued-execution', 'error', 'false', 'immediate-exit', 'incomplete', 'logic', 'memout', 'sat', 'success', 'theory', 'true', 'unknown', 'unsupported', 'unsat', Numeral, Binary, HexDecimal, Decimal, UndefinedSymbol}
+starting file "samples/smt2output.smt2"
+starting 2 iterations
+starting file "samples/bv_to_int2.smt2"
+starting 1 iterations
+line 1:8 mismatched input ')' expecting {'(', String, QuotedSymbol, 'not', 'Bool', 'continued-execution', 'error', 'false', 'immediate-exit', 'incomplete', 'logic', 'memout', 'sat', 'success', 'theory', 'true', 'unknown', 'unsupported', 'unsat', Numeral, Binary, HexDecimal, Decimal, UndefinedSymbol}
+starting file "samples/mult-pow2-negative.smt2"
+line 4:37 token recognition error at: '#b'
+line 4:44 token recognition error at: '#b'
+line 4:53 token recognition error at: '#b'
+starting 2 iterations
+starting file "samples/issue4007-rint-uf.smt2"
+starting 2 iterations
+cvc4 error on file 0_issue4007-rint-uf.smt2 : Fatal failure within CVC4::Result CVC4::SmtEngine::checkSatisfiability(const std::vector<CVC4::Expr>&, bool, bool) at /home/dylan/git/CVC4/src/smt/smt_engine.cpp:2584
+Expected result sat but got unsat
+
+Error with file 0_issue4007-rint-uf.smt2
+starting file "samples/card3-ground.smt2"
+starting 1 iterations
+line 1:8 mismatched input ')' expecting {'(', String, QuotedSymbol, 'not', 'Bool', 'continued-execution', 'error', 'false', 'immediate-exit', 'incomplete', 'logic', 'memout', 'sat', 'success', 'theory', 'true', 'unknown', 'unsupported', 'unsat', Numeral, Binary, HexDecimal, Decimal, UndefinedSymbol}
+z3 error on file 0_card3-ground.smt2
+Error with file 0_card3-ground.smt2
+starting file "samples/bv2nat-ground.smt2"
+starting 512 iterations
+starting file "samples/str-code-unsat-3.smt2"
+starting 4 iterations
+z3 error on file 0_str-code-unsat-3.smt2
+Error with file 0_str-code-unsat-3.smt2
+z3 error on file 1_str-code-unsat-3.smt2
+Error with file 1_str-code-unsat-3.smt2
+z3 error on file 2_str-code-unsat-3.smt2
+Error with file 2_str-code-unsat-3.smt2
+z3 error on file 3_str-code-unsat-3.smt2
+Error with file 3_str-code-unsat-3.smt2
+starting file "samples/horn-ground-pre-post.smt2"
+starting 8 iterations
+starting file "samples/strip-endpoint-itos.smt2"
+starting 1 iterations
+line 1:8 mismatched input ')' expecting {'(', String, QuotedSymbol, 'not', 'Bool', 'continued-execution', 'error', 'false', 'immediate-exit', 'incomplete', 'logic', 'memout', 'sat', 'success', 'theory', 'true', 'unknown', 'unsupported', 'unsat', Numeral, Binary, HexDecimal, Decimal, UndefinedSymbol}
+z3 error on file 0_strip-endpoint-itos.smt2
+Error with file 0_strip-endpoint-itos.smt2
+starting file "samples/translator-example-input.smt2"
+starting 2 iterations
+starting file "samples/ackermann8.smt2"
+starting 64 iterations
+starting file "samples/loop006.smt2"
+starting 2 iterations
+cvc4 error on file 1_loop006.smt2 : Fatal failure within CVC4::Result CVC4::SmtEngine::checkSatisfiability(const std::vector<CVC4::Expr>&, bool, bool) at /home/dylan/git/CVC4/src/smt/smt_engine.cpp:2584
+Expected result sat but got unsat
+
+Error with file 1_loop006.smt2
+starting file "samples/bug272.minimized.smtv1.smt2"
+line 10:20 missing ')' at '('
+starting 1 iterations
+line 1:8 mismatched input ')' expecting {'(', String, QuotedSymbol, 'not', 'Bool', 'continued-execution', 'error', 'false', 'immediate-exit', 'incomplete', 'logic', 'memout', 'sat', 'success', 'theory', 'true', 'unknown', 'unsupported', 'unsat', Numeral, Binary, HexDecimal, Decimal, UndefinedSymbol}
+z3 error on file 0_bug272.minimized.smtv1.smt2
+Error with file 0_bug272.minimized.smtv1.smt2
+starting file "samples/small-1.smt2"
+starting 1 iterations
+line 1:8 mismatched input ')' expecting {'(', String, QuotedSymbol, 'not', 'Bool', 'continued-execution', 'error', 'false', 'immediate-exit', 'incomplete', 'logic', 'memout', 'sat', 'success', 'theory', 'true', 'unknown', 'unsupported', 'unsat', Numeral, Binary, HexDecimal, Decimal, UndefinedSymbol}
+starting file "samples/pbrewrites-test.smt2"
+starting 1 iterations
+line 1:8 mismatched input ')' expecting {'(', String, QuotedSymbol, 'not', 'Bool', 'continued-execution', 'error', 'false', 'immediate-exit', 'incomplete', 'logic', 'memout', 'sat', 'success', 'theory', 'true', 'unknown', 'unsupported', 'unsat', Numeral, Binary, HexDecimal, Decimal, UndefinedSymbol}
+starting file "samples/z3.620661-no-fv-trigger.smt2"
+starting 549755813888 iterations
