@@ -16,12 +16,12 @@ use nom::sequence::delimited;
 use nom::sequence::preceded;
 use nom::{bytes::complete::tag, combinator::map, sequence::tuple, IResult};
 
-#[derive(Debug, Eq, PartialEq)]
+#[derive(Debug, Eq, PartialEq, Clone)]
 pub enum Script<'a> {
     Commands(Vec<Command<'a>>),
 }
 
-#[derive(Debug, Eq, PartialEq)]
+#[derive(Debug, Eq, PartialEq, Clone)]
 pub enum Command<'a> {
     Logic(),
     CheckSat(),
@@ -32,28 +32,28 @@ pub enum Command<'a> {
     Generic(Vec<&'a str>),
 }
 
-#[derive(Debug, Eq, PartialEq)]
+#[derive(Debug, Eq, PartialEq, Clone)]
 pub enum Sort<'a> {
     UInt(),
     Dec(),
     Str(),
     Bool(),
-    //    Hex(),
-    //    Bin(),
     BitVec(),
     Array(),
     UserDef(&'a str),
     Compound(Vec<Sort<'a>>),
 }
 
-#[derive(Debug, Eq, PartialEq)]
+#[derive(Debug, Eq, PartialEq, Clone)]
 pub enum SExp<'a> {
     Compound(Vec<SExp<'a>>),
     Constant(Constant<'a>),
     Symbol(&'a str),
+    Var(String), // Not used for parsing, only manipulation of the ast so we don't need to do
+                 // lifetime gymnastics... vars are always parsed as Symbols
 }
 
-#[derive(Debug, Eq, PartialEq)]
+#[derive(Debug, Eq, PartialEq, Clone)]
 pub enum Constant<'a> {
     UInt(&'a str),
     Dec(&'a str),
@@ -144,7 +144,8 @@ impl<'a> SExp<'a> {
                 rec_s.insert(0, '('); // TODO
                 rec_s.push(')');
                 rec_s
-            }
+            },
+            SExp::Var(s) => s.clone(),
         }
     }
 }

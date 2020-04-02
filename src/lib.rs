@@ -3,21 +3,24 @@ extern crate nom;
 
 pub mod parser;
 
-use parser::{rmv_comments, script, Command, SExp, Script};
+use parser::{rmv_comments, script, Command, Sort, Constant, SExp, Script};
 
 use std::fs;
 use std::process;
 use std::str::from_utf8;
 
-struct VarNameGenerator {
+struct VarNameGenerator<'a> {
     basename: String,
     counter: u32,
+    vars_generated: Vec<(String, Sort<'a>)>,
 }
 
-impl VarNameGenerator {
-    fn get_name(&mut self) -> String {
+impl<'a> VarNameGenerator<'a> {
+    fn get_name(&mut self, sort : Sort<'a>) -> String {
         self.counter = self.counter + 1;
-        format!("{}{}", self.basename, self.counter)
+        let name = format!("{}{}", self.basename, self.counter);
+        self.vars_generated.push((name.clone(), sort));
+        name
     }
 }
 
@@ -30,9 +33,7 @@ pub fn exec() {
         let filepath = file.path();
         let contents = &fs::read_to_string(filepath).expect("error reading file")[..];
         let contents_ = &rmv_comments(contents)
-            .expect("failed to rmv comments")
-            .1
-            .join(" ")[..];
+            .expect("failed to rmv comments").1.join(" ")[..];
         match (script(contents_), script(contents_)) {
             (Ok((_, a)), Ok((_, b))) => assert_eq!(
                 a,
@@ -45,31 +46,56 @@ pub fn exec() {
     }
 }
 
-fn rc(script: &mut Script) {
+fn rc(script: &mut Script, vng : &mut VarNameGenerator){
     match script {
         Script::Commands(cmds) => {
             for cmd in cmds {
-                rc_c(cmd);
+                rc_c(cmd, vng);
             }
         }
     }
 }
 
-fn rc_c(cmd: &mut Command) {
+fn rc_c(cmd: &mut Command, vng : &mut  VarNameGenerator) {
     match cmd {
-        Command::Assert(sexp) | Command::CheckSatAssuming(sexp) => rc_se(sexp),
+        Command::Assert(sexp) | Command::CheckSatAssuming(sexp) => rc_se(sexp, vng),
         _ => (),
     }
 }
 
-fn rc_se(sexp: &mut SExp) {
+fn rc_se(sexp: &mut SExp, vng : &mut VarNameGenerator) {
     match sexp {
-        SExp::Constant(_c) => *sexp = SExp::Symbol("x"),
+        SExp::Constant(c) => {
+            let sort = match c {
+                Constant::UInt(_) => Sort::UInt(),
+                Constant::Dec(_) => Sort::Dec(),
+                Constant::Str(_) => Sort::Str(),
+                Constant::Bool(_) => Sort::Bool(),
+                Constant::Bin(_) |
+                Constant::Hex(_) => Sort::BitVec(),
+            };
+            let name = vng.get_name(sort);
+            *sexp = SExp::Var(name);
+        },
         SExp::Compound(sexps) => {
             for sexp in sexps {
-                rc_se(sexp)
+                rc_se(sexp, vng)
             }
         }
+        _ => (),
+    }
+}
+
+fn bav_se<'a>(sexp: &'a mut SExp<'a>, vng : &mut VarNameGenerator, bavs : &'a mut Vec<(String, SExp<'a>)>) {
+    match sexp {
+        SExp::Compound(sexps) => {
+            let name = vng.get_name(Sort::Bool());
+            let sec = sexp.clone();
+            bavs.push((name, sec));
+            for sexp in sexps {
+                bav_se(sexp, vng, bavs);
+            }
+        },
         _ => (),
     }
 }
@@ -132,9 +158,6 @@ mod tests {
 
     #[test]
     fn t() {
-        let mut c = SExp::Constant(Constant::UInt("7"));
-        rc_se(&mut c);
-        println!("{:?}", c);
     }
 
     #[test]
@@ -145,13 +168,15 @@ mod tests {
     #[test]
     fn visual_test() {
         let contents = &fs::read_to_string("ex.smt2").expect("error reading file")[..];
-        println!("Script: {:?}", script(contents));
-
-        match script(contents) {
-            Ok((_, script)) => {
-                println!("restrung: {}", script.to_string());
-            }
-            _ => (),
+        let mut vng = VarNameGenerator {
+            basename : "GEN".to_string(),
+            counter : 0,
+            vars_generated : vec![],
         };
+        let mut s = script(contents).expect("parse problem").1;
+        rc(&mut s, &mut vng);
+
+        println!("Script: {:?}", s);
+        println!("restrung: {}", s.to_string());
     }
 }
