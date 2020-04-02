@@ -3,7 +3,7 @@ extern crate nom;
 
 pub mod parser;
 
-use parser::{rmv_comments, script, Command, Constant, SExp, Script};
+use parser::{rmv_comments, script, Command, SExp, Script};
 
 use std::fs;
 use std::process;
@@ -64,7 +64,7 @@ fn rc_c(cmd: &mut Command) {
 
 fn rc_se(sexp: &mut SExp) {
     match sexp {
-        SExp::Constant(c) => *sexp = SExp::Symbol("x"),
+        SExp::Constant(_c) => *sexp = SExp::Symbol("x"),
         SExp::Compound(sexps) => {
             for sexp in sexps {
                 rc_se(sexp)
