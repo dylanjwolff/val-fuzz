@@ -8,7 +8,9 @@ use nom::{
     IResult,
 };
 
+use std::process;
 use std::fs;
+use std::str::from_utf8;
 use nom::character::complete::not_line_ending;
 use nom::character::complete::line_ending;
 use nom::number::complete::recognize_float;
@@ -306,7 +308,6 @@ fn rmv_comments(s: &str) -> IResult<&str, Vec<&str>> {
     )))(s)
 }
 
-
 pub fn exec() {
     let files = fs::read_dir("samples").expect("error with sample dir");
 
@@ -326,14 +327,87 @@ pub fn exec() {
     }
 }
 
+fn replace_constants(script : &mut Script) {
+   match script {
+       Script::Commands(cmds) => {
+           for cmd in cmds { rc_c(cmd); }
+       }
+   }
+}
 
+fn rc_c(cmd : &mut Command) {
+    match cmd {
+        Command::Assert(sexp) |
+        Command::CheckSatAssuming(sexp)=> rc_se(sexp),
+        _ => (),
+    }
+}
 
+fn rc_se(sexp : &mut SExp) {
+    match sexp{
+        SExp::Constant(c) => *sexp = SExp::Symbol("x"),
+        SExp::Compound(sexps) => { for sexp in sexps { rc_se(sexp) } },
+        _ => (),
+    }
+}
 
+fn solve(filename: &str) {
+    let cvc4_res = process::Command::new("cvc4")
+        .args(&[filename, "--produce-model", "--tlimit", "5000"])
+        .output();
+
+    let z3_res = process::Command::new("z3").args(&[filename, "-T:5"]).output();
+
+    let cvc4_stdout_res = cvc4_res
+        .and_then(|out| {
+            if !out.status.success() && out.stderr.len() > 0 {
+                println!("cvc4 error on file {} : {}", filename, from_utf8(&out.stderr[..]).unwrap());
+                Err(std::io::Error::last_os_error()) // really sloppy hack for now, needs to be fixed
+            } else {
+                Ok(out)
+            }
+        })
+        .map(|out| from_utf8(&out.stdout.clone()[..]).map(|s| s.to_string()));
+
+    let z3_stdout_res = z3_res
+        .and_then(|out| {
+            if !out.status.success() && out.stderr.len() > 0 {
+                println!("z3 error on file {}", filename);
+                Err(std::io::Error::last_os_error()) // really sloppy hack for now, needs to be fixed
+            } else {
+                Ok(out)
+            }
+        })
+        .map(|out| from_utf8(&out.stdout.clone()[..]).map(|s| s.to_string()));
+
+    match (cvc4_stdout_res, z3_stdout_res) {
+        (Ok(Ok(cvc4_stdout)), Ok(Ok(z3_stdout))) => {
+            // also sloppy hack above
+            if cvc4_stdout.contains("unsat") && !z3_stdout.contains("unsat") {
+                println!("file {} has soundness problem!!!", filename);
+            } else if cvc4_stdout.contains("sat") && !z3_stdout.contains("sat") {
+                println!("file {} has soundness problem!!!", filename);
+            } else {
+                fs::remove_file(filename);
+            }
+            ()
+        }
+        _ => println!("Error with file {}", filename),
+    }
+}
 
 #[cfg(test)]
 mod tests {
     use super::*;
     use std::fs;
+
+    #[test]
+    fn t() {
+        let mut c = SExp::Constant(Constant::UInt("7"));
+        rc_se(&mut c);
+        println!("{:?}", c);
+    }
+
 
     #[test]
     fn quick_test() {
@@ -342,7 +416,7 @@ mod tests {
 
     #[test]
     fn smoke_test() {
-       exec();
+       // exec();
     }
 
     #[test]
