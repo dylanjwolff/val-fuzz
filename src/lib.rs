@@ -3,17 +3,10 @@ extern crate nom;
 
 pub mod parser;
 
-use parser::{
-    rmv_comments,
-    script,
-    Script,
-    Command,
-    Constant,
-    SExp,
-};
+use parser::{rmv_comments, script, Command, Constant, SExp, Script};
 
-use std::process;
 use std::fs;
+use std::process;
 use std::str::from_utf8;
 
 struct VarNameGenerator {
@@ -36,37 +29,47 @@ pub fn exec() {
         println!("Starting {:?}", file);
         let filepath = file.path();
         let contents = &fs::read_to_string(filepath).expect("error reading file")[..];
-        let contents_ = &rmv_comments(contents).expect("failed to rmv comments").1.join(" ")[..];
+        let contents_ = &rmv_comments(contents)
+            .expect("failed to rmv comments")
+            .1
+            .join(" ")[..];
         match (script(contents_), script(contents_)) {
-            (Ok((_, a)), Ok((_, b))) => assert_eq!(a, 
-                                                   script(&b.to_string()[..]).expect("Failed on second parse").1
-                                                   ),
-            (Err(e), _) |
-            (_, Err(e)) => panic!("SMT Parse Error {}", e),
+            (Ok((_, a)), Ok((_, b))) => assert_eq!(
+                a,
+                script(&b.to_string()[..])
+                    .expect("Failed on second parse")
+                    .1
+            ),
+            (Err(e), _) | (_, Err(e)) => panic!("SMT Parse Error {}", e),
         }
     }
 }
 
-fn rc(script : &mut Script) {
-   match script {
-       Script::Commands(cmds) => {
-           for cmd in cmds { rc_c(cmd); }
-       }
-   }
+fn rc(script: &mut Script) {
+    match script {
+        Script::Commands(cmds) => {
+            for cmd in cmds {
+                rc_c(cmd);
+            }
+        }
+    }
 }
 
-fn rc_c(cmd : &mut Command) {
+fn rc_c(cmd: &mut Command) {
     match cmd {
-        Command::Assert(sexp) |
-        Command::CheckSatAssuming(sexp)=> rc_se(sexp),
+        Command::Assert(sexp) | Command::CheckSatAssuming(sexp) => rc_se(sexp),
         _ => (),
     }
 }
 
-fn rc_se(sexp : &mut SExp) {
-    match sexp{
+fn rc_se(sexp: &mut SExp) {
+    match sexp {
         SExp::Constant(c) => *sexp = SExp::Symbol("x"),
-        SExp::Compound(sexps) => { for sexp in sexps { rc_se(sexp) } },
+        SExp::Compound(sexps) => {
+            for sexp in sexps {
+                rc_se(sexp)
+            }
+        }
         _ => (),
     }
 }
@@ -76,12 +79,18 @@ fn solve(filename: &str) {
         .args(&[filename, "--produce-model", "--tlimit", "5000"])
         .output();
 
-    let z3_res = process::Command::new("z3").args(&[filename, "-T:5"]).output();
+    let z3_res = process::Command::new("z3")
+        .args(&[filename, "-T:5"])
+        .output();
 
     let cvc4_stdout_res = cvc4_res
         .and_then(|out| {
             if !out.status.success() && out.stderr.len() > 0 {
-                println!("cvc4 error on file {} : {}", filename, from_utf8(&out.stderr[..]).unwrap());
+                println!(
+                    "cvc4 error on file {} : {}",
+                    filename,
+                    from_utf8(&out.stderr[..]).unwrap()
+                );
                 Err(std::io::Error::last_os_error()) // really sloppy hack for now, needs to be fixed
             } else {
                 Ok(out)
@@ -128,10 +137,9 @@ mod tests {
         println!("{:?}", c);
     }
 
-
     #[test]
     fn smoke_test() {
-       // exec();
+        // exec();
     }
 
     #[test]
@@ -140,10 +148,10 @@ mod tests {
         println!("Script: {:?}", script(contents));
 
         match script(contents) {
-            Ok((_, script)) => { 
+            Ok((_, script)) => {
                 println!("restrung: {}", script.to_string());
             }
-            _ => ()
+            _ => (),
         };
     }
 }
