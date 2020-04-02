@@ -86,19 +86,36 @@ fn rc_se(sexp: &mut SExp, vng : &mut VarNameGenerator) {
     }
 }
 
-// fn bav_se<'a, 'b>(sexp: &'a mut SExp<'a>, vng : &mut VarNameGenerator, bavs : &'b mut Vec<(String, SExp<'b>)>) {
-//     match sexp {
-//         SExp::Compound(sexps) => {
-//             let name = vng.get_name(Sort::Bool());
-//             let sec = sexp.clone();
-//             bavs.push((name, sec));
-//             for sexp in sexps {
-//                 bav_se(sexp, vng, bavs);
-//             }
-//         },
-//         _ => (),
-//     }
-// }
+fn bav(script: &mut Script, vng : &mut VarNameGenerator, bava : &mut Vec<(String, SExp)>){
+    match script {
+        Script::Commands(cmds) => {
+            for cmd in cmds {
+                bav_c(cmd, vng, bava);
+            }
+        }
+    }
+}
+
+fn bav_c(cmd: &mut Command, vng : &mut  VarNameGenerator, bava : &mut Vec<(String, SExp)>){
+    match cmd {
+        Command::Assert(sexp) | Command::CheckSatAssuming(sexp) => bav_se(sexp, vng, bava),
+        _ => (),
+    }
+}
+
+fn bav_se(sexp: &mut SExp, vng : &mut VarNameGenerator, bavs : &mut Vec<(String, SExp)>) {
+    match sexp {
+        SExp::Compound(sexps) => {
+            let name = vng.get_name(Sort::Bool());
+            let sec = SExp::Compound(sexps.clone());
+            bavs.push((name, sec));
+            for sexp in sexps {
+                bav_se(sexp, vng, bavs);
+            }
+        },
+        _ => (),
+    }
+}
 
 fn solve(filename: &str) {
     let cvc4_res = process::Command::new("cvc4")
@@ -173,10 +190,12 @@ mod tests {
             counter : 0,
             vars_generated : vec![],
         };
+        let mut bava = vec![];
+
         let mut s = script(contents).expect("parse problem").1;
-        rc(&mut s, &mut vng);
+        bav(&mut s, &mut vng, &mut bava);
 
         println!("Script: {:?}", s);
-        println!("restrung: {}", s.to_string());
+        println!("restrung: {:?}", bava);
     }
 }
