@@ -9,14 +9,14 @@ use std::fs;
 use std::process;
 use std::str::from_utf8;
 
-struct VarNameGenerator<'a> {
+struct VarNameGenerator {
     basename: String,
     counter: u32,
-    vars_generated: Vec<(String, Sort<'a>)>,
+    vars_generated: Vec<(String, Sort)>,
 }
 
-impl<'a> VarNameGenerator<'a> {
-    fn get_name(&mut self, sort : Sort<'a>) -> String {
+impl VarNameGenerator {
+    fn get_name(&mut self, sort : Sort) -> String {
         self.counter = self.counter + 1;
         let name = format!("{}{}", self.basename, self.counter);
         self.vars_generated.push((name.clone(), sort));
@@ -86,19 +86,19 @@ fn rc_se(sexp: &mut SExp, vng : &mut VarNameGenerator) {
     }
 }
 
-fn bav_se<'a>(sexp: &'a mut SExp<'a>, vng : &mut VarNameGenerator, bavs : &'a mut Vec<(String, SExp<'a>)>) {
-    match sexp {
-        SExp::Compound(sexps) => {
-            let name = vng.get_name(Sort::Bool());
-            let sec = sexp.clone();
-            bavs.push((name, sec));
-            for sexp in sexps {
-                bav_se(sexp, vng, bavs);
-            }
-        },
-        _ => (),
-    }
-}
+// fn bav_se<'a, 'b>(sexp: &'a mut SExp<'a>, vng : &mut VarNameGenerator, bavs : &'b mut Vec<(String, SExp<'b>)>) {
+//     match sexp {
+//         SExp::Compound(sexps) => {
+//             let name = vng.get_name(Sort::Bool());
+//             let sec = sexp.clone();
+//             bavs.push((name, sec));
+//             for sexp in sexps {
+//                 bav_se(sexp, vng, bavs);
+//             }
+//         },
+//         _ => (),
+//     }
+// }
 
 fn solve(filename: &str) {
     let cvc4_res = process::Command::new("cvc4")

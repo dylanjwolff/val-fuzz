@@ -17,54 +17,54 @@ use nom::sequence::preceded;
 use nom::{bytes::complete::tag, combinator::map, sequence::tuple, IResult};
 
 #[derive(Debug, Eq, PartialEq, Clone)]
-pub enum Script<'a> {
-    Commands(Vec<Command<'a>>),
+pub enum Script {
+    Commands(Vec<Command>),
 }
 
 #[derive(Debug, Eq, PartialEq, Clone)]
-pub enum Command<'a> {
+pub enum Command {
     Logic(),
     CheckSat(),
-    CheckSatAssuming(SExp<'a>),
-    Assert(SExp<'a>),
+    CheckSatAssuming(SExp),
+    Assert(SExp),
     GetModel(),
-    DeclConst(&'a str, Sort<'a>),
-    Generic(Vec<&'a str>),
+    DeclConst(String, Sort),
+    Generic(Vec<String>),
 }
 
 #[derive(Debug, Eq, PartialEq, Clone)]
-pub enum Sort<'a> {
+pub enum Sort {
     UInt(),
     Dec(),
     Str(),
     Bool(),
     BitVec(),
     Array(),
-    UserDef(&'a str),
-    Compound(Vec<Sort<'a>>),
+    UserDef(String),
+    Compound(Vec<Sort>),
 }
 
 #[derive(Debug, Eq, PartialEq, Clone)]
-pub enum SExp<'a> {
-    Compound(Vec<SExp<'a>>),
-    Constant(Constant<'a>),
-    Symbol(&'a str),
+pub enum SExp {
+    Compound(Vec<SExp>),
+    Constant(Constant),
+    Symbol(String),
     Var(String), // Not used for parsing, only manipulation of the ast so we don't need to do
                  // lifetime gymnastics... vars are always parsed as Symbols
 }
 
 #[derive(Debug, Eq, PartialEq, Clone)]
-pub enum Constant<'a> {
-    UInt(&'a str),
-    Dec(&'a str),
-    Hex(&'a str),
+pub enum Constant {
+    UInt(String),
+    Dec(String),
+    Hex(String),
     Bin(Vec<char>),
-    Str(&'a str),
+    Str(String),
     Bool(bool),
 }
 
-impl<'a> Script<'a> {
-    pub fn to_string(&'a self) -> String {
+impl Script {
+    pub fn to_string(&self) -> String {
         match self {
             Script::Commands(cmds) => cmds
                 .iter()
@@ -75,8 +75,8 @@ impl<'a> Script<'a> {
     }
 }
 
-impl<'a> Command<'a> {
-    pub fn to_string(&'a self) -> String {
+impl Command {
+    pub fn to_string(&self) -> String {
         match self {
             Command::Logic() => "(set-logic QLIA)".to_string(), // TODO
             Command::CheckSat() => "(check-sat)".to_string(),
@@ -93,8 +93,8 @@ impl<'a> Command<'a> {
     }
 }
 
-impl<'a> Constant<'a> {
-    pub fn to_string(&'a self) -> String {
+impl Constant {
+    pub fn to_string(&self) -> String {
         match self {
             Constant::UInt(s) => s.to_string(),
             Constant::Dec(d) => d.to_string(),
@@ -106,8 +106,8 @@ impl<'a> Constant<'a> {
     }
 }
 
-impl<'a> Sort<'a> {
-    pub fn to_string(&'a self) -> String {
+impl Sort {
+    pub fn to_string(&self) -> String {
         match self {
             Sort::UInt() => "Int".to_string(),
             Sort::Dec() => "Real".to_string(),
@@ -130,8 +130,8 @@ impl<'a> Sort<'a> {
     }
 }
 
-impl<'a> SExp<'a> {
-    pub fn to_string(&'a self) -> String {
+impl SExp {
+    pub fn to_string(&self) -> String {
         match self {
             SExp::Constant(c) => c.to_string(),
             SExp::Symbol(s) => s.to_string(),
@@ -188,11 +188,11 @@ fn string(s: &str) -> IResult<&str, &str> {
 
 fn constant(s: &str) -> IResult<&str, Constant> {
     alt((
-        map(integer, |i| Constant::UInt(i)),
-        map(decimal, |d| Constant::Dec(d)),
-        map(hex, |h| Constant::Hex(h)),
-        map(bin, |b| Constant::Bin(b)),
-        map(string, |s| Constant::Str(s)),
+        map(integer, |i| Constant::UInt(i.to_owned())),
+        map(decimal, |d| Constant::Dec(d.to_owned())),
+        map(hex, |h| Constant::Hex(h.to_owned())),
+        map(bin, |b| Constant::Bin(b.to_owned())),
+        map(string, |s| Constant::Str(s.to_owned())),
     ))(s)
 }
 
@@ -208,7 +208,7 @@ fn sexp(s: &str) -> IResult<&str, SExp> {
     alt((
         map(ws_rec_sexp, |e| SExp::Compound(e)),
         map(ws_constant, |c| SExp::Constant(c)),
-        map(ws_symbol, |s| SExp::Symbol(s)),
+        map(ws_symbol, |s| SExp::Symbol(s.to_owned())),
     ))(s)
 }
 
@@ -221,7 +221,7 @@ fn sort(s: &str) -> IResult<&str, Sort> {
     alt((
         map(ws_int, |_| Sort::UInt()),
         map(ws_dec, |_| Sort::Dec()),
-        map(ws_userdef, |s| Sort::UserDef(s)),
+        map(ws_userdef, |s| Sort::UserDef(s.to_owned())),
         map(ws_rec_sort, |s| Sort::Compound(s)),
     ))(s)
 }
@@ -258,7 +258,7 @@ fn naked_command(s: &str) -> IResult<&str, Command> {
         map(tag("check-sat"), |_| Command::CheckSat()),
         map(tag("get-model"), |_| Command::GetModel()),
         map(naked_logic, |_| Command::Logic()),
-        map(naked_decl_const, |(v, s)| Command::DeclConst(v, s)),
+        map(naked_decl_const, |(v, s)| Command::DeclConst(v.to_owned(), s)),
     ))(s)
 }
 
@@ -283,7 +283,10 @@ fn command(s: &str) -> IResult<&str, Command> {
     let command = delimited(char('('), ws_ncommand, char(')'));
     alt((
         delimited(multispace0, command, multispace0),
-        map(unknown_balanced, |s| Command::Generic(s)),
+        map(unknown_balanced, |v| Command::Generic(
+                v.into_iter()
+                    .map(|g| g.to_owned())
+                    .collect::<Vec<String>>())),
     ))(s)
 }
 
