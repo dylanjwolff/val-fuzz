@@ -1,362 +1,360 @@
-#![feature(try_blocks)]
-#![feature(rustc_private)]
-extern crate antlr_rust;
-extern crate itertools;
 #[macro_use]
-extern crate lazy_static;
+extern crate nom;
 
-pub mod smtlibv2lexer;
-pub mod smtlibv2listener;
-pub mod smtlibv2parser;
+use nom::{
+    bytes::complete::{tag},
+    combinator::map,
+    sequence::tuple,
+    IResult,
+};
 
-use std::convert::TryInto;
-use crate::smtlibv2parser::CommandContext;
-use crate::smtlibv2parser::Qual_identiferContext;
-use crate::smtlibv2parser::Spec_constantContextAttrs;
-use crate::smtlibv2parser::TermContext;
-use crate::smtlibv2parser::TermContextAttrs;
-use antlr_rust::common_token_stream::CommonTokenStream;
-use antlr_rust::input_stream::InputStream;
-use antlr_rust::parser_rule_context::ParserRuleContextType;
-use antlr_rust::parser_rule_context::{BaseParserRuleContext, ParserRuleContext};
-use antlr_rust::tree::Tree;
-use antlr_rust::tree::{ParseTree, ParseTreeListener, TerminalNodeCtx};
-use itertools::Itertools;
-use rsmt2::SmtConf;
-use smtlibv2lexer::SMTLIBv2Lexer;
-use smtlibv2listener::SMTLIBv2Listener;
-use std::path::PathBuf;
-use std::process::Command;
-use std::str::from_utf8;
-
-use smtlibv2parser::CommandContextAttrs;
-use smtlibv2parser::IdentifierContextAttrs;
-use smtlibv2parser::Qual_identiferContextAttrs;
-use smtlibv2parser::SMTLIBv2Parser;
-use smtlibv2parser::SimpleSymbolContextAttrs;
-use smtlibv2parser::SymbolContextAttrs;
-
-use std::collections::BTreeMap;
 use std::fs;
-use std::rc::Rc;
+use nom::character::complete::not_line_ending;
+use nom::character::complete::line_ending;
+use nom::number::complete::recognize_float;
+use nom::sequence::delimited;
+use nom::sequence::preceded;
+use nom::character::complete::multispace0;
+use nom::branch::alt;
+use nom::bytes::complete::take_while;
+use nom::bytes::complete::take_while1;
+use nom::character::complete::char;
+use nom::combinator::not;
+use nom::multi::many0;
+use nom::multi::many1;
+use nom::character::complete::digit1;
+use nom::character::complete::hex_digit1;
+use nom::combinator::peek;
+
+
+#[derive(Debug, Eq, PartialEq)]
+enum Script<'a> {
+    Commands(Vec<Command<'a>>),
+}
+
+#[derive(Debug, Eq, PartialEq)]
+enum Command<'a> {
+    Logic(),
+    CheckSat(),
+    CheckSatAssuming(SExp<'a>),
+    Assert(SExp<'a>),
+    GetModel(),
+    DeclConst(&'a str, Sort<'a>),
+    Generic(Vec<&'a str>),
+}
+
+#[derive(Debug, Eq, PartialEq)]
+enum Sort<'a> {
+    UInt(),
+    Dec(),
+    Str(),
+    Bool(),
+//    Hex(),
+//    Bin(),
+    BitVec(),
+    Array(),
+    UserDef(&'a str),
+    Compound(Vec<Sort<'a>>),
+}
+
+#[derive(Debug, Eq, PartialEq)]
+enum SExp<'a> {
+    Compound(Vec<SExp<'a>>),
+    Constant(Constant<'a>),
+    Symbol(&'a str),
+}
+
+#[derive(Debug, Eq, PartialEq)]
+enum Constant<'a> {
+    UInt(&'a str),
+    Dec(&'a str),
+    Hex(&'a str),
+    Bin(Vec<char>),
+    Str(&'a str),
+    Bool(bool),
+}
+
+impl<'a> Script<'a> {
+    fn to_string(&'a self) -> String {
+        match self {
+            Script::Commands(cmds) => 
+                cmds.iter()
+                .map(|cmd| cmd.to_string())
+                .collect::<Vec<String>>()
+                .join("\n"),
+        }
+    }
+}
+
+impl<'a> Command<'a> {
+    fn to_string(&'a self) -> String {
+      match self {
+          Command::Logic() => "(set-logic QLIA)".to_string(), // TODO
+          Command::CheckSat() => "(check-sat)".to_string(),
+          Command::CheckSatAssuming(sexp) => ("(check-sat-assuming ".to_owned() + &sexp.to_string()[..] + ")").to_string(), // TODO
+          Command::GetModel() => "(get-model)".to_string(),
+          Command::DeclConst(v, s) => ("(declare-const ".to_string() + v + " " + &s.to_string()[..] + ")").to_string(),
+          Command::Generic(v) => v.join(""),
+          Command::Assert(s) => ("(assert ".to_string() + &s.to_string()[..] + ")").to_string(),
+      }
+    }
+}
+
+impl<'a> Constant<'a> {
+    fn to_string(&'a self) -> String {
+        match self {
+            Constant::UInt(s) => s.to_string(),
+            Constant::Dec(d) => d.to_string(),
+            Constant::Hex(s) => {
+                "#x".to_string() + &s.to_string()[..]
+            },
+            Constant::Str(s) => {
+                "\"".to_string() + &s.to_string()[..] + "\""
+            },
+            Constant::Bool(b) => b.to_string(),
+            Constant::Bin(bv) => {
+                "#b".to_string() + &bv.into_iter().collect::<String>()[..]
+            },
+        }
+    }
+}
+
+impl<'a> Sort<'a> {
+    fn to_string(&'a self) -> String {
+        match self {
+            Sort::UInt() => "Int".to_string(),
+            Sort::Dec() =>  "Real".to_string(),
+            Sort::Bool() =>  "Bool".to_string(),
+            Sort::Str() =>  "String".to_string(),
+            Sort::BitVec() =>  "BitVec".to_string(),
+            Sort::Array() =>  "Array".to_string(),
+            Sort::UserDef(s) =>  s.to_string(),
+            Sort::Compound(v) =>  {
+                let mut rec_s = v.iter().map(|sort| sort.to_string()).collect::<Vec<String>>().join(" ");
+                rec_s.insert(0, '(');  // TODO
+                rec_s.push(')'); 
+                rec_s
+            },
+        }
+    }
+}
+
+impl<'a> SExp<'a> {
+    fn to_string(&'a self) -> String {
+        match self {
+            SExp::Constant(c) => c.to_string(),
+            SExp::Symbol(s) =>   s.to_string(),
+            SExp::Compound(v) => {
+                let mut rec_s = v.iter().map(|sexp| sexp.to_string()).collect::<Vec<String>>().join(" ");
+                rec_s.insert(0, '(');  // TODO
+                rec_s.push(')'); 
+                rec_s
+            },
+        }
+    }
+}
+
+fn integer(s: &str) -> IResult<&str, &str> {
+    // let inner = |(sn, _peek): (&str, ())| {
+    //    sn.parse::<u64>().unwrap()
+    // };
+    map(tuple((digit1, peek(not(char('.'))))), |(sn, _)| sn)(s)
+}
+
+fn decimal(s: &str) -> IResult<&str, &str> {
+    recognize_float(s)
+}
+
+fn hex(s: &str) -> IResult<&str, &str> {
+    map(tuple((tag("#x"), hex_digit1)),|(_, h)| h)(s)
+}
+
+fn bin(s: &str) -> IResult<&str, Vec<char>> {
+    // Fn doesn't implement clone for some reason
+    let bstring_orig = many1(alt((char('0'), char('1'))));
+    let bstring_clne = many1(alt((char('0'), char('1'))));
+
+    alt((
+        bstring_orig,
+        map(tuple((tag("#b"), bstring_clne)), |(_, b)| b)
+    ))(s)
+}
+
+fn not_quote(s: &str) -> IResult<&str, &str> {
+    take_while(|c| c != '"')(s)
+}
+
+fn string(s: &str) -> IResult<&str, &str> {
+    map(tuple((char('"'), not_quote, char('"'))), |(_, sout, _)| sout)(s)
+}
+
+fn constant(s: &str) -> IResult<&str, Constant> {
+    alt((
+        map(integer, |i| Constant::UInt(i)),
+        map(decimal, |d| Constant::Dec(d)),
+        map(hex,     |h| Constant::Hex(h)),
+        map(bin,     |b| Constant::Bin(b)),
+        map(string,  |s| Constant::Str(s)),
+    ))(s)
+}
+
+fn symbol(s: &str) -> IResult<&str, &str> {
+    take_while1(|c : char| !c.is_whitespace() && !(c=='(') && !(c ==')'))(s)
+}
+
+fn sexp(s: &str) -> IResult<&str, SExp> {
+    let rec_sexp = delimited(char('('), many1(sexp), char(')'));
+    let ws_rec_sexp = delimited(multispace0, rec_sexp, multispace0);
+    let ws_constant = delimited(multispace0, constant, multispace0);
+    let ws_symbol = delimited(multispace0, symbol, multispace0);
+    alt((
+        map(ws_rec_sexp, |e| SExp::Compound(e)),
+        map(ws_constant, |c| SExp::Constant(c)),
+        map(ws_symbol,   |s| SExp::Symbol(s)),
+    ))(s)
+}
+
+fn sort(s: &str) -> IResult<&str, Sort> {
+    let ws_int = delimited(multispace0, tag("Int"), multispace0);
+    let ws_dec = delimited(multispace0, tag("Real"), multispace0);
+    let ws_userdef = delimited(multispace0, symbol, multispace0);
+    let rec_sort = delimited(char('('), many1(sort), char(')'));
+    let ws_rec_sort = delimited(multispace0, rec_sort, multispace0);
+    alt((
+        map(ws_int, |_| Sort::UInt()),
+        map(ws_dec, |_| Sort::Dec()),
+        map(ws_userdef, |s| Sort::UserDef(s)),
+        map(ws_rec_sort, |s| Sort::Compound(s)),
+    ))(s)
+}
+
+fn naked_decl_const(s: &str) -> IResult<&str, (&str, Sort)> {
+    let ws_decl = delimited(multispace0, tag("declare-const"), multispace0);
+    let ws_symbol = delimited(multispace0, symbol, multispace0);
+    let ws_sort = delimited(multispace0, sort, multispace0);
+    preceded(ws_decl, tuple((ws_symbol, ws_sort)))(s)
+}
+
+fn naked_assert(s: &str) -> IResult<&str, SExp> {
+    let ws_atag = delimited(multispace0, tag("assert"), multispace0);
+    let ws_sexp = delimited(multispace0, sexp, multispace0);
+    preceded(ws_atag, ws_sexp)(s)
+}
+
+fn naked_csa(s: &str) -> IResult<&str, SExp> {
+    let ws_csatag = delimited(multispace0, tag("check-sat-assuming"), multispace0);
+    let ws_sexp = delimited(multispace0, sexp, multispace0);
+    preceded(ws_csatag, ws_sexp)(s)
+}
+
+fn naked_logic(s: &str) -> IResult<&str, &str> {
+    let ws_ltag = delimited(multispace0, tag("set-logic"), multispace0);
+    let ws_logic = delimited(multispace0, symbol, multispace0);
+    preceded(ws_ltag, ws_logic)(s)
+
+}
+
+fn naked_command(s: &str) -> IResult<&str, Command> {
+    alt((
+        map(naked_assert,      |a| Command::Assert(a)),
+        map(naked_csa,         |a| Command::CheckSatAssuming(a)),
+        map(tag("check-sat"),  |_| Command::CheckSat()),
+        map(tag("get-model"),  |_| Command::GetModel()),
+        map(naked_logic,       |_| Command::Logic()),
+        map(naked_decl_const,  |(v, s)| Command::DeclConst(v, s)),
+    ))(s)
+}
+
+fn unknown_balanced(s: &str) -> IResult<&str, Vec<&str>> {
+    alt((
+        map(tuple((char('('), many0(unknown_balanced), char(')'))), 
+            |(_, v, _)| {
+                let mut vflat = v.concat();
+                vflat.insert(0, "(");
+                vflat.push(")");
+                vflat
+            }),
+        // Trim whitespace here
+        map(take_while1(|c| !(c == '(') && !(c == ')')), |s| vec![s]),
+    ))(s)
+}
+
+
+fn command(s: &str) -> IResult<&str, Command> {
+    let ws_ncommand =   delimited(multispace0, naked_command, multispace0);
+    let command = delimited(char('('), ws_ncommand, char(')'));
+    alt((
+        delimited(multispace0, command, multispace0),
+        map(unknown_balanced,  |s| Command::Generic(s)),
+    ))(s)
+}
+
+
+fn script(s: &str) -> IResult<&str, Script> {
+    map(
+        many0(delimited(multispace0, command,multispace0)),
+        |cmds| Script::Commands(cmds)
+    )(s)
+}
+
+fn rmv_comments(s: &str) -> IResult<&str, Vec<&str>> {
+    let not_comment = take_while1(|c| !(c == ';'));
+   let comment = delimited(char(';'), not_line_ending, line_ending);
+    many1(alt((
+        not_comment,
+        map(comment, |_| ""),
+    )))(s)
+}
+
 
 pub fn exec() {
     let files = fs::read_dir("samples").expect("error with sample dir");
 
     for file_res in files {
-        match file_res {
-            Ok(file) => {
-                let filepath = file.path();
-                println!("starting file {:?}", filepath);
-                test_file(&filepath);
-            }
-            Err(_) => (),
+        let file = file_res.expect("problem with file");
+        println!("Starting {:?}", file);
+        let filepath = file.path();
+        let contents = &fs::read_to_string(filepath).expect("error reading file")[..];
+        let contents_ = &rmv_comments(contents).expect("failed to rmv comments").1.join(" ")[..];
+        match (script(contents_), script(contents_)) {
+            (Ok((_, a)), Ok((_, b))) => assert_eq!(a, 
+                                                   script(&b.to_string()[..]).expect("Failed on second parse").1
+                                                   ),
+            (Err(e), _) |
+            (_, Err(e)) => panic!("SMT Parse Error {}", e),
         }
     }
 }
 
-pub fn test_file(source_filepath: &PathBuf) {
-    let smt_ex: String =
-        fs::read_to_string(source_filepath).expect("Something went wrong reading the file");
-    let mut _lexer = SMTLIBv2Lexer::new(Box::new(InputStream::new(smt_ex.into())));
-    let token_source = CommonTokenStream::new(_lexer);
-    let mut parser = SMTLIBv2Parser::new(Box::new(token_source));
-    let listener = Box::new(Listener {
-        vng: VarNameGenerator {
-            basename: "GEN".to_string(),
-            counter: 0,
-        },
-        new_vars: BTreeMap::new(),
-        bexps: vec![],
-    });
-    let lid = parser.add_parse_listener(listener);
-    let result = parser.script();
 
-    let listener = parser.remove_parse_listener(lid);
-    let mut bav_gen = VarNameGenerator {
-        basename: "BAV".to_string(),
-        counter: 0,
-    };
 
-    let (bav_names, bav_inits) = listener
-        .bexps
-        .into_iter()
-        .map(|term| {
-            let t: ParserRuleContextType = Rc::new(term);
-            let name = bav_gen.get_name();
-            let cmd = cmd_from(format!("(assert (= {} {}))", name, ast_string(&t)));
-            (name, cmd)
-        })
-        .unzip::<String, ParserRuleContextType, Vec<String>, Vec<ParserRuleContextType>>();
 
-    let bool_type = vec![SMTlibConst::Bool()];
-    let new_bavs = bav_names.iter().zip(bool_type.iter().cycle());
-
-    let decls = listener
-        .new_vars
-        .iter()
-        .chain(new_bavs)
-        .map(|(k, v)| format!("(declare-const {} {})", k, v.typestr()))
-        .map(|ds| cmd_from(ds))
-        .collect::<Vec<Rc<dyn ParserRuleContext + 'static>>>();
-
-    let script: Rc<dyn ParserRuleContext> = result.unwrap();
-
-    let maybe_sl_pos = script.get_children().iter().position(|pctx| {
-        match pctx
-            .upcast_any()
-            .downcast_ref::<CommandContext>()
-            .and_then(|cmd| cmd.cmd_setLogic())
-        {
-            Some(_) => true,
-            None => false,
-        }
-    });
-
-    let start_insertion_point = match maybe_sl_pos {
-        Some(sl_pos) => sl_pos + 1,
-        None => 0,
-    };
-
-    for decl in decls {
-        script
-            .get_children_full()
-            .borrow_mut()
-            .insert(start_insertion_point, decl);
-    }
-
-    let maybe_cs_pos = script.get_children().iter().position(|pctx| {
-        match pctx
-            .upcast_any()
-            .downcast_ref::<CommandContext>()
-            .and_then(|cmd| cmd.cmd_checkSat())
-        {
-            Some(_) => true,
-            None => false,
-        }
-    });
-
-    let end_insertion_point = match maybe_cs_pos {
-        Some(cs_pos) => cs_pos,
-        None => script.get_children().len(),
-    };
-
-    for bav_init in bav_inits {
-        script
-            .get_children_full()
-            .borrow_mut()
-            .insert(end_insertion_point, bav_init);
-    }
-
-    script
-        .get_children_full()
-        .borrow_mut()
-        .insert(end_insertion_point, cmd_from("(assert true)".to_owned()));
-
-    let mut iterations = 0;
-    let num_bavs = bav_names.len();
-
-    println!("starting {} iterations", 2_u64.pow(num_bavs.try_into().unwrap()));
-    for truths in 0..num_bavs + 1 {
-        let mut unordered_tvs = vec![true; truths];
-        unordered_tvs.extend(vec![false; num_bavs - truths]);
-        let truth_value_assigments = unordered_tvs.iter().permutations(num_bavs).unique();
-        let mut inner_iterations = 0;
-        for truth_values in truth_value_assigments {
-            if inner_iterations > 1000 {
-                break;
-            }
-
-            let cmd_string = format!(
-                "(assert {})",
-                bam_string(&mut bav_names.iter(), &mut truth_values.iter())
-            );
-
-            let cmd = cmd_from(cmd_string);
-            let mut kids = script.get_children_full().borrow_mut();
-            kids[end_insertion_point] = cmd;
-            drop(kids); // Not sure why, but borrow checker needs help here
-            let source_filename = match source_filepath.file_name().and_then(|n| n.to_str()) {
-                Some(name) => name,
-                None => "unknown",
-            };
-            let filename = (iterations).to_string() + "_" + source_filename;
-            fs::write(&filename, ast_string(&script));
-            solve(&filename);
-            inner_iterations = inner_iterations + 1;
-            iterations = iterations + 1;
-        }
-    }
-}
-
-fn solve(filename: &str) {
-    let cvc4_res = Command::new("cvc4")
-        .args(&[filename, "--produce-model", "--tlimit", "5000"])
-        .output();
-
-    let z3_res = Command::new("z3").args(&[filename, "-T:5"]).output();
-
-    let cvc4_stdout_res = cvc4_res
-        .and_then(|out| {
-            if !out.status.success() && out.stderr.len() > 0 {
-                println!("cvc4 error on file {} : {}", filename, from_utf8(&out.stderr[..]).unwrap());
-                Err(std::io::Error::last_os_error()) // really sloppy hack for now, needs to be fixed
-            } else {
-                Ok(out)
-            }
-        })
-        .map(|out| from_utf8(&out.stdout.clone()[..]).map(|s| s.to_string()));
-
-    let z3_stdout_res = z3_res
-        .and_then(|out| {
-            if !out.status.success() && out.stderr.len() > 0 {
-                println!("z3 error on file {}", filename);
-                Err(std::io::Error::last_os_error()) // really sloppy hack for now, needs to be fixed
-            } else {
-                Ok(out)
-            }
-        })
-        .map(|out| from_utf8(&out.stdout.clone()[..]).map(|s| s.to_string()));
-
-    match (cvc4_stdout_res, z3_stdout_res) {
-        (Ok(Ok(cvc4_stdout)), Ok(Ok(z3_stdout))) => {
-            // also sloppy hack above
-            if cvc4_stdout.contains("unsat") && !z3_stdout.contains("unsat") {
-                println!("file {} has soundness problem!!!", filename);
-            } else if cvc4_stdout.contains("sat") && !z3_stdout.contains("sat") {
-                println!("file {} has soundness problem!!!", filename);
-            } else {
-                fs::remove_file(filename);
-            }
-            ()
-        }
-        _ => println!("Error with file {}", filename),
-    }
-}
-
-fn bam_string(
-    names: &mut std::slice::Iter<String>,
-    truth_vals: &mut std::slice::Iter<&bool>,
-) -> String {
-    match (names.next(), truth_vals.next()) {
-        (Some(name), Some(truth_val)) => {
-            let sub = bam_string(names, truth_vals);
-            format!("(and (= {} {}) {})", name, truth_val, sub)
-        }
-        _ => "".to_string(),
-    }
-}
-
-fn ast_string(ast: &ParserRuleContextType) -> String {
-    match ast
-        .upcast_any()
-        .downcast_ref::<BaseParserRuleContext<TerminalNodeCtx>>()
-    {
-        Some(tn) => tn.get_text() + " ",
-        None => {
-            let mut s: String = "".to_owned();
-            for child in ast.get_children().iter() {
-                s.push_str(&ast_string(child)[..]);
-            }
-            s
-        }
-    }
-}
-
-fn cmd_from(cmd: String) -> Rc<dyn ParserRuleContext + 'static> {
-    let mut _lexer = SMTLIBv2Lexer::new(Box::new(InputStream::new(cmd)));
-    let token_source = CommonTokenStream::new(_lexer);
-    let mut parser = SMTLIBv2Parser::new(Box::new(token_source));
-    parser.command().unwrap()
-}
-
-#[derive(Debug, Clone)]
-enum SMTlibConst {
-    Num(i64),
-    Dec(f64),
-    Str(String),
-    Bool(),
-    Bin(), // Will add support later
-    Hex(), // ditto
-}
-
-impl SMTlibConst {
-    fn typestr(&self) -> &str {
-        match self {
-            SMTlibConst::Num(_) => "Int",
-            SMTlibConst::Bool() => "Bool",
-            _ => panic!("Unimplemented for non-ints"),
-        }
-    }
-}
-
-struct VarNameGenerator {
-    basename: String,
-    counter: u32,
-}
-
-impl VarNameGenerator {
-    fn get_name(&mut self) -> String {
-        self.counter = self.counter + 1;
-        format!("{}{}", self.basename, self.counter)
-    }
-}
-
-struct Listener {
-    vng: VarNameGenerator,
-    new_vars: BTreeMap<String, SMTlibConst>,
-    bexps: Vec<TermContext>,
-}
-
-fn qual_id_from(var: String) -> Rc<Qual_identiferContext> {
-    let mut _lexer = SMTLIBv2Lexer::new(Box::new(InputStream::new(var)));
-    let token_source = CommonTokenStream::new(_lexer);
-    let mut parser = SMTLIBv2Parser::new(Box::new(token_source));
-    parser.qual_identifer().unwrap()
-}
-
-impl SMTLIBv2Listener for Listener {
-    // should add some assertions that these are single parent nodes
-    fn exit_term(&mut self, term: &TermContext) {
-        match term.spec_constant() {
-            Some(sc) => {
-                let name = self.vng.get_name();
-                sc.numeral()
-                    .and_then(|n| n.get_text().parse::<i64>().ok())
-                    .map(|n| self.new_vars.insert(name.clone(), SMTlibConst::Num(n)));
-                term.get_children_full().replace(vec![qual_id_from(name)]);
-                ()
-            }
-            None => (),
-        };
-
-        // Assume all ops are wrapped in qi's like this
-        term.qual_identifer()
-            .and_then(|qi| qi.identifier())
-            .and_then(|i| i.symbol())
-            .and_then(|s| s.simpleSymbol())
-            .and_then(|ss| ss.UndefinedSymbol())
-            .map(|us| us.get_text())
-            .map(|op| match &op[..] {
-                "<" | "=" | "or" | "and" => self
-                    .bexps
-                    .push(BaseParserRuleContext::copy_from(term, (*term).clone())),
-                _ => (),
-            });
-    }
-}
-
-impl ParseTreeListener for Listener {
-    fn enter_every_rule(&mut self, _ctx: &dyn ParserRuleContext) {}
-    fn exit_every_rule(&mut self, _ctx: &dyn ParserRuleContext) {}
-}
 
 #[cfg(test)]
 mod tests {
     use super::*;
+    use std::fs;
 
     #[test]
-    fn it_works() {
-        exec();
+    fn quick_test() {
+       println!("{:?}", unknown_balanced("((declare-fun sin )Real Real() decl)"));
+    }
+
+    #[test]
+    fn smoke_test() {
+       exec();
+    }
+
+    #[test]
+    fn visual_test() {
+        let contents = &fs::read_to_string("ex.smt2").expect("error reading file")[..];
+        println!("Script: {:?}", script(contents));
+
+        match script(contents) {
+            Ok((_, script)) => { 
+                println!("restrung: {}", script.to_string());
+            }
+            _ => ()
+        };
     }
 }

@@ -63,7 +63,6 @@
 (push)
 (assert (or
   (not (= (str.from_code (- 1)) ""))
-  (not (= (str.from_code 100000000000000000000000) ""))
   (not (= (str.from_code 65) "A"))))
 (check-sat)
 (pop)
