@@ -80,7 +80,7 @@ pub enum Constant {
 
 #[derive(Debug, Eq, PartialEq, Clone)]
 pub enum Logic {
-    QFSLIA(),
+    QF_SLIA(),
     Other(String),
 }
 
@@ -114,7 +114,7 @@ impl Script {
         let Script::Commands(cmds) = self;
         let maybe_logic = cmds.iter().find(|cmd| cmd.is_logic());
         match maybe_logic {
-            Some(Command::Logic(Logic::QFSLIA())) => true,
+            Some(Command::Logic(Logic::QF_SLIA())) => true,
             _ => false,
         }
     }
@@ -248,7 +248,7 @@ impl BoolOp {
 impl Logic {
     fn to_string(&self) -> String {
         match self {
-            Logic::QFSLIA() => "QFSLIA".to_owned(),
+            Logic::QF_SLIA() => "QF_SLIA".to_owned(),
             Logic::Other(s) => s.clone(),
         }
     }
@@ -389,7 +389,7 @@ fn naked_csa(s: &str) -> IResult<&str, SExp> {
 
 fn naked_logic(s: &str) -> IResult<&str, Logic> {
     let ws_ltag = delimited(multispace0, tag("set-logic"), multispace0);
-    let qslia = map(tag("QFSLIA"), |_| Logic::QFSLIA());
+    let qslia = map(tag("QF_SLIA"), |_| Logic::QF_SLIA());
     let other = map(symbol, |s| Logic::Other(s.to_owned()));
     let ws_l = delimited(multispace0, alt((qslia, other)), multispace0);
     preceded(ws_ltag, ws_l)(s)
