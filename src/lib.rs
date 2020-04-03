@@ -105,10 +105,15 @@ fn bav_c(cmd: &mut Command, vng : &mut  VarNameGenerator, bava : &mut Vec<(Strin
 
 fn bav_se(sexp: &mut SExp, vng : &mut VarNameGenerator, bavs : &mut Vec<(String, SExp)>) {
     match sexp {
-        SExp::Compound(sexps) => {
+        SExp::Equals(sexps) => {
             let name = vng.get_name(Sort::Bool());
             let sec = SExp::Compound(sexps.clone());
             bavs.push((name, sec));
+            for sexp in sexps {
+                bav_se(sexp, vng, bavs);
+            }
+        },
+        SExp::Compound(sexps) => {
             for sexp in sexps {
                 bav_se(sexp, vng, bavs);
             }

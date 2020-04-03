@@ -47,6 +47,7 @@ pub enum Sort {
 #[derive(Debug, Eq, PartialEq, Clone)]
 pub enum SExp {
     Compound(Vec<SExp>),
+    Equals(Vec<SExp>),
     Constant(Constant),
     Symbol(String),
     Var(String), // Not used for parsing, only manipulation of the ast so we don't need to do
@@ -135,7 +136,8 @@ impl SExp {
         match self {
             SExp::Constant(c) => c.to_string(),
             SExp::Symbol(s) => s.to_string(),
-            SExp::Compound(v) => {
+            SExp::Compound(v) |
+            SExp::Equals(v) => {
                 let mut rec_s = v
                     .iter()
                     .map(|sexp| sexp.to_string())
@@ -200,12 +202,18 @@ fn symbol(s: &str) -> IResult<&str, &str> {
     take_while1(|c: char| !c.is_whitespace() && !(c == '(') && !(c == ')'))(s)
 }
 
+fn equals(s: &str) -> IResult<&str, Vec<SExp>> {
+    delimited(char('('), preceded(char('='), many1(sexp)), char(')'))(s)
+}
+
 fn sexp(s: &str) -> IResult<&str, SExp> {
     let rec_sexp = delimited(char('('), many1(sexp), char(')'));
     let ws_rec_sexp = delimited(multispace0, rec_sexp, multispace0);
     let ws_constant = delimited(multispace0, constant, multispace0);
     let ws_symbol = delimited(multispace0, symbol, multispace0);
+    let ws_eq = delimited(multispace0, equals, multispace0);
     alt((
+        map(ws_eq,       |e| SExp::Equals(e)),
         map(ws_rec_sexp, |e| SExp::Compound(e)),
         map(ws_constant, |c| SExp::Constant(c)),
         map(ws_symbol, |s| SExp::Symbol(s.to_owned())),
