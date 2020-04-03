@@ -4,10 +4,11 @@ extern crate itertools;
 
 pub mod parser;
 
-use parser::{rmv_comments, script, Command, Sort, Constant, SExp, Script, BoolOp};
+use parser::{rmv_comments, script, Symbol, Command, Sort, Constant, SExp, Script, BoolOp};
 
 use std::path::PathBuf;
 use std::fs;
+use std::collections::BTreeMap;
 use std::process;
 use std::str::from_utf8;
 use itertools::Itertools;
@@ -35,6 +36,36 @@ impl VarNameGenerator {
     }
 }
 
+fn rl_s(sexp: &mut SExp, scoped_vars: &mut BTreeMap<String, Vec<SExp>>){
+
+    match sexp {
+        SExp::Let(v, rest) => {
+            // This looks a bit strange, but if we don't explore these first, those expressions are
+            // each copied multiple times. By doing the exploration on these originals first, we
+            // don't need to later on the copies. We can't add the variable values to the tree yet,
+            // because they may overwrite variables in the original expressions. All solutions are
+            // at least O(2n) and this is clear, and n = number of variables in a let expression =
+            // typically a very small number anyways.
+            for (var, val) in v {
+                rl_s(val, scoped_vars); // first make sure the val is "let-free"
+            }
+            for (var, val) in v {
+                match var {
+                    Symbol::Var(vname) | Symbol::Token(vname) => {
+                        match scoped_vars.get(vname) {
+                            Some(vals) => vals.push(val.clone()), // TODO could be refs 
+                            None => {scoped_vars.insert(vname.clone(), vec![val.clone()]);},
+                        };
+                    }
+                }
+            }
+
+            
+
+        },
+        _ => (),
+    }
+}
 
 fn rc(script: &mut Script, vng : &mut VarNameGenerator){
     match script {
@@ -65,7 +96,7 @@ fn rc_se(sexp: &mut SExp, vng : &mut VarNameGenerator) {
                 Constant::Hex(_) => Sort::BitVec(),
             };
             let name = vng.get_name(sort);
-            *sexp = SExp::Var(name);
+            *sexp = SExp::Symbol(Symbol::Var(name));
         },
         SExp::Compound(sexps) |
         SExp::BExp(_, sexps) => {
@@ -147,17 +178,16 @@ fn add_ba(script : &mut Script, bavs : Vec<(String, SExp)>) {
 
     let mut baveq_iter = bavs.into_iter()
         .map(|(vname, sexp)| {
-            SExp::BExp(BoolOp::Equals(), vec![SExp::Symbol(vname), sexp])
+            SExp::BExp(BoolOp::Equals(), vec![SExp::Symbol(Symbol::Var(vname)), sexp])
         });
 
     cmds.insert(cs_pos, assert_many(&mut baveq_iter));
 }
 
 fn assert_many(iter: &mut dyn Iterator<Item = SExp>) -> Command {
-
     let init = match iter.next() {
         Some(bav_eq) => bav_eq,
-        _ => SExp::Symbol("true".to_owned()), // shouldn't ever actually be added
+        _ => SExp::true_sexp(), // shouldn't ever actually be added
     };
 
     let intersection = iter
@@ -182,7 +212,7 @@ fn get_bav_assign(bavns : &Vec<String>, ta : Vec<bool>) -> Command {
     let mut baveq = bavs.into_iter()
         .map(|(vname, bval)| {
             let val = if bval { SExp::true_sexp() } else { SExp::false_sexp() };
-            SExp::BExp(BoolOp::Equals(), vec![SExp::Symbol(vname.clone()), val])
+            SExp::BExp(BoolOp::Equals(), vec![SExp::Symbol(Symbol::Var(vname.clone())), val])
         });
 
     assert_many(&mut baveq)

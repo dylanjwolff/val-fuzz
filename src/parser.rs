@@ -47,12 +47,17 @@ pub enum Sort {
 #[derive(Debug, Eq, PartialEq, Clone)]
 pub enum SExp {
     Compound(Vec<SExp>),
-    Let(Vec<(SExp, SExp)>, Box<SExp>),
+    Let(Vec<(Symbol, SExp)>, Box<SExp>),
     BExp(BoolOp, Vec<SExp>),
     Constant(Constant),
-    Symbol(String),
-    Var(String), // Not used for parsing, only manipulation of the ast so we don't need to do
-                 // lifetime gymnastics... vars are always parsed as Symbols
+    Symbol(Symbol),
+}
+
+#[derive(Debug, Eq, PartialEq, Clone)]
+pub enum Symbol {
+    Var(String), // Currently, it is hard to detect all variables, so some Tokens may also be
+                     // variables too
+    Token(String),
 }
 
 #[derive(Debug, Eq, PartialEq, Clone)]
@@ -192,11 +197,11 @@ impl Sort {
 
 impl SExp {
     pub fn true_sexp() -> SExp {
-        SExp::Symbol("true".to_owned())
+        SExp::Symbol(Symbol::Token("true".to_owned()))
     }
 
     pub fn false_sexp() -> SExp {
-        SExp::Symbol("false".to_owned())
+        SExp::Symbol(Symbol::Token("false".to_owned()))
     }
 
     pub fn to_string(&self) -> String {
@@ -208,7 +213,7 @@ impl SExp {
                     .map(|(v, s)| {
                        format!("({} {})", v.to_string(), s.to_string())
                     }).collect::<String>();
-                format!("(let {} {})", vbss, s.to_string())
+                format!("(let ({}) {})", vbss, s.to_string())
             },
             SExp::Compound(v) => {
                 let mut rec_s = v
@@ -231,7 +236,16 @@ impl SExp {
                 s.push(')');
                 s
             },
-            SExp::Var(s) => s.clone(),
+            SExp::Symbol(Symbol::Var(s)) => s.clone(),
+        }
+    }
+}
+
+impl Symbol {
+    pub fn to_string(&self) -> String {
+        match self {
+            Symbol::Var(s) |
+            Symbol::Token(s) => s.clone(),
         }
     }
 }
@@ -349,9 +363,9 @@ fn bool_sexp(s: &str) -> IResult<&str, SExp> {
 }
 
 
-fn let_sexp(s : &str) -> IResult<&str, (Vec<(SExp, SExp)>, SExp)> {
+fn let_sexp(s : &str) -> IResult<&str, (Vec<(Symbol, SExp)>, SExp)> {
     let ws_symbol = delimited(multispace0, symbol, multispace0);
-    let mapped_ws_symbol = map(ws_symbol, |s| SExp::Symbol(s.to_owned()));
+    let mapped_ws_symbol = map(ws_symbol, |s| Symbol::Var(s.to_owned()));
     let ws_sexp = delimited(multispace0, sexp, multispace0);
     let var_binding = delimited(char('('),
                         tuple((mapped_ws_symbol, ws_sexp)),
@@ -378,7 +392,7 @@ fn sexp(s: &str) -> IResult<&str, SExp> {
         map(ws_let_sexp, |(tbs, sexp)| SExp::Let(tbs, Box::new(sexp))),
         map(ws_rec_sexp, |e| SExp::Compound(e)),
         map(ws_constant, |c| SExp::Constant(c)),
-        map(ws_symbol, |s| SExp::Symbol(s.to_owned())),
+        map(ws_symbol, |s| SExp::Symbol(Symbol::Token(s.to_owned()))),
     ))(s)
 }
 
