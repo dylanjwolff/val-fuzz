@@ -342,8 +342,7 @@ mod tests {
     #[test]
     fn smoke_test() {
         let mut pb = PathBuf::new();
-        pb.push("samples/ex.smt2");
-
+        pb.push("samples/bug272.smtv1.smt2");
         strip_and_test_file(&pb);
     }
 }

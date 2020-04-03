@@ -47,6 +47,7 @@ pub enum Sort {
 #[derive(Debug, Eq, PartialEq, Clone)]
 pub enum SExp {
     Compound(Vec<SExp>),
+    Let(Vec<(SExp, Sort)>, Box<SExp>),
     BExp(BoolOp, Vec<SExp>),
     Constant(Constant),
     Symbol(String),
@@ -202,6 +203,13 @@ impl SExp {
         match self {
             SExp::Constant(c) => c.to_string(),
             SExp::Symbol(s) => s.to_string(),
+            SExp::Let(vbs, s) => {
+                let vbss = vbs.iter()
+                    .map(|(v, s)| {
+                       format!("({} {})", v.to_string(), s.to_string())
+                    }).collect::<String>();
+                format!("(let {} {})", vbss, s.to_string())
+            },
             SExp::Compound(v) => {
                 let mut rec_s = v
                     .iter()
@@ -340,14 +348,34 @@ fn bool_sexp(s: &str) -> IResult<&str, SExp> {
     delimited(char('('), naked_b, char(')'))(s)
 }
 
+
+fn let_sexp(s : &str) -> IResult<&str, (Vec<(SExp, Sort)>, SExp)> {
+    let ws_symbol = delimited(multispace0, symbol, multispace0);
+    let mapped_ws_symbol = map(ws_symbol, |s| SExp::Symbol(s.to_owned()));
+    let ws_sort = delimited(multispace0, sort, multispace0);
+    let var_binding = delimited(char('('),
+                        tuple((mapped_ws_symbol, ws_sort)),
+                    char(')'));
+    let ws_var_b = delimited(multispace0, var_binding, multispace0);
+    let var_bs = delimited(char('('), many1(ws_var_b), char(')'));
+    let ws_var_bs = delimited(multispace0, var_bs, multispace0);
+    let inner = preceded(tag("let"), tuple((ws_var_bs, sexp)));
+    let ws_inner = delimited(multispace0, inner, multispace0);
+    let wrapped = delimited(char('('), ws_inner, char(')'));
+
+    wrapped(s)
+}
+
 fn sexp(s: &str) -> IResult<&str, SExp> {
     let rec_sexp = delimited(char('('), many1(sexp), char(')'));
     let ws_rec_sexp = delimited(multispace0, rec_sexp, multispace0);
     let ws_constant = delimited(multispace0, constant, multispace0);
     let ws_symbol = delimited(multispace0, symbol, multispace0);
     let ws_bexp = delimited(multispace0, bool_sexp, multispace0);
+    let ws_let_sexp = delimited(multispace0, let_sexp, multispace0);
     alt((
         ws_bexp,
+        map(ws_let_sexp, |(tbs, sexp)| SExp::Let(tbs, Box::new(sexp))),
         map(ws_rec_sexp, |e| SExp::Compound(e)),
         map(ws_constant, |c| SExp::Constant(c)),
         map(ws_symbol, |s| SExp::Symbol(s.to_owned())),
