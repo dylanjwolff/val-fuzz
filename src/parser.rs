@@ -23,7 +23,7 @@ pub enum Script {
 
 #[derive(Debug, Eq, PartialEq, Clone)]
 pub enum Command {
-    Logic(),
+    Logic(Logic),
     CheckSat(),
     CheckSatAssuming(SExp),
     Assert(SExp),
@@ -78,6 +78,12 @@ pub enum Constant {
     Bool(bool),
 }
 
+#[derive(Debug, Eq, PartialEq, Clone)]
+pub enum Logic {
+    QFSLIA(),
+    Other(String),
+}
+
 impl Script {
     pub fn to_string(&self) -> String {
         match self {
@@ -103,12 +109,21 @@ impl Script {
         let Script::Commands(cmds) = self;
         cmds[i] = Command::Assert(SExp::true_sexp());
     }
+
+    pub fn is_unsupported_logic(&self) -> bool {
+        let Script::Commands(cmds) = self;
+        let maybe_logic = cmds.iter().find(|cmd| cmd.is_logic());
+        match maybe_logic {
+            Some(Command::Logic(Logic::QFSLIA())) => true,
+            _ => false,
+        }
+    }
 }
 
 impl Command {
     pub fn to_string(&self) -> String {
         match self {
-            Command::Logic() => "(set-logic QLIA)".to_string(), // TODO
+            Command::Logic(l) => "(set-logic ".to_owned() + &l.to_string()[..] + ")",
             Command::CheckSat() => "(check-sat)".to_string(),
             Command::CheckSatAssuming(sexp) => {
                 ("(check-sat-assuming ".to_owned() + &sexp.to_string()[..] + ")").to_string()
@@ -124,7 +139,7 @@ impl Command {
 
     pub fn is_logic(&self) -> bool {
         match self {
-            Command::Logic() => true,
+            Command::Logic(_) => true,
             _ => false,
         }
     }
@@ -211,7 +226,6 @@ impl SExp {
             SExp::Var(s) => s.clone(),
         }
     }
-    
 }
 
 impl BoolOp {
@@ -227,6 +241,15 @@ impl BoolOp {
             BoolOp::Lt() => "<".to_owned(),
             BoolOp::Gte() => ">=".to_owned(),
             BoolOp::Lte() => "<=".to_owned(),
+        }
+    }
+}
+
+impl Logic {
+    fn to_string(&self) -> String {
+        match self {
+            Logic::QFSLIA() => "QFSLIA".to_owned(),
+            Logic::Other(s) => s.clone(),
         }
     }
 }
@@ -364,10 +387,12 @@ fn naked_csa(s: &str) -> IResult<&str, SExp> {
     preceded(ws_csatag, ws_sexp)(s)
 }
 
-fn naked_logic(s: &str) -> IResult<&str, &str> {
+fn naked_logic(s: &str) -> IResult<&str, Logic> {
     let ws_ltag = delimited(multispace0, tag("set-logic"), multispace0);
-    let ws_logic = delimited(multispace0, symbol, multispace0);
-    preceded(ws_ltag, ws_logic)(s)
+    let qslia = map(tag("QFSLIA"), |_| Logic::QFSLIA());
+    let other = map(symbol, |s| Logic::Other(s.to_owned()));
+    let ws_l = delimited(multispace0, alt((qslia, other)), multispace0);
+    preceded(ws_ltag, ws_l)(s)
 }
 
 fn naked_command(s: &str) -> IResult<&str, Command> {
@@ -376,7 +401,7 @@ fn naked_command(s: &str) -> IResult<&str, Command> {
         map(naked_csa, |a| Command::CheckSatAssuming(a)),
         map(tag("check-sat"), |_| Command::CheckSat()),
         map(tag("get-model"), |_| Command::GetModel()),
-        map(naked_logic, |_| Command::Logic()),
+        map(naked_logic, |l| Command::Logic(l)),
         map(naked_decl_const, |(v, s)| Command::DeclConst(v.to_owned(), s)),
     ))(s)
 }
