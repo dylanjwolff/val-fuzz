@@ -36,7 +36,6 @@ impl VarNameGenerator {
 }
 
 
-
 fn rc(script: &mut Script, vng : &mut VarNameGenerator){
     match script {
         Script::Commands(cmds) => {
@@ -110,6 +109,7 @@ fn bav_se(sexp: &mut SExp, vng : &mut VarNameGenerator, bavs : &mut Vec<(String,
                 bav_se(sexp, vng, bavs);
             }
         },
+        SExp::Let(_, _) => panic!("Let statments should be filtered out!"),
         _ => (),
     }
 }
@@ -318,6 +318,14 @@ mod tests {
     use super::*;
     use std::fs;
 
+    fn parse_file(f : &str) -> Script {
+            let contents = &fs::read_to_string(f).expect("error reading file")[..];
+            let contents_sans_comments = &rmv_comments(contents)
+                .expect("failed to rmv comments").1.join(" ")[..];
+
+            script(contents_sans_comments).expect("parser error").1
+    }
+
     #[test]
     #[ignore]
     fn parse_unparse() {
@@ -342,7 +350,13 @@ mod tests {
     #[test]
     fn smoke_test() {
         let mut pb = PathBuf::new();
-        pb.push("samples/bug272.smtv1.smt2");
+        pb.push("samples/ex.smt2");
         strip_and_test_file(&pb);
+    }
+
+    #[test]
+    fn quick_visual() {
+        let s = parse_file("samples/bug272.minimized.smtv1.smt2");
+        println!("{:?}", s);
     }
 }

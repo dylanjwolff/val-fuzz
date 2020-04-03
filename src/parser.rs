@@ -47,7 +47,7 @@ pub enum Sort {
 #[derive(Debug, Eq, PartialEq, Clone)]
 pub enum SExp {
     Compound(Vec<SExp>),
-    Let(Vec<(SExp, Sort)>, Box<SExp>),
+    Let(Vec<(SExp, SExp)>, Box<SExp>),
     BExp(BoolOp, Vec<SExp>),
     Constant(Constant),
     Symbol(String),
@@ -349,12 +349,12 @@ fn bool_sexp(s: &str) -> IResult<&str, SExp> {
 }
 
 
-fn let_sexp(s : &str) -> IResult<&str, (Vec<(SExp, Sort)>, SExp)> {
+fn let_sexp(s : &str) -> IResult<&str, (Vec<(SExp, SExp)>, SExp)> {
     let ws_symbol = delimited(multispace0, symbol, multispace0);
     let mapped_ws_symbol = map(ws_symbol, |s| SExp::Symbol(s.to_owned()));
-    let ws_sort = delimited(multispace0, sort, multispace0);
+    let ws_sexp = delimited(multispace0, sexp, multispace0);
     let var_binding = delimited(char('('),
-                        tuple((mapped_ws_symbol, ws_sort)),
+                        tuple((mapped_ws_symbol, ws_sexp)),
                     char(')'));
     let ws_var_b = delimited(multispace0, var_binding, multispace0);
     let var_bs = delimited(char('('), many1(ws_var_b), char(')'));
