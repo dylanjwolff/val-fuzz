@@ -47,11 +47,25 @@ pub enum Sort {
 #[derive(Debug, Eq, PartialEq, Clone)]
 pub enum SExp {
     Compound(Vec<SExp>),
-    Equals(Vec<SExp>),
+    BExp(BoolOp, Vec<SExp>),
     Constant(Constant),
     Symbol(String),
     Var(String), // Not used for parsing, only manipulation of the ast so we don't need to do
                  // lifetime gymnastics... vars are always parsed as Symbols
+}
+
+#[derive(Debug, Eq, PartialEq, Clone)]
+pub enum BoolOp {
+    Equals(),
+    And(),
+    Or(),
+    Xor(),
+    Implies(),
+    Distinct(),
+    Gt(),
+    Lt(),
+    Gte(),
+    Lte(),
 }
 
 #[derive(Debug, Eq, PartialEq, Clone)]
@@ -74,6 +88,21 @@ impl Script {
                 .join("\n"),
         }
     }
+
+    pub fn insert(&mut self, i : usize, cmd : Command) {
+        let Script::Commands(cmds) = self;
+        cmds.insert(i, cmd);
+    }
+
+    pub fn replace(&mut self, i : usize, cmd : Command) {
+        let Script::Commands(cmds) = self;
+        cmds[i] = cmd;
+    }
+
+    pub fn init(&mut self, i : usize) {
+        let Script::Commands(cmds) = self;
+        cmds[i] = Command::Assert(SExp::true_sexp());
+    }
 }
 
 impl Command {
@@ -90,6 +119,20 @@ impl Command {
             }
             Command::Generic(v) => v.join(""),
             Command::Assert(s) => ("(assert ".to_string() + &s.to_string()[..] + ")").to_string(),
+        }
+    }
+
+    pub fn is_logic(&self) -> bool {
+        match self {
+            Command::Logic() => true,
+            _ => false,
+        }
+    }
+
+    pub fn is_checksat(&self) -> bool {
+        match self {
+            Command::CheckSat() | Command::CheckSatAssuming(_) => true,
+            _ => false,
         }
     }
 }
@@ -132,12 +175,19 @@ impl Sort {
 }
 
 impl SExp {
+    pub fn true_sexp() -> SExp {
+        SExp::Symbol("true".to_owned())
+    }
+
+    pub fn false_sexp() -> SExp {
+        SExp::Symbol("false".to_owned())
+    }
+
     pub fn to_string(&self) -> String {
         match self {
             SExp::Constant(c) => c.to_string(),
             SExp::Symbol(s) => s.to_string(),
-            SExp::Compound(v) |
-            SExp::Equals(v) => {
+            SExp::Compound(v) => {
                 let mut rec_s = v
                     .iter()
                     .map(|sexp| sexp.to_string())
@@ -146,8 +196,37 @@ impl SExp {
                 rec_s.insert(0, '('); // TODO
                 rec_s.push(')');
                 rec_s
+            }
+            SExp::BExp(o, v) => {
+                let rec_s = v
+                    .iter()
+                    .map(|sexp| sexp.to_string())
+                    .collect::<Vec<String>>()
+                    .join(" ");
+                let mut s = o.to_string() + " " + &rec_s[..];
+                s.insert(0, '('); // TODO
+                s.push(')');
+                s
             },
             SExp::Var(s) => s.clone(),
+        }
+    }
+    
+}
+
+impl BoolOp {
+    pub fn to_string(&self) -> String {
+        match self {
+            BoolOp::And() => "and".to_owned(),
+            BoolOp::Or() => "or".to_owned(),
+            BoolOp::Xor() => "xor".to_owned(),
+            BoolOp::Implies() => "=>".to_owned(),
+            BoolOp::Distinct() => "distinct".to_owned(),
+            BoolOp::Equals() => "=".to_owned(),
+            BoolOp::Gt() => ">".to_owned(),
+            BoolOp::Lt() => "<".to_owned(),
+            BoolOp::Gte() => ">=".to_owned(),
+            BoolOp::Lte() => "<=".to_owned(),
         }
     }
 }
@@ -202,8 +281,40 @@ fn symbol(s: &str) -> IResult<&str, &str> {
     take_while1(|c: char| !c.is_whitespace() && !(c == '(') && !(c == ')'))(s)
 }
 
-fn equals(s: &str) -> IResult<&str, Vec<SExp>> {
-    delimited(char('('), preceded(char('='), many1(sexp)), char(')'))(s)
+fn bool_int_ops(s: &str) -> IResult<&str, BoolOp> {
+    let naked_bop_tags = alt((
+            map(tag(">="), |_| BoolOp::Gte()),
+            map(tag("<="), |_| BoolOp::Lte()),
+    ));
+    let naked_bop_chars = alt((
+            map(char('<'), |_| BoolOp::Lt()),
+            map(char('>'), |_| BoolOp::Gt()),
+    ));
+
+    delimited(multispace0, alt((naked_bop_tags, naked_bop_chars)), multispace0)(s)
+}
+
+fn bool_core_ops(s: &str) -> IResult<&str, BoolOp> {
+    let naked_bool_tags = alt((
+            map(tag("and"), |_| BoolOp::And()),
+            map(tag("or"), |_| BoolOp::Or()),
+            map(tag("xor"), |_| BoolOp::Xor()),
+            map(tag("=>"), |_| BoolOp::Implies()),
+            map(tag("distinct"), |_| BoolOp::Distinct()),
+    ));
+    let naked_eq = map(char('='), |_| BoolOp::Equals());
+
+    delimited(multispace0, alt((naked_bool_tags, naked_eq)), multispace0)(s)
+}
+
+fn bool_sexp(s: &str) -> IResult<&str, SExp> {
+    let inner_int = map(tuple((bool_int_ops, many1(sexp))), 
+                        |(o, v)| SExp::BExp(o, v));
+    let inner_core = map(tuple((bool_core_ops, many1(sexp))), 
+                        |(o, v)| SExp::BExp(o, v));
+
+    let naked_b = alt((inner_int, inner_core));
+    delimited(char('('), naked_b, char(')'))(s)
 }
 
 fn sexp(s: &str) -> IResult<&str, SExp> {
@@ -211,9 +322,9 @@ fn sexp(s: &str) -> IResult<&str, SExp> {
     let ws_rec_sexp = delimited(multispace0, rec_sexp, multispace0);
     let ws_constant = delimited(multispace0, constant, multispace0);
     let ws_symbol = delimited(multispace0, symbol, multispace0);
-    let ws_eq = delimited(multispace0, equals, multispace0);
+    let ws_bexp = delimited(multispace0, bool_sexp, multispace0);
     alt((
-        map(ws_eq,       |e| SExp::Equals(e)),
+        ws_bexp,
         map(ws_rec_sexp, |e| SExp::Compound(e)),
         map(ws_constant, |c| SExp::Constant(c)),
         map(ws_symbol, |s| SExp::Symbol(s.to_owned())),

@@ -1,13 +1,16 @@
 #[macro_use]
 extern crate nom;
+extern crate itertools;
 
 pub mod parser;
 
-use parser::{rmv_comments, script, Command, Sort, Constant, SExp, Script};
+use parser::{rmv_comments, script, Command, Sort, Constant, SExp, Script, BoolOp};
 
+use std::path::PathBuf;
 use std::fs;
 use std::process;
 use std::str::from_utf8;
+use itertools::Itertools;
 
 struct VarNameGenerator {
     basename: String,
@@ -22,29 +25,17 @@ impl VarNameGenerator {
         self.vars_generated.push((name.clone(), sort));
         name
     }
-}
 
-pub fn exec() {
-    let files = fs::read_dir("samples").expect("error with sample dir");
-
-    for file_res in files {
-        let file = file_res.expect("problem with file");
-        println!("Starting {:?}", file);
-        let filepath = file.path();
-        let contents = &fs::read_to_string(filepath).expect("error reading file")[..];
-        let contents_ = &rmv_comments(contents)
-            .expect("failed to rmv comments").1.join(" ")[..];
-        match (script(contents_), script(contents_)) {
-            (Ok((_, a)), Ok((_, b))) => assert_eq!(
-                a,
-                script(&b.to_string()[..])
-                    .expect("Failed on second parse")
-                    .1
-            ),
-            (Err(e), _) | (_, Err(e)) => panic!("SMT Parse Error {}", e),
+    fn new(base : &str) -> VarNameGenerator {
+        VarNameGenerator {
+            basename : base.to_owned(),
+            counter : 0,
+            vars_generated : vec![],
         }
     }
 }
+
+
 
 fn rc(script: &mut Script, vng : &mut VarNameGenerator){
     match script {
@@ -77,7 +68,8 @@ fn rc_se(sexp: &mut SExp, vng : &mut VarNameGenerator) {
             let name = vng.get_name(sort);
             *sexp = SExp::Var(name);
         },
-        SExp::Compound(sexps) => {
+        SExp::Compound(sexps) |
+        SExp::BExp(_, sexps) => {
             for sexp in sexps {
                 rc_se(sexp, vng)
             }
@@ -105,9 +97,9 @@ fn bav_c(cmd: &mut Command, vng : &mut  VarNameGenerator, bava : &mut Vec<(Strin
 
 fn bav_se(sexp: &mut SExp, vng : &mut VarNameGenerator, bavs : &mut Vec<(String, SExp)>) {
     match sexp {
-        SExp::Equals(sexps) => {
+        SExp::BExp(bop, sexps) => {
             let name = vng.get_name(Sort::Bool());
-            let sec = SExp::Compound(sexps.clone());
+            let sec = SExp::BExp(bop.clone(), sexps.clone());
             bavs.push((name, sec));
             for sexp in sexps {
                 bav_se(sexp, vng, bavs);
@@ -120,6 +112,96 @@ fn bav_se(sexp: &mut SExp, vng : &mut VarNameGenerator, bavs : &mut Vec<(String,
         },
         _ => (),
     }
+}
+
+
+fn init_vars(script : &mut Script, vars : Vec<(String, Sort)>) {
+    let Script::Commands(cmds) = script;
+
+    let maybe_log_pos = cmds.iter().position(|cmd| cmd.is_logic());
+
+    let log_pos = match maybe_log_pos {
+        Some(pos) => pos,
+        None => 0,
+    };
+
+    let mut end = cmds.split_off(log_pos + 1);
+
+    let mut decls = vars.into_iter()
+        .map(|(vname, sort)| Command::DeclConst(vname, sort))
+        .collect::<Vec<Command>>();
+
+    cmds.append(&mut decls);
+    cmds.append(&mut end);
+}
+
+fn add_ba(script : &mut Script, bavs : Vec<(String, SExp)>) {
+    let Script::Commands(cmds) = script;
+
+    let maybe_cs_pos = cmds.iter().position(|cmd| cmd.is_checksat());
+
+    let cs_pos = match maybe_cs_pos {
+        Some(pos) => pos,
+        None => cmds.len(),
+    };
+
+    let mut baveq_iter = bavs.into_iter()
+        .map(|(vname, sexp)| {
+            SExp::BExp(BoolOp::Equals(), vec![SExp::Symbol(vname), sexp])
+        });
+
+    cmds.insert(cs_pos, assert_many(&mut baveq_iter));
+}
+
+fn assert_many(iter: &mut dyn Iterator<Item = SExp>) -> Command {
+
+    let init = match iter.next() {
+        Some(bav_eq) => bav_eq,
+        _ => SExp::Symbol("true".to_owned()), // shouldn't ever actually be added
+    };
+
+    let intersection = iter
+        .fold(init, |acc, curr| SExp::BExp(BoolOp::And(), vec![acc, curr]));
+
+    return Command::Assert(intersection)
+}
+
+fn end_insert_pt(script : &Script) -> usize {
+    let Script::Commands(cmds) = script;
+
+    let maybe_cs_pos = cmds.iter().position(|cmd| cmd.is_checksat());
+
+    match maybe_cs_pos {
+        Some(pos) => pos,
+        None => cmds.len(),
+    }
+}
+
+fn get_bav_assign(bavns : &Vec<String>, ta : Vec<bool>) -> Command {
+    let bavs = bavns.into_iter().zip(ta.into_iter());
+    let mut baveq = bavs.into_iter()
+        .map(|(vname, bval)| {
+            let val = if bval { SExp::true_sexp() } else { SExp::false_sexp() };
+            SExp::BExp(BoolOp::Equals(), vec![SExp::Symbol(vname.clone()), val])
+        });
+
+    assert_many(&mut baveq)
+}
+
+/// returns the Boolean Abstract Variables added as vector of their names 
+fn to_skel(script : &mut Script) -> Vec<String> {
+    let mut vng = VarNameGenerator::new("GEN");
+    rc(script, &mut vng);
+
+    vng.basename = "BAV".to_owned();
+    let mut bavs = vec![];
+    bav(script, &mut vng, &mut bavs);
+
+    init_vars(script, vng.vars_generated);
+    let bavns = bavs.iter()
+        .map(|(name, _)| name.clone()).collect::<Vec<String>>();
+    add_ba(script, bavs);
+    bavns
 }
 
 fn solve(filename: &str) {
@@ -173,34 +255,92 @@ fn solve(filename: &str) {
     }
 }
 
+
+pub fn strip_and_test_file(source_file: &PathBuf) {
+    let contents: String =
+        fs::read_to_string(source_file).expect("Something went wrong reading the file");
+    let stripped_contents = &rmv_comments(&contents[..]).expect("Error stripping comments").1.join(" ")[..];
+    let mut script = script(&stripped_contents[..]).expect("Parsing error").1;
+    // TODO error handling here on prev 3 lines
+
+    let bavns = to_skel(&mut script);
+    let eip = end_insert_pt(&script);
+    script.init(eip);
+    let num_bavs = bavns.len();
+    let mut iterations = 0;
+
+    println!("starting {} iterations", 2_u64.pow(num_bavs as u32));
+    for truths in 0..num_bavs + 1 {
+        let mut unordered_tvs = vec![true; truths];
+        unordered_tvs.extend(vec![false; num_bavs - truths]);
+        let truth_value_assigments = unordered_tvs.into_iter().permutations(num_bavs).unique();
+        let mut inner_iterations = 0;
+        for truth_values in truth_value_assigments {
+            let source_filename = match source_file.file_name().and_then(|n| n.to_str()) {
+                Some(name) => name,
+                None => "unknown",
+            };
+            let filename = (iterations).to_string() + "_" + source_filename;
+
+
+
+            script.replace(eip, get_bav_assign(&bavns, truth_values));
+            fs::write(&filename, script.to_string());
+            solve(&filename);
+
+
+
+            inner_iterations = inner_iterations + 1;
+            iterations = iterations + 1;
+        }
+    }
+}
+
+pub fn exec() {
+    let files = fs::read_dir("samples").expect("error with sample dir");
+
+    for file_res in files {
+        match file_res {
+            Ok(file) => {
+                let filepath = file.path();
+                println!("starting file {:?}", filepath);
+                strip_and_test_file(&filepath);
+            }
+            Err(_) => (),
+        }
+    }
+}
 #[cfg(test)]
 mod tests {
     use super::*;
     use std::fs;
 
     #[test]
-    fn t() {
+    #[ignore]
+    fn parse_unparse() {
+        let files = fs::read_dir("samples").expect("error with sample dir");
+
+        for file_res in files {
+            let file = file_res.expect("problem with file");
+            println!("Starting {:?}", file);
+            let filepath = file.path();
+            let contents = &fs::read_to_string(filepath).expect("error reading file")[..];
+            let contents_sans_comments = &rmv_comments(contents)
+                .expect("failed to rmv comments").1.join(" ")[..];
+
+            let p = script(contents_sans_comments).expect("parser error").1;
+
+            let pup = script(&p.to_string()[..]).expect("reparse error").1;
+
+            assert_eq!(p, pup);
+        }
     }
 
     #[test]
     fn smoke_test() {
-        // exec();
-    }
+        let mut pb = PathBuf::new();
+        pb.push("ex.smt2");
 
-    #[test]
-    fn visual_test() {
-        let contents = &fs::read_to_string("ex.smt2").expect("error reading file")[..];
-        let mut vng = VarNameGenerator {
-            basename : "GEN".to_string(),
-            counter : 0,
-            vars_generated : vec![],
-        };
-        let mut bava = vec![];
-
-        let mut s = script(contents).expect("parse problem").1;
-        bav(&mut s, &mut vng, &mut bava);
-
-        println!("Script: {:?}", s);
-        println!("restrung: {:?}", bava);
+        strip_and_test_file(&pb);
     }
 }
