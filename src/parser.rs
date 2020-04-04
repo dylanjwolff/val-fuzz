@@ -113,7 +113,7 @@ impl Script {
 
     pub fn init(&mut self, i : usize) {
         let Script::Commands(cmds) = self;
-        cmds[i] = Command::Assert(SExp::true_sexp());
+        cmds.insert(i, Command::Assert(SExp::true_sexp()));
     }
 
     pub fn is_unsupported_logic(&self) -> bool {
@@ -437,6 +437,17 @@ fn naked_logic(s: &str) -> IResult<&str, Logic> {
     preceded(ws_ltag, ws_l)(s)
 }
 
+fn set_info_status(s : &str) -> IResult<&str, (&str, &str)> {
+    let ws_val = delimited(multispace0, alt((tag("sat"), tag("unsat"))), multispace0);
+    let ws_status = delimited(multispace0, tag(":status"), multispace0);
+    let naked_si = preceded(tag("set-info"), tuple((ws_status, ws_val)));
+
+    let wrapped = delimited(char('('),
+              delimited(multispace0, naked_si, multispace0),
+              char(')'));
+    delimited(multispace0, wrapped, multispace0)(s)
+}
+
 fn naked_command(s: &str) -> IResult<&str, Command> {
     alt((
         map(naked_assert, |a| Command::Assert(a)),
@@ -466,9 +477,10 @@ fn unknown_balanced(s: &str) -> IResult<&str, Vec<&str>> {
 
 fn command(s: &str) -> IResult<&str, Command> {
     let ws_ncommand = delimited(multispace0, naked_command, multispace0);
-    let command = delimited(char('('), ws_ncommand, char(')'));
+    let delim_command = delimited(char('('), ws_ncommand, char(')'));
     alt((
-        delimited(multispace0, command, multispace0),
+        preceded(set_info_status, command), // just drop for now
+        delimited(multispace0, delim_command, multispace0),
         map(unknown_balanced, |v| Command::Generic(
                 v.into_iter()
                     .map(|g| g.to_owned())

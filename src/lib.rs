@@ -339,13 +339,16 @@ pub fn strip_and_test_file(source_file: &PathBuf) {
     let num_bavs = bavns.len();
     let mut iterations = 0;
 
-    println!("starting {} iterations", 2_u64.pow(num_bavs as u32));
+    println!("starting 2^{} iterations", num_bavs);
     for truths in 0..num_bavs + 1 {
+        if (iterations > 5) { break; }
+
         let mut unordered_tvs = vec![true; truths];
         unordered_tvs.extend(vec![false; num_bavs - truths]);
         let truth_value_assigments = unordered_tvs.into_iter().permutations(num_bavs).unique();
         let mut inner_iterations = 0;
         for truth_values in truth_value_assigments {
+            println!("iter {}", iterations);
             let source_filename = match source_file.file_name().and_then(|n| n.to_str()) {
                 Some(name) => name,
                 None => "unknown",
@@ -359,15 +362,15 @@ pub fn strip_and_test_file(source_file: &PathBuf) {
             solve(&filename);
 
 
-
             inner_iterations = inner_iterations + 1;
             iterations = iterations + 1;
+            println!("ret spv");
         }
     }
 }
 
 pub fn exec() {
-    let files = fs::read_dir("samples").expect("error with sample dir");
+    let files = fs::read_dir("test").expect("error with sample dir");
 
     for file_res in files {
         match file_res {
