@@ -1,7 +1,6 @@
 #[macro_use]
 extern crate nom;
 extern crate itertools;
-
 pub mod parser;
 
 use parser::{rmv_comments, script, Symbol, Command, Sort, Constant, SExp, Script, BoolOp};
@@ -36,34 +35,70 @@ impl VarNameGenerator {
     }
 }
 
-fn rl_s(sexp: &mut SExp, scoped_vars: &mut BTreeMap<String, Vec<SExp>>){
+fn rl(script: &mut Script, scoped_vars: &mut BTreeMap<String, Vec<SExp>>){
+    match script {
+        Script::Commands(cmds) => {
+            for cmd in cmds {
+                rl_c(cmd, scoped_vars);
+            }
+        }
+    }
+}
 
+fn rl_c(cmd: &mut Command, scoped_vars: &mut BTreeMap<String, Vec<SExp>>){
+    match cmd {
+        Command::Assert(s) | Command::CheckSatAssuming(s) => rl_s(s, scoped_vars),
+        _ => (),
+    }
+}
+
+fn rl_s(sexp: &mut SExp, scoped_vars: &mut BTreeMap<String, Vec<SExp>>){
     match sexp {
         SExp::Let(v, rest) => {
             // This looks a bit strange, but if we don't explore these first, those expressions are
             // each copied multiple times. By doing the exploration on these originals first, we
             // don't need to later on the copies. We can't add the variable values to the tree yet,
             // because they may overwrite variables in the original expressions. All solutions are
-            // at least O(2n) and this is clear, and n = number of variables in a let expression =
-            // typically a very small number anyways.
+            // at least O(2n) before the recursive call on rest, and this one at least is clear,
+            // and n = number of variables in a let expression = typically a very small number anyways.
+
+            let mut new_vars : Vec<(&Symbol, &SExp)> = vec![];
             for (var, val) in v {
                 rl_s(val, scoped_vars); // first make sure the val is "let-free"
-            }
-            for (var, val) in v {
-                match var {
-                    Symbol::Var(vname) | Symbol::Token(vname) => {
-                        match scoped_vars.get(vname) {
-                            Some(vals) => vals.push(val.clone()), // TODO could be refs 
-                            None => {scoped_vars.insert(vname.clone(), vec![val.clone()]);},
-                        };
-                    }
-                }
+                new_vars.push((var, val)); // make note of the mapping to add to the rest
             }
 
-            
+            // Add all of the allocated variabled to the scope
+            for (var, val) in new_vars.iter() {
+                let maybe_vals = scoped_vars.get_mut(&var.to_string()[..]);
+                match maybe_vals {
+                    Some(vals) => vals.push((*val).clone()),
+                    None => {scoped_vars.insert(var.to_string(), vec![(*val).clone()]);},
+                };
+            }
 
+            // Recurse on the rest of the SExp
+            rl_s(rest, scoped_vars);
+
+            // Pop our variables off of the stack
+            for (var, _) in new_vars {
+                scoped_vars.get_mut(&var.to_string()[..]).map(|v| v.pop());
+            }
+
+            *sexp = (**rest).clone(); // the let expression isn't doing anything anymore
         },
-        _ => (),
+        SExp::Symbol(s) => {
+            match scoped_vars.get(&s.to_string()[..]).and_then(|v| v.last()) {
+                Some(e) => {
+                    *sexp = e.clone();
+                },
+                None => (),
+            }
+        },
+
+        SExp::Compound(v) |
+        SExp::BExp(_, v) => for e in v { rl_s(e, scoped_vars) },
+        SExp::Constant(_) => (),
     }
 }
 
@@ -223,6 +258,9 @@ fn to_skel(script : &mut Script) -> Vec<String> {
     let mut vng = VarNameGenerator::new("GEN");
     rc(script, &mut vng);
 
+    let mut scopes = BTreeMap::new();
+    rl(script, &mut scopes);
+
     vng.basename = "BAV".to_owned();
     let mut bavs = vec![];
     bav(script, &mut vng, &mut bavs);
@@ -378,6 +416,16 @@ mod tests {
     }
 
     #[test]
+    fn qc_rls() {
+        let v = Symbol::Var("x".to_owned());
+        let e = SExp::Symbol(Symbol::Token("changed".to_owned()));
+        let expected = e.clone();
+        let mut sexp = SExp::Let(vec![(v.clone(), e)], Box::new(SExp::Symbol(v)));
+        rl_s(&mut sexp, &mut BTreeMap::new());
+        assert_eq!(sexp, expected);
+    }
+
+    #[test]
     fn smoke_test() {
         let mut pb = PathBuf::new();
         pb.push("samples/ex.smt2");
@@ -386,7 +434,9 @@ mod tests {
 
     #[test]
     fn quick_visual() {
-        let s = parse_file("samples/bug272.minimized.smtv1.smt2");
-        println!("{:?}", s);
+        let mut s = parse_file("samples/bug272.minimized.smtv1.smt2");
+        println!("Before \n {} \n\n", s.to_string());
+        to_skel(&mut s);
+        println!("Skeleton \n {}", s.to_string());
     }
 }
