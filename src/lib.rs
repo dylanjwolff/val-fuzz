@@ -1,16 +1,24 @@
 #[macro_use]
 extern crate nom;
 extern crate itertools;
+extern crate rand_xoshiro;
+extern crate rand_core;
+extern crate rand;
 pub mod parser;
 
+use rand_core::RngCore;
+use bit_vec::BitVec;
 use parser::{rmv_comments, script, Symbol, Command, Sort, Constant, SExp, Script, BoolOp};
-
+use rand::Rng;
+use rand_xoshiro::rand_core::SeedableRng;
 use std::path::PathBuf;
 use std::fs;
 use std::collections::BTreeMap;
+use std::collections::BTreeSet;
 use std::process;
 use std::str::from_utf8;
 use itertools::Itertools;
+
 
 struct VarNameGenerator {
     basename: String,
@@ -32,6 +40,66 @@ impl VarNameGenerator {
             counter : 0,
             vars_generated : vec![],
         }
+    }
+}
+
+struct RandUniqPermGen {
+    rng : Xoshiro256Plus,
+    numbits : usize,
+    buf : Vec<u8>,
+    seen : BTreeSet<BitVec>,
+    retries : u16,
+    max : u32,
+    use_max : bool,
+    use_retries : bool,
+}
+
+use rand_xoshiro::Xoshiro256Plus;
+impl RandUniqPermGen {
+
+    fn new_definite(numbits : usize, maxiter: u32) -> Self {
+        let buf = BitVec::from_elem(numbits, false).to_bytes();
+        let seen = BTreeSet::new();
+        let rng = Xoshiro256Plus::seed_from_u64(9999);
+
+        let true_max = if (maxiter as f64).log2() < (numbits as f64)  {
+            maxiter 
+        } else { (numbits as f64).exp2() as u32 };
+
+        RandUniqPermGen {
+            rng : rng,
+            numbits : numbits,
+            buf : buf,
+            seen : seen,
+            retries : 0,
+            max : true_max,
+            use_max : true,
+            use_retries : false,
+        }
+    }
+
+    fn get_count(&self) -> u32 {
+        self.seen.len() as u32
+    }
+
+
+    fn sample(&mut self) -> Option<BitVec> {
+          if self.max <= self.seen.len() as u32 { return None }
+
+          let mut is_new = false;
+          let mut attempt = 0;
+          while true || (self.use_retries && attempt < self.retries) {
+              self.rng.fill(&mut self.buf[..]);
+              let mut bv = BitVec::from_bytes(&self.buf[..]);
+              bv.truncate(self.numbits);
+              is_new = self.seen.insert(bv.clone());
+              if is_new {
+                  return Some(bv)
+              }
+              attempt = attempt + 1;
+          }
+
+          None
     }
 }
 
@@ -183,6 +251,7 @@ fn bav_se(sexp: &mut SExp, vng : &mut VarNameGenerator, bavs : &mut Vec<(String,
 
 fn init_vars(script : &mut Script, vars : Vec<(String, Sort)>) {
     let Script::Commands(cmds) = script;
+    if cmds.len() == 0 { return }
 
     let maybe_log_pos = cmds.iter().position(|cmd| cmd.is_logic());
 
@@ -242,7 +311,7 @@ fn end_insert_pt(script : &Script) -> usize {
     }
 }
 
-fn get_bav_assign(bavns : &Vec<String>, ta : Vec<bool>) -> Command {
+fn get_bav_assign(bavns : &Vec<String>, ta : BitVec) -> Command {
     let bavs = bavns.into_iter().zip(ta.into_iter());
     let mut baveq = bavs.into_iter()
         .map(|(vname, bval)| {
@@ -273,12 +342,12 @@ fn to_skel(script : &mut Script) -> Vec<String> {
 }
 
 fn solve(filename: &str) {
-    let cvc4_res = process::Command::new("cvc4")
-        .args(&[filename, "--produce-model", "--tlimit", "5000"])
+    let cvc4_res = process::Command::new("timeout")
+        .args(&["5s", "cvc4", filename, "--produce-model", "--tlimit", "5000"])
         .output();
 
     let z3_res = process::Command::new("z3")
-        .args(&[filename, "-T:5"])
+        .args(&["timeout", "5s", filename, "-T:5"])
         .output();
 
     let cvc4_stdout_res = cvc4_res
@@ -316,6 +385,7 @@ fn solve(filename: &str) {
                 println!("file {} has soundness problem!!!", filename);
             } else {
                 fs::remove_file(filename);
+                println!("remd");
             }
             ()
         }
@@ -336,41 +406,30 @@ pub fn strip_and_test_file(source_file: &PathBuf) {
     let bavns = to_skel(&mut script);
     let eip = end_insert_pt(&script);
     script.init(eip);
+
     let num_bavs = bavns.len();
-    let mut iterations = 0;
-
     println!("starting 2^{} iterations", num_bavs);
-    for truths in 0..num_bavs + 1 {
-        if (iterations > 5) { break; }
-
-        let mut unordered_tvs = vec![true; truths];
-        unordered_tvs.extend(vec![false; num_bavs - truths]);
-        let truth_value_assigments = unordered_tvs.into_iter().permutations(num_bavs).unique();
-        let mut inner_iterations = 0;
-        for truth_values in truth_value_assigments {
-            println!("iter {}", iterations);
-            let source_filename = match source_file.file_name().and_then(|n| n.to_str()) {
-                Some(name) => name,
-                None => "unknown",
-            };
-            let filename = (iterations).to_string() + "_" + source_filename;
-
-
-
-            script.replace(eip, get_bav_assign(&bavns, truth_values));
-            fs::write(&filename, script.to_string());
-            solve(&filename);
-
-
-            inner_iterations = inner_iterations + 1;
-            iterations = iterations + 1;
-            println!("ret spv");
-        }
+    let mut urng = RandUniqPermGen::new_definite(num_bavs, 10);
+    while let Some(truth_values) = urng.sample() {
+        let filename = get_iter_fileout_name(source_file, urng.get_count());
+        script.replace(eip, get_bav_assign(&bavns, truth_values));
+        fs::write(&filename, script.to_string());
+        solve(&filename);
     }
 }
 
+fn get_iter_fileout_name(source_file : &PathBuf, iter : u32) -> String {
+    let source_filename = match source_file.file_name().and_then(|n| n.to_str()) {
+        Some(name) => name,
+        None => "unknown",
+    };
+    (iter).to_string() + "_" + source_filename
+}
+
+
+
 pub fn exec() {
-    let files = fs::read_dir("test").expect("error with sample dir");
+    let files = fs::read_dir("samples").expect("error with sample dir");
 
     for file_res in files {
         match file_res {
@@ -433,6 +492,14 @@ mod tests {
         let mut pb = PathBuf::new();
         pb.push("samples/ex.smt2");
         strip_and_test_file(&pb);
+    }
+
+    #[test]
+    fn rando_calrissian() {
+        let mut rng = RandUniqPermGen::new_definite(10, 1);
+        println!("samples {:?} {:?}", rng.sample(), rng.sample());
+        let mut rng = RandUniqPermGen::new_definite(1, 100);
+        println!("samples {:?} {:?} {:?}", rng.sample(), rng.sample(), rng.sample());
     }
 
     #[test]
