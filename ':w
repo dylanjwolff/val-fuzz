@@ -119,16 +119,8 @@ fn get_children(node : AstNode) -> Vec<AstNode> {
                     .chain(once(AstNode::BoolOp(bop)))
                     .collect()
         },
-        AstNode::SExp(SExp::Let(vs, s)) => { 
-            let mut astns = vs.iter_mut()
-                .fold(vec![], |mut asts, (vr, vl)| {
-                    asts.push(AstNode::Symbol(vr)); 
-                    asts.push(AstNode::SExp(vl)); 
-                    asts
-                });
-            astns.push(AstNode::SExp(s));
-            astns.into_iter().rev().collect()
-        },
+        AstNode::SExp(SExp::Let(vs, s)) => v.fold(vec![], |asts, (v, t)| { 
+            asts.push(AstNode::Symbol(v)); asts.push(AstNode::Sort(t)); asts})
         AstNode::SExp(SExp::Constant(c)) => vec![AstNode::Constant(c)],
         AstNode::SExp(SExp::Symbol(s)) => vec![AstNode::Symbol(s)],
         _ => vec![],
