@@ -16,20 +16,21 @@ use nom::sequence::delimited;
 use nom::sequence::preceded;
 use nom::{bytes::complete::tag, combinator::map, sequence::tuple, IResult};
 use std::iter::once;
+use std::cell::RefCell;
 
 #[derive(Debug, Eq, PartialEq, Clone)]
 pub enum Script {
-    Commands(Vec<Command>),
+    Commands(RefCell<Vec<Command>>),
 }
 
 #[derive(Debug, Eq, PartialEq, Clone)]
 pub enum Command {
-    Logic(Logic),
+    Logic(RefCell<Logic>),
     CheckSat(),
-    CheckSatAssuming(SExp),
-    Assert(SExp),
+    CheckSatAssuming(RefCell<SExp>),
+    Assert(RefCell<SExp>),
     GetModel(),
-    DeclConst(String, Sort),
+    DeclConst(String, RefCell<Sort>),
     Generic(Vec<String>),
 }
 
@@ -103,54 +104,13 @@ enum AstNode<'a> {
     Sort(&'a mut Sort),
 }
 
-fn get_children(node : AstNode) -> Vec<AstNode> {
-    match node {
-        AstNode::Script(Script::Commands(cmds)) => cmds.iter_mut().map(|cmd| AstNode::Command(cmd)).rev().collect(),
-        AstNode::Command(Command::Logic(l)) => vec![AstNode::Logic(l)],
-        AstNode::Command(Command::Assert(a)) |
-        AstNode::Command(Command::CheckSatAssuming(a)) => vec![AstNode::SExp(a)],
-        AstNode::Command(Command::DeclConst(_, s)) => vec![AstNode::Sort(s)],
-        AstNode::Sort(Sort::Compound(ss)) => ss.iter_mut().map(|s| AstNode::Sort(s)).rev().collect(),
-        AstNode::SExp(SExp::Compound(ss)) => ss.iter_mut().map(|s| AstNode::SExp(s)).rev().collect(),
-        AstNode::SExp(SExp::BExp(bop, ss)) => { 
-                ss.iter_mut()
-                    .map(|s| AstNode::SExp(s))
-                    .rev()
-                    .chain(once(AstNode::BoolOp(bop)))
-                    .collect()
-        },
-        AstNode::SExp(SExp::Let(vs, s)) => { 
-            let mut astns = vs.iter_mut()
-                .fold(vec![], |mut asts, (vr, vl)| {
-                    asts.push(AstNode::Symbol(vr)); 
-                    asts.push(AstNode::SExp(vl)); 
-                    asts
-                });
-            astns.push(AstNode::SExp(s));
-            astns.into_iter().rev().collect()
-        },
-        AstNode::SExp(SExp::Constant(c)) => vec![AstNode::Constant(c)],
-        AstNode::SExp(SExp::Symbol(s)) => vec![AstNode::Symbol(s)],
-        _ => vec![],
-    }
-}
-
-fn traverse(node : AstNode) {
-    let mut visiting = vec![node];
-
-    while let Some(node) = visiting.pop() {
-        println!("pre {:?}", node);
-        visiting.extend(get_children(node));
-        println!("post");
-    }
-}
-
 
 
 impl Script {
     pub fn to_string(&self) -> String {
         match self {
             Script::Commands(cmds) => cmds
+                .borrow()
                 .iter()
                 .map(|cmd| cmd.to_string())
                 .collect::<Vec<String>>()
@@ -160,24 +120,31 @@ impl Script {
 
     pub fn insert(&mut self, i : usize, cmd : Command) {
         let Script::Commands(cmds) = self;
-        cmds.insert(i, cmd);
+        cmds.borrow_mut().insert(i, cmd);
     }
 
     pub fn replace(&mut self, i : usize, cmd : Command) {
         let Script::Commands(cmds) = self;
-        cmds[i] = cmd;
+        cmds.borrow_mut()[i] = cmd;
     }
 
     pub fn init(&mut self, i : usize) {
         let Script::Commands(cmds) = self;
-        cmds.insert(i, Command::Assert(SExp::true_sexp()));
+        cmds.borrow_mut().insert(i, Command::Assert(RefCell::new(SExp::true_sexp())));
     }
 
     pub fn is_unsupported_logic(&self) -> bool {
         let Script::Commands(cmds) = self;
-        let maybe_logic = cmds.iter().find(|cmd| cmd.is_logic());
+        let bcmds = cmds.borrow();
+        let maybe_logic = bcmds.iter().find(|cmd| (cmd).is_logic());
         match maybe_logic {
-            Some(Command::Logic(Logic::QF_SLIA())) => true,
+            Some(cmd) => match cmd {
+                Command::Logic(l) => match *l.borrow() {
+                   Logic::QF_SLIA() => true,
+                   _ => false,
+                },
+                _ => false,
+            },
             _ => false,
         }
     }
@@ -186,17 +153,17 @@ impl Script {
 impl Command {
     pub fn to_string(&self) -> String {
         match self {
-            Command::Logic(l) => "(set-logic ".to_owned() + &l.to_string()[..] + ")",
+            Command::Logic(l) => "(set-logic ".to_owned() + &l.borrow().to_string()[..] + ")",
             Command::CheckSat() => "(check-sat)".to_string(),
             Command::CheckSatAssuming(sexp) => {
-                ("(check-sat-assuming ".to_owned() + &sexp.to_string()[..] + ")").to_string()
+                ("(check-sat-assuming ".to_owned() + &sexp.borrow().to_string()[..] + ")").to_string()
             } // TODO
             Command::GetModel() => "(get-model)".to_string(),
             Command::DeclConst(v, s) => {
-                ("(declare-const ".to_string() + v + " " + &s.to_string()[..] + ")").to_string()
+                ("(declare-const ".to_string() + v + " " + &s.borrow().to_string()[..] + ")").to_string()
             }
             Command::Generic(v) => v.join(""),
-            Command::Assert(s) => ("(assert ".to_string() + &s.to_string()[..] + ")").to_string(),
+            Command::Assert(s) => ("(assert ".to_string() + &s.borrow().to_string()[..] + ")").to_string(),
         }
     }
 
@@ -220,10 +187,10 @@ impl Constant {
         match self {
             Constant::UInt(s) => s.to_string(),
             Constant::Dec(d) => d.to_string(),
-            Constant::Hex(s) => "#x".to_string() + &s.to_string()[..],
-            Constant::Str(s) => "\"".to_string() + &s.to_string()[..] + "\"",
+            Constant::Hex(s) => format!("#x{}", s.to_string()),
+            Constant::Str(s) => format!("\"{}\"", s.to_string()),
             Constant::Bool(b) => b.to_string(),
-            Constant::Bin(bv) => "#b".to_string() + &bv.into_iter().collect::<String>()[..],
+            Constant::Bin(bv) => format!("#b{}", bv.into_iter().collect::<String>()),
         }
     }
 }
@@ -239,14 +206,13 @@ impl Sort {
             Sort::Array() => "Array".to_string(),
             Sort::UserDef(s) => s.to_string(),
             Sort::Compound(v) => {
-                let mut rec_s = v
+                let rec_s = v
                     .iter()
-                    .map(|sort| sort.to_string())
+                    .map(|sort| Box::new(sort.to_string()))
+                    .map(|bs| *bs)
                     .collect::<Vec<String>>()
                     .join(" ");
-                rec_s.insert(0, '('); // TODO
-                rec_s.push(')');
-                rec_s
+                format!("({})", rec_s)
             }
         }
     }
@@ -266,32 +232,32 @@ impl SExp {
             SExp::Constant(c) => c.to_string(),
             SExp::Symbol(s) => s.to_string(),
             SExp::Let(vbs, s) => {
-                let vbss = vbs.iter()
+                let vbss = Box::new(vbs.iter()
                     .map(|(v, s)| {
-                       format!("({} {})", v.to_string(), s.to_string())
-                    }).collect::<String>();
+                       Box::new(format!("({} {})", v.to_string(), s.to_string()))
+                    })
+                    .map(|bs| *bs)
+                    .collect::<String>());
                 format!("(let ({}) {})", vbss, s.to_string())
             },
             SExp::Compound(v) => {
                 let mut rec_s = v
                     .iter()
-                    .map(|sexp| sexp.to_string())
+                    .map(|sexp| Box::new(sexp.to_string()))
+                    .map(|bs| *bs)
                     .collect::<Vec<String>>()
                     .join(" ");
-                rec_s.insert(0, '('); // TODO
-                rec_s.push(')');
-                rec_s
+                format!("({})", rec_s)
             }
             SExp::BExp(o, v) => {
                 let rec_s = v
                     .iter()
-                    .map(|sexp| sexp.to_string())
+                    .map(|sexp| Box::new(sexp.to_string()))
+                    .map(|bs| *bs)
                     .collect::<Vec<String>>()
                     .join(" ");
                 let mut s = o.to_string() + " " + &rec_s[..];
-                s.insert(0, '('); // TODO
-                s.push(')');
-                s
+                format!("({} {})", s, rec_s)
             },
             SExp::Symbol(Symbol::Var(s)) => s.clone(),
         }
@@ -507,12 +473,12 @@ fn set_info_status(s : &str) -> IResult<&str, (&str, &str)> {
 
 fn naked_command(s: &str) -> IResult<&str, Command> {
     alt((
-        map(naked_assert, |a| Command::Assert(a)),
-        map(naked_csa, |a| Command::CheckSatAssuming(a)),
+        map(naked_assert, |a| Command::Assert(RefCell::new(a))),
+        map(naked_csa, |a| Command::CheckSatAssuming(RefCell::new(a))),
         map(tag("check-sat"), |_| Command::CheckSat()),
         map(tag("get-model"), |_| Command::GetModel()),
-        map(naked_logic, |l| Command::Logic(l)),
-        map(naked_decl_const, |(v, s)| Command::DeclConst(v.to_owned(), s)),
+        map(naked_logic, |l| Command::Logic(RefCell::new(l))),
+        map(naked_decl_const, |(v, s)| Command::DeclConst(v.to_owned(), RefCell::new(s))),
     ))(s)
 }
 
@@ -548,7 +514,7 @@ fn command(s: &str) -> IResult<&str, Command> {
 pub fn script(s: &str) -> IResult<&str, Script> {
     map(
         many0(delimited(multispace0, command, multispace0)),
-        |cmds| Script::Commands(cmds),
+        |cmds| Script::Commands(RefCell::new(cmds)),
     )(s)
 }
 
@@ -575,7 +541,6 @@ mod tests {
     #[test]
     fn traversal() {
         let mut s = parse_file("samples/ex.smt2");
-        traverse(AstNode::Script(&mut s));
     }
 }
  
