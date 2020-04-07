@@ -43,16 +43,16 @@ pub enum Sort {
     BitVec(),
     Array(),
     UserDef(String),
-    Compound(Vec<Sort>),
+    Compound(Vec<RefCell<Sort>>),
 }
 
 #[derive(Debug, Eq, PartialEq, Clone)]
 pub enum SExp {
-    Compound(Vec<SExp>),
-    Let(Vec<(Symbol, SExp)>, Box<SExp>),
-    BExp(BoolOp, Vec<SExp>),
-    Constant(Constant),
-    Symbol(Symbol),
+    Compound(Vec<RefCell<SExp>>),
+    Let(Vec<(RefCell<Symbol>, RefCell<SExp>)>, RefCell<Box<SExp>>),
+    BExp(RefCell<BoolOp>, Vec<RefCell<SExp>>),
+    Constant(RefCell<Constant>),
+    Symbol(RefCell<Symbol>),
 }
 
 #[derive(Debug, Eq, PartialEq, Clone)]
@@ -208,7 +208,7 @@ impl Sort {
             Sort::Compound(v) => {
                 let rec_s = v
                     .iter()
-                    .map(|sort| Box::new(sort.to_string()))
+                    .map(|sort| Box::new(sort.borrow().to_string()))
                     .map(|bs| *bs)
                     .collect::<Vec<String>>()
                     .join(" ");
@@ -220,30 +220,30 @@ impl Sort {
 
 impl SExp {
     pub fn true_sexp() -> SExp {
-        SExp::Symbol(Symbol::Token("true".to_owned()))
+        SExp::Symbol(RefCell::new(Symbol::Token("true".to_owned())))
     }
 
     pub fn false_sexp() -> SExp {
-        SExp::Symbol(Symbol::Token("false".to_owned()))
+        SExp::Symbol(RefCell::new(Symbol::Token("false".to_owned())))
     }
 
     pub fn to_string(&self) -> String {
         match self {
-            SExp::Constant(c) => c.to_string(),
-            SExp::Symbol(s) => s.to_string(),
+            SExp::Constant(c) => c.borrow().to_string(),
+            SExp::Symbol(s) => s.borrow().to_string(),
             SExp::Let(vbs, s) => {
                 let vbss = Box::new(vbs.iter()
                     .map(|(v, s)| {
-                       Box::new(format!("({} {})", v.to_string(), s.to_string()))
+                       Box::new(format!("({} {})", v.borrow().to_string(), s.borrow().to_string()))
                     })
                     .map(|bs| *bs)
                     .collect::<String>());
-                format!("(let ({}) {})", vbss, s.to_string())
+                format!("(let ({}) {})", vbss, s.borrow().to_string())
             },
             SExp::Compound(v) => {
                 let mut rec_s = v
                     .iter()
-                    .map(|sexp| Box::new(sexp.to_string()))
+                    .map(|sexp| Box::new(sexp.borrow().to_string()))
                     .map(|bs| *bs)
                     .collect::<Vec<String>>()
                     .join(" ");
@@ -252,14 +252,13 @@ impl SExp {
             SExp::BExp(o, v) => {
                 let rec_s = v
                     .iter()
-                    .map(|sexp| Box::new(sexp.to_string()))
+                    .map(|sexp| Box::new(sexp.borrow().to_string()))
                     .map(|bs| *bs)
                     .collect::<Vec<String>>()
                     .join(" ");
-                let mut s = o.to_string() + " " + &rec_s[..];
-                format!("({} {})", s, rec_s)
+                format!("({} {})", o.borrow().to_string(), rec_s)
             },
-            SExp::Symbol(Symbol::Var(s)) => s.clone(),
+            SExp::Symbol(s) => s.borrow().to_string(),
         }
     }
 }
@@ -377,16 +376,16 @@ fn bool_core_ops(s: &str) -> IResult<&str, BoolOp> {
 
 fn bool_sexp(s: &str) -> IResult<&str, SExp> {
     let inner_int = map(tuple((bool_int_ops, many1(sexp))), 
-                        |(o, v)| SExp::BExp(o, v));
+                        |(o, v)| SExp::BExp(RefCell::new(o), v.into_iter().map(|s| RefCell::new(s)).collect()));
     let inner_core = map(tuple((bool_core_ops, many1(sexp))), 
-                        |(o, v)| SExp::BExp(o, v));
+                        |(o, v)| SExp::BExp(RefCell::new(o), v.into_iter().map(|s| RefCell::new(s)).collect()));
 
     let naked_b = alt((inner_int, inner_core));
     delimited(char('('), naked_b, char(')'))(s)
 }
 
 
-fn let_sexp(s : &str) -> IResult<&str, (Vec<(Symbol, SExp)>, SExp)> {
+fn let_sexp(s : &str) -> IResult<&str, (Vec<(RefCell<Symbol>, RefCell<SExp>)>, RefCell<Box<SExp>>)> {
     let ws_symbol = delimited(multispace0, symbol, multispace0);
     let mapped_ws_symbol = map(ws_symbol, |s| Symbol::Var(s.to_owned()));
     let ws_sexp = delimited(multispace0, sexp, multispace0);
@@ -399,8 +398,8 @@ fn let_sexp(s : &str) -> IResult<&str, (Vec<(Symbol, SExp)>, SExp)> {
     let inner = preceded(tag("let"), tuple((ws_var_bs, sexp)));
     let ws_inner = delimited(multispace0, inner, multispace0);
     let wrapped = delimited(char('('), ws_inner, char(')'));
-
-    wrapped(s)
+    let mapped = map(wrapped, |(a, b)| (a.into_iter().map(|(x, y)| (RefCell::new(x), RefCell::new(y))).collect(), RefCell::new(Box::new(b))));
+    mapped(s)
 }
 
 fn sexp(s: &str) -> IResult<&str, SExp> {
@@ -412,10 +411,10 @@ fn sexp(s: &str) -> IResult<&str, SExp> {
     let ws_let_sexp = delimited(multispace0, let_sexp, multispace0);
     alt((
         ws_bexp,
-        map(ws_let_sexp, |(tbs, sexp)| SExp::Let(tbs, Box::new(sexp))),
-        map(ws_rec_sexp, |e| SExp::Compound(e)),
-        map(ws_constant, |c| SExp::Constant(c)),
-        map(ws_symbol, |s| SExp::Symbol(Symbol::Token(s.to_owned()))),
+        map(ws_let_sexp, |(tbs, sexp)| SExp::Let(tbs, sexp)),
+        map(ws_rec_sexp, |es| SExp::Compound(es.into_iter().map(|e| RefCell::new(e)).collect())),
+        map(ws_constant, |c| SExp::Constant(RefCell::new(c))),
+        map(ws_symbol, |s| SExp::Symbol(RefCell::new(Symbol::Token(s.to_owned())))),
     ))(s)
 }
 
@@ -429,7 +428,7 @@ fn sort(s: &str) -> IResult<&str, Sort> {
         map(ws_int, |_| Sort::UInt()),
         map(ws_dec, |_| Sort::Dec()),
         map(ws_userdef, |s| Sort::UserDef(s.to_owned())),
-        map(ws_rec_sort, |s| Sort::Compound(s)),
+        map(ws_rec_sort, |ss| Sort::Compound(ss.into_iter().map(|s| RefCell::new(s)).collect())),
     ))(s)
 }
 

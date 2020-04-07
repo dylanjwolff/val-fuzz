@@ -132,30 +132,30 @@ fn rl_s(sexp: &mut SExp, scoped_vars: &mut BTreeMap<String, Vec<SExp>>){
             // at least O(2n) before the recursive call on rest, and this one at least is clear,
             // and n = number of variables in a let expression = typically a very small number anyways.
 
-            let mut new_vars : Vec<(&Symbol, &SExp)> = vec![];
+            let mut new_vars : Vec<(&RefCell<Symbol>, &RefCell<SExp>)> = vec![];
             for (var, val) in v {
-                rl_s(val, scoped_vars); // first make sure the val is "let-free"
+                rl_s(&mut *val.borrow_mut(), scoped_vars); // first make sure the val is "let-free"
                 new_vars.push((var, val)); // make note of the mapping to add to the rest
             }
 
             // Add all of the allocated variabled to the scope
             for (var, val) in new_vars.iter() {
-                let maybe_vals = scoped_vars.get_mut(&var.to_string()[..]);
+                let maybe_vals = scoped_vars.get_mut(&var.borrow().to_string()[..]);
                 match maybe_vals {
-                    Some(vals) => vals.push((*val).clone()),
-                    None => {scoped_vars.insert(var.to_string(), vec![(*val).clone()]);},
+                    Some(vals) => vals.push((*val).borrow().clone()),
+                    None => {scoped_vars.insert(var.borrow().to_string(), vec![val.borrow().clone()]);},
                 };
             }
 
             // Recurse on the rest of the SExp
-            rl_s(rest, scoped_vars);
+            rl_s(&mut *rest.borrow_mut(), scoped_vars);
 
             // Pop our variables off of the stack
             for (var, _) in new_vars {
-                scoped_vars.get_mut(&var.to_string()[..]).map(|v| v.pop());
+                scoped_vars.get_mut(&var.borrow().to_string()[..]).map(|v| v.pop());
             }
 
-            *sexp = (**rest).clone(); // the let expression isn't doing anything anymore
+            sexp.replace(rest.borrow().clone()); // the let expression isn't doing anything anymore
         },
         SExp::Symbol(s) => {
             match scoped_vars.get(&s.to_string()[..]).and_then(|v| v.last()) {
