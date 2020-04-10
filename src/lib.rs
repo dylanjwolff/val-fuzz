@@ -4,6 +4,7 @@ extern crate itertools;
 extern crate rand_xoshiro;
 extern crate rand_core;
 extern crate rand;
+#[macro_use]
 pub mod parser;
 
 use std::cell::RefMut;
@@ -11,6 +12,7 @@ use std::cell::RefCell;
 use rand_core::RngCore;
 use bit_vec::BitVec;
 use parser::{rmv_comments, script, Symbol, Command, Sort, Constant, SExp, Script, BoolOp};
+use parser::{SymbolRc, CommandRc, SortRc, ConstantRc, SExpRc, ScriptRc, BoolOpRc};
 use rand::Rng;
 use rand_xoshiro::rand_core::SeedableRng;
 use std::path::PathBuf;
@@ -19,7 +21,7 @@ use std::collections::BTreeMap;
 use std::collections::BTreeSet;
 use std::process;
 use std::str::from_utf8;
-
+use std::rc::Rc;
 
 struct VarNameGenerator {
     basename: String,
@@ -131,7 +133,7 @@ fn rl_s(sexp: &mut SExp, scoped_vars: &mut BTreeMap<String, Vec<SExp>>){
             // at least O(2n) before the recursive call on rest, and this one at least is clear,
             // and n = number of variables in a let expression = typically a very small number anyways.
 
-            let mut new_vars : Vec<(&RefCell<Symbol>, &RefCell<SExp>)> = vec![];
+            let mut new_vars : Vec<(&SymbolRc, &SExpRc)> = vec![];
             for (var, val) in v {
                 rl_s(&mut *val.borrow_mut(), scoped_vars); // first make sure the val is "let-free"
                 new_vars.push((var, val)); // make note of the mapping to add to the rest
@@ -206,7 +208,7 @@ fn rc_se(sexp: &mut SExp, vng : &mut VarNameGenerator) {
                 Constant::Hex(_) => Sort::BitVec(),
             };
             let name = vng.get_name(sort);
-            *sexp = SExp::Symbol(RefCell::new(Symbol::Var(name)));
+            *sexp = SExp::Symbol(rccell!(Symbol::Var(name)));
         },
         SExp::Compound(sexps) |
         SExp::BExp(_, sexps) => {
@@ -270,9 +272,9 @@ fn init_vars(script : &mut Script, vars : Vec<(String, Sort)>) {
     let mut end = cmds.split_off(log_pos + 1);
 
     let mut decls = vars.into_iter()
-        .map(|(vname, sort)| Command::DeclConst(vname, RefCell::new(sort)))
-        .map(|cmd| RefCell::new(cmd))
-        .collect::<Vec<RefCell<Command>>>();
+        .map(|(vname, sort)| Command::DeclConst(vname, rccell!(sort)))
+        .map(|cmd| rccell!(cmd))
+        .collect::<Vec<CommandRc>>();
 
     cmds.append(&mut decls);
     cmds.append(&mut end);
@@ -290,12 +292,12 @@ fn add_ba(script : &mut Script, bavs : Vec<(String, SExp)>) {
 
     let mut baveq_iter = bavs.into_iter()
         .map(|(vname, sexp)| {
-            SExp::BExp(RefCell::new(BoolOp::Equals()),
-                vec![RefCell::new(SExp::Symbol(RefCell::new(Symbol::Var(vname)))), RefCell::new(sexp)]
+            SExp::BExp(rccell!(BoolOp::Equals()),
+                vec![rccell!(SExp::Symbol(rccell!(Symbol::Var(vname)))), rccell!(sexp)]
             )
         });
 
-    cmds.insert(cs_pos, RefCell::new(assert_many(&mut baveq_iter)));
+    cmds.insert(cs_pos, rccell!(assert_many(&mut baveq_iter)));
 }
 
 fn assert_many(iter: &mut dyn Iterator<Item = SExp>) -> Command {
@@ -305,9 +307,9 @@ fn assert_many(iter: &mut dyn Iterator<Item = SExp>) -> Command {
     };
 
     let intersection = iter
-        .fold(init, |acc, curr| SExp::BExp(RefCell::new(BoolOp::And()), vec![RefCell::new(acc), RefCell::new(curr)]));
+        .fold(init, |acc, curr| SExp::BExp(rccell!(BoolOp::And()), vec![rccell!(acc), rccell!(curr)]));
 
-    return Command::Assert(RefCell::new(intersection))
+    return Command::Assert(rccell!(intersection))
 }
 
 fn end_insert_pt(script : &Script) -> usize {
@@ -326,7 +328,7 @@ fn get_bav_assign(bavns : &Vec<String>, ta : BitVec) -> Command {
     let mut baveq = bavs.into_iter()
         .map(|(vname, bval)| {
             let val = if bval { SExp::true_sexp() } else { SExp::false_sexp() };
-            SExp::BExp(RefCell::new(BoolOp::Equals()), vec![RefCell::new(SExp::Symbol(RefCell::new(Symbol::Var(vname.clone())))), RefCell::new(val)])
+            SExp::BExp(rccell!(BoolOp::Equals()), vec![rccell!(SExp::Symbol(rccell!(Symbol::Var(vname.clone())))), rccell!(val)])
         });
 
     assert_many(&mut baveq)
@@ -490,9 +492,9 @@ mod tests {
     #[test]
     fn qc_rls() {
         let v = Symbol::Var("x".to_owned());
-        let e = SExp::Symbol(RefCell::new(Symbol::Token("changed".to_owned())));
+        let e = SExp::Symbol(rccell!(Symbol::Token("changed".to_owned())));
         let expected = e.clone();
-        let mut sexp = SExp::Let(vec![(RefCell::new(v.clone()), RefCell::new(e))], RefCell::new(Box::new(SExp::Symbol(RefCell::new(v)))));
+        let mut sexp = SExp::Let(vec![(rccell!(v.clone()), rccell!(e))], rccell!(Box::new(SExp::Symbol(rccell!(v)))));
         rl_s(&mut sexp, &mut BTreeMap::new());
         assert_eq!(sexp, expected);
     }

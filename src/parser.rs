@@ -19,21 +19,23 @@ use std::iter::once;
 use std::cell::RefCell;
 use std::rc::Rc;
 
+pub type ScriptRc = Rc<RefCell<Script>>;
+pub type CommandRc = Rc<RefCell<Command>>;
+pub type LogicRc = Rc<RefCell<Logic>>;
+pub type SExpRc = Rc<RefCell<SExp>>;
+pub type SExpBoxRc = Rc<RefCell<Box<SExp>>>;
+pub type SortRc = Rc<RefCell<Sort>>;
+pub type SymbolRc = Rc<RefCell<Symbol>>;
+pub type ConstantRc = Rc<RefCell<Constant>>;
+pub type BoolOpRc = Rc<RefCell<BoolOp>>;
+
 #[derive(Debug, Eq, PartialEq, Clone)]
 pub enum Script {
-    Commands(Vec<RefCell<Command>>),
+    Commands(Vec<CommandRc>),
 }
 
-type LogicRc = Rc<RefCell<Logic>>;
-type SExpRc = Rc<RefCell<SExp>>;
-type SExpBoxRc = Rc<RefCell<Box<SExp>>>;
-type SortRc = Rc<RefCell<Sort>>;
-type SymbolRc = Rc<RefCell<Symbol>>;
-type ConstantRc = Rc<RefCell<Constant>>;
-type BoolOpRc = Rc<RefCell<BoolOp>>;
-
 macro_rules! rccell {
-    ($x:ident) => {
+    ($x:expr) => {
         {
             Rc::new(RefCell::new($x))
         }
@@ -44,10 +46,10 @@ macro_rules! rccell {
 pub enum Command {
     Logic(LogicRc),
     CheckSat(),
-    CheckSatAssuming(RefCell<SExp>),
-    Assert(RefCell<SExp>),
+    CheckSatAssuming(SExpRc),
+    Assert(SExpRc),
     GetModel(),
-    DeclConst(String, RefCell<Sort>),
+    DeclConst(String, SortRc),
     Generic(Vec<String>),
 }
 
@@ -60,16 +62,16 @@ pub enum Sort {
     BitVec(),
     Array(),
     UserDef(String),
-    Compound(Vec<RefCell<Sort>>),
+    Compound(Vec<SortRc>),
 }
 
 #[derive(Debug, Eq, PartialEq, Clone)]
 pub enum SExp {
-    Compound(Vec<RefCell<SExp>>),
-    Let(Vec<(RefCell<Symbol>, RefCell<SExp>)>, RefCell<Box<SExp>>),
-    BExp(RefCell<BoolOp>, Vec<RefCell<SExp>>),
-    Constant(RefCell<Constant>),
-    Symbol(RefCell<Symbol>),
+    Compound(Vec<SExpRc>),
+    Let(Vec<(SymbolRc, SExpRc)>, SExpBoxRc),
+    BExp(BoolOpRc, Vec<SExpRc>),
+    Constant(ConstantRc),
+    Symbol(SymbolRc),
 }
 
 #[derive(Debug, Eq, PartialEq, Clone)]
@@ -111,14 +113,14 @@ pub enum Logic {
 
 #[derive(Debug, Eq, PartialEq)]
 enum AstNode {
-    Script(Rc<RefCell<Script>>),
-    Command(Rc<RefCell<Command>>),
-    Constant(Rc<RefCell<Constant>>),
-    Symbol(Rc<RefCell<Symbol>>),
-    SExp(Rc<RefCell<SExp>>),
-    Logic(Rc<RefCell<Logic>>),
-    BoolOp(Rc<RefCell<BoolOp>>),
-    Sort(Rc<RefCell<Sort>>),
+    Script(ScriptRc),
+    Command(CommandRc),
+    Constant(ConstantRc),
+    Symbol(SymbolRc),
+    SExp(SExpRc),
+    Logic(LogicRc),
+    BoolOp(BoolOpRc),
+    Sort(SortRc),
 }
 
 
@@ -136,17 +138,17 @@ impl Script {
 
     pub fn insert(&mut self, i : usize, cmd : Command) {
         let Script::Commands(cmds) = self;
-        cmds.insert(i, RefCell::new(cmd));
+        cmds.insert(i, rccell!(cmd));
     }
 
     pub fn replace(&mut self, i : usize, cmd : Command) {
         let Script::Commands(cmds) = self;
-        cmds[i] = RefCell::new(cmd);
+        cmds[i] = rccell!(cmd);
     }
 
     pub fn init(&mut self, i : usize) {
         let Script::Commands(cmds) = self;
-        cmds.insert(i, RefCell::new(Command::Assert(RefCell::new(SExp::true_sexp()))));
+        cmds.insert(i, rccell!(Command::Assert(rccell!(SExp::true_sexp()))));
     }
 
     pub fn is_unsupported_logic(&self) -> bool {
@@ -235,11 +237,11 @@ impl Sort {
 
 impl SExp {
     pub fn true_sexp() -> SExp {
-        SExp::Symbol(RefCell::new(Symbol::Token("true".to_owned())))
+        SExp::Symbol(rccell!(Symbol::Token("true".to_owned())))
     }
 
     pub fn false_sexp() -> SExp {
-        SExp::Symbol(RefCell::new(Symbol::Token("false".to_owned())))
+        SExp::Symbol(rccell!(Symbol::Token("false".to_owned())))
     }
 
     pub fn to_string(&self) -> String {
@@ -391,16 +393,16 @@ fn bool_core_ops(s: &str) -> IResult<&str, BoolOp> {
 
 fn bool_sexp(s: &str) -> IResult<&str, SExp> {
     let inner_int = map(tuple((bool_int_ops, many1(sexp))), 
-                        |(o, v)| SExp::BExp(RefCell::new(o), v.into_iter().map(|s| RefCell::new(s)).collect()));
+                        |(o, v)| SExp::BExp(rccell!(o), v.into_iter().map(|s| rccell!(s)).collect()));
     let inner_core = map(tuple((bool_core_ops, many1(sexp))), 
-                        |(o, v)| SExp::BExp(RefCell::new(o), v.into_iter().map(|s| RefCell::new(s)).collect()));
+                        |(o, v)| SExp::BExp(rccell!(o), v.into_iter().map(|s| rccell!(s)).collect()));
 
     let naked_b = alt((inner_int, inner_core));
     delimited(char('('), naked_b, char(')'))(s)
 }
 
 
-fn let_sexp(s : &str) -> IResult<&str, (Vec<(RefCell<Symbol>, RefCell<SExp>)>, RefCell<Box<SExp>>)> {
+fn let_sexp(s : &str) -> IResult<&str, (Vec<(SymbolRc, SExpRc)>, SExpBoxRc)> {
     let ws_symbol = delimited(multispace0, symbol, multispace0);
     let mapped_ws_symbol = map(ws_symbol, |s| Symbol::Var(s.to_owned()));
     let ws_sexp = delimited(multispace0, sexp, multispace0);
@@ -413,7 +415,7 @@ fn let_sexp(s : &str) -> IResult<&str, (Vec<(RefCell<Symbol>, RefCell<SExp>)>, R
     let inner = preceded(tag("let"), tuple((ws_var_bs, sexp)));
     let ws_inner = delimited(multispace0, inner, multispace0);
     let wrapped = delimited(char('('), ws_inner, char(')'));
-    let mapped = map(wrapped, |(a, b)| (a.into_iter().map(|(x, y)| (RefCell::new(x), RefCell::new(y))).collect(), RefCell::new(Box::new(b))));
+    let mapped = map(wrapped, |(a, b)| (a.into_iter().map(|(x, y)| (rccell!(x), rccell!(y))).collect(), rccell!(Box::new(b))));
     mapped(s)
 }
 
@@ -427,9 +429,9 @@ fn sexp(s: &str) -> IResult<&str, SExp> {
     alt((
         ws_bexp,
         map(ws_let_sexp, |(tbs, sexp)| SExp::Let(tbs, sexp)),
-        map(ws_rec_sexp, |es| SExp::Compound(es.into_iter().map(|e| RefCell::new(e)).collect())),
-        map(ws_constant, |c| SExp::Constant(RefCell::new(c))),
-        map(ws_symbol, |s| SExp::Symbol(RefCell::new(Symbol::Token(s.to_owned())))),
+        map(ws_rec_sexp, |es| SExp::Compound(es.into_iter().map(|e| rccell!(e)).collect())),
+        map(ws_constant, |c| SExp::Constant(rccell!(c))),
+        map(ws_symbol, |s| SExp::Symbol(rccell!(Symbol::Token(s.to_owned())))),
     ))(s)
 }
 
@@ -443,7 +445,7 @@ fn sort(s: &str) -> IResult<&str, Sort> {
         map(ws_int, |_| Sort::UInt()),
         map(ws_dec, |_| Sort::Dec()),
         map(ws_userdef, |s| Sort::UserDef(s.to_owned())),
-        map(ws_rec_sort, |ss| Sort::Compound(ss.into_iter().map(|s| RefCell::new(s)).collect())),
+        map(ws_rec_sort, |ss| Sort::Compound(ss.into_iter().map(|s| rccell!(s)).collect())),
     ))(s)
 }
 
@@ -487,12 +489,12 @@ fn set_info_status(s : &str) -> IResult<&str, (&str, &str)> {
 
 fn naked_command(s: &str) -> IResult<&str, Command> {
     alt((
-        map(naked_assert, |a| Command::Assert(RefCell::new(a))),
-        map(naked_csa, |a| Command::CheckSatAssuming(RefCell::new(a))),
+        map(naked_assert, |a| Command::Assert(rccell!(a))),
+        map(naked_csa, |a| Command::CheckSatAssuming(rccell!(a))),
         map(tag("check-sat"), |_| Command::CheckSat()),
         map(tag("get-model"), |_| Command::GetModel()),
         map(naked_logic, |l| Command::Logic(rccell!(l))),
-        map(naked_decl_const, |(v, s)| Command::DeclConst(v.to_owned(), RefCell::new(s))),
+        map(naked_decl_const, |(v, s)| Command::DeclConst(v.to_owned(), rccell!(s))),
     ))(s)
 }
 
@@ -528,7 +530,7 @@ fn command(s: &str) -> IResult<&str, Command> {
 pub fn script(s: &str) -> IResult<&str, Script> {
     map(
         many0(delimited(multispace0, command, multispace0)),
-        |cmds| Script::Commands(cmds.into_iter().map(|cmd| RefCell::new(cmd)).collect()),
+        |cmds| Script::Commands(cmds.into_iter().map(|cmd| rccell!(cmd)).collect()),
     )(s)
 }
 
