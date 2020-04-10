@@ -19,7 +19,6 @@ use std::collections::BTreeMap;
 use std::collections::BTreeSet;
 use std::process;
 use std::str::from_utf8;
-use itertools::Itertools;
 
 
 struct VarNameGenerator {
@@ -108,8 +107,8 @@ impl RandUniqPermGen {
 fn rl(script: &mut Script, scoped_vars: &mut BTreeMap<String, Vec<SExp>>){
     match script {
         Script::Commands(cmds) => {
-            for cmd in cmds.borrow_mut().iter_mut() {
-                rl_c(cmd, scoped_vars);
+            for cmd in cmds.iter_mut() {
+                rl_c(&mut *cmd.borrow_mut(), scoped_vars);
             }
         }
     }
@@ -181,8 +180,8 @@ fn rl_s(sexp: &mut SExp, scoped_vars: &mut BTreeMap<String, Vec<SExp>>){
 fn rc(script: &mut Script, vng : &mut VarNameGenerator){
     match script {
         Script::Commands(cmds) => {
-            for cmd in cmds.borrow_mut().iter_mut() {
-                rc_c(cmd, vng);
+            for cmd in cmds.iter_mut() {
+                rc_c(&mut *cmd.borrow_mut(), vng);
             }
         }
     }
@@ -222,8 +221,8 @@ fn rc_se(sexp: &mut SExp, vng : &mut VarNameGenerator) {
 fn bav(script: &mut Script, vng : &mut VarNameGenerator, bava : &mut Vec<(String, SExp)>){
     match script {
         Script::Commands(cmds) => {
-            for cmd in cmds.borrow_mut().iter_mut() {
-                bav_c(cmd, vng, bava);
+            for cmd in cmds.iter_mut() {
+                bav_c(&mut *cmd.borrow_mut(), vng, bava);
             }
         }
     }
@@ -259,33 +258,34 @@ fn bav_se(sexp: &mut SExp, vng : &mut VarNameGenerator, bavs : &mut Vec<(String,
 
 fn init_vars(script : &mut Script, vars : Vec<(String, Sort)>) {
     let Script::Commands(cmds) = script;
-    if cmds.borrow().len() == 0 { return }
+    if cmds.len() == 0 { return }
 
-    let maybe_log_pos = cmds.borrow().iter().position(|cmd| cmd.is_logic());
+    let maybe_log_pos = cmds.iter().position(|cmd| cmd.borrow().is_logic());
 
     let log_pos = match maybe_log_pos {
         Some(pos) => pos,
         None => 0,
     };
 
-    let mut end = cmds.borrow_mut().split_off(log_pos + 1);
+    let mut end = cmds.split_off(log_pos + 1);
 
     let mut decls = vars.into_iter()
         .map(|(vname, sort)| Command::DeclConst(vname, RefCell::new(sort)))
-        .collect::<Vec<Command>>();
+        .map(|cmd| RefCell::new(cmd))
+        .collect::<Vec<RefCell<Command>>>();
 
-    cmds.borrow_mut().append(&mut decls);
-    cmds.borrow_mut().append(&mut end);
+    cmds.append(&mut decls);
+    cmds.append(&mut end);
 }
 
 fn add_ba(script : &mut Script, bavs : Vec<(String, SExp)>) {
     let Script::Commands(cmds) = script;
 
-    let maybe_cs_pos = cmds.borrow().iter().position(|cmd| cmd.is_checksat());
+    let maybe_cs_pos = cmds.iter().position(|cmd| cmd.borrow().is_checksat());
 
     let cs_pos = match maybe_cs_pos {
         Some(pos) => pos,
-        None => cmds.borrow().len(),
+        None => cmds.len(),
     };
 
     let mut baveq_iter = bavs.into_iter()
@@ -295,7 +295,7 @@ fn add_ba(script : &mut Script, bavs : Vec<(String, SExp)>) {
             )
         });
 
-    cmds.borrow_mut().insert(cs_pos, assert_many(&mut baveq_iter));
+    cmds.insert(cs_pos, RefCell::new(assert_many(&mut baveq_iter)));
 }
 
 fn assert_many(iter: &mut dyn Iterator<Item = SExp>) -> Command {
@@ -313,11 +313,11 @@ fn assert_many(iter: &mut dyn Iterator<Item = SExp>) -> Command {
 fn end_insert_pt(script : &Script) -> usize {
     let Script::Commands(cmds) = script;
 
-    let maybe_cs_pos = cmds.borrow().iter().position(|cmd| cmd.is_checksat());
+    let maybe_cs_pos = cmds.iter().position(|cmd| cmd.borrow().is_checksat());
 
     match maybe_cs_pos {
         Some(pos) => pos,
-        None => cmds.borrow().len(),
+        None => cmds.len(),
     }
 }
 

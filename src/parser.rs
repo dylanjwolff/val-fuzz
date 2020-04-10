@@ -17,15 +17,32 @@ use nom::sequence::preceded;
 use nom::{bytes::complete::tag, combinator::map, sequence::tuple, IResult};
 use std::iter::once;
 use std::cell::RefCell;
+use std::rc::Rc;
 
 #[derive(Debug, Eq, PartialEq, Clone)]
 pub enum Script {
-    Commands(RefCell<Vec<Command>>),
+    Commands(Vec<RefCell<Command>>),
+}
+
+type LogicRc = Rc<RefCell<Logic>>;
+type SExpRc = Rc<RefCell<SExp>>;
+type SExpBoxRc = Rc<RefCell<Box<SExp>>>;
+type SortRc = Rc<RefCell<Sort>>;
+type SymbolRc = Rc<RefCell<Symbol>>;
+type ConstantRc = Rc<RefCell<Constant>>;
+type BoolOpRc = Rc<RefCell<BoolOp>>;
+
+macro_rules! rccell {
+    ($x:ident) => {
+        {
+            Rc::new(RefCell::new($x))
+        }
+    };
 }
 
 #[derive(Debug, Eq, PartialEq, Clone)]
 pub enum Command {
-    Logic(RefCell<Logic>),
+    Logic(LogicRc),
     CheckSat(),
     CheckSatAssuming(RefCell<SExp>),
     Assert(RefCell<SExp>),
@@ -93,15 +110,15 @@ pub enum Logic {
 }
 
 #[derive(Debug, Eq, PartialEq)]
-enum AstNode<'a> {
-    Script(&'a mut Script),
-    Command(&'a mut Command),
-    Constant(&'a mut Constant),
-    Symbol(&'a mut Symbol),
-    SExp(&'a mut SExp),
-    Logic(&'a mut Logic),
-    BoolOp(&'a mut BoolOp),
-    Sort(&'a mut Sort),
+enum AstNode {
+    Script(Rc<RefCell<Script>>),
+    Command(Rc<RefCell<Command>>),
+    Constant(Rc<RefCell<Constant>>),
+    Symbol(Rc<RefCell<Symbol>>),
+    SExp(Rc<RefCell<SExp>>),
+    Logic(Rc<RefCell<Logic>>),
+    BoolOp(Rc<RefCell<BoolOp>>),
+    Sort(Rc<RefCell<Sort>>),
 }
 
 
@@ -110,9 +127,8 @@ impl Script {
     pub fn to_string(&self) -> String {
         match self {
             Script::Commands(cmds) => cmds
-                .borrow()
                 .iter()
-                .map(|cmd| cmd.to_string())
+                .map(|cmd| cmd.borrow().to_string())
                 .collect::<Vec<String>>()
                 .join("\n"),
         }
@@ -120,25 +136,24 @@ impl Script {
 
     pub fn insert(&mut self, i : usize, cmd : Command) {
         let Script::Commands(cmds) = self;
-        cmds.borrow_mut().insert(i, cmd);
+        cmds.insert(i, RefCell::new(cmd));
     }
 
     pub fn replace(&mut self, i : usize, cmd : Command) {
         let Script::Commands(cmds) = self;
-        cmds.borrow_mut()[i] = cmd;
+        cmds[i] = RefCell::new(cmd);
     }
 
     pub fn init(&mut self, i : usize) {
         let Script::Commands(cmds) = self;
-        cmds.borrow_mut().insert(i, Command::Assert(RefCell::new(SExp::true_sexp())));
+        cmds.insert(i, RefCell::new(Command::Assert(RefCell::new(SExp::true_sexp()))));
     }
 
     pub fn is_unsupported_logic(&self) -> bool {
         let Script::Commands(cmds) = self;
-        let bcmds = cmds.borrow();
-        let maybe_logic = bcmds.iter().find(|cmd| (cmd).is_logic());
+        let maybe_logic = cmds.iter().find(|cmd| cmd.borrow().is_logic());
         match maybe_logic {
-            Some(cmd) => match cmd {
+            Some(cmd) => match &*cmd.borrow() {
                 Command::Logic(l) => match *l.borrow() {
                    Logic::QF_SLIA() => true,
                    _ => false,
@@ -476,7 +491,7 @@ fn naked_command(s: &str) -> IResult<&str, Command> {
         map(naked_csa, |a| Command::CheckSatAssuming(RefCell::new(a))),
         map(tag("check-sat"), |_| Command::CheckSat()),
         map(tag("get-model"), |_| Command::GetModel()),
-        map(naked_logic, |l| Command::Logic(RefCell::new(l))),
+        map(naked_logic, |l| Command::Logic(rccell!(l))),
         map(naked_decl_const, |(v, s)| Command::DeclConst(v.to_owned(), RefCell::new(s))),
     ))(s)
 }
@@ -513,7 +528,7 @@ fn command(s: &str) -> IResult<&str, Command> {
 pub fn script(s: &str) -> IResult<&str, Script> {
     map(
         many0(delimited(multispace0, command, multispace0)),
-        |cmds| Script::Commands(RefCell::new(cmds)),
+        |cmds| Script::Commands(cmds.into_iter().map(|cmd| RefCell::new(cmd)).collect()),
     )(s)
 }
 
@@ -522,6 +537,7 @@ pub fn rmv_comments(s: &str) -> IResult<&str, Vec<&str>> {
     let comment = delimited(char(';'), not_line_ending, line_ending);
     many1(alt((not_comment, map(comment, |_| ""))))(s)
 }
+
 
 
 #[cfg(test)]
