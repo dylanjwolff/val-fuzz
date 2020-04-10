@@ -155,19 +155,25 @@ fn rl_s(sexp: &mut SExp, scoped_vars: &mut BTreeMap<String, Vec<SExp>>){
                 scoped_vars.get_mut(&var.borrow().to_string()[..]).map(|v| v.pop());
             }
 
-            sexp.replace(rest.borrow().clone()); // the let expression isn't doing anything anymore
+            let b =(**rest.borrow()).clone();
+            *sexp = b; // the let expression isn't doing anything anymore, replace it with rest
         },
         SExp::Symbol(s) => {
-            match scoped_vars.get(&s.to_string()[..]).and_then(|v| v.last()) {
+            let new_s = scoped_vars
+                .get(&s.borrow().to_string()[..])
+                .and_then(|v| v.last());
+
+            match new_s {
                 Some(e) => {
-                    *sexp = e.clone();
+                    let b = e.clone();
+                    *sexp = b;
                 },
                 None => (),
             }
         },
 
         SExp::Compound(v) |
-        SExp::BExp(_, v) => for e in v { rl_s(e, scoped_vars) },
+        SExp::BExp(_, v) => for e in v { rl_s(&mut *e.borrow_mut(), scoped_vars) },
         SExp::Constant(_) => (),
     }
 }
@@ -192,7 +198,7 @@ fn rc_c(cmd: &mut Command, vng : &mut  VarNameGenerator) {
 fn rc_se(sexp: &mut SExp, vng : &mut VarNameGenerator) {
     match sexp {
         SExp::Constant(c) => {
-            let sort = match c {
+            let sort = match *c.borrow_mut() {
                 Constant::UInt(_) => Sort::UInt(),
                 Constant::Dec(_) => Sort::Dec(),
                 Constant::Str(_) => Sort::Str(),
@@ -201,12 +207,12 @@ fn rc_se(sexp: &mut SExp, vng : &mut VarNameGenerator) {
                 Constant::Hex(_) => Sort::BitVec(),
             };
             let name = vng.get_name(sort);
-            *sexp = SExp::Symbol(Symbol::Var(name));
+            *sexp = SExp::Symbol(RefCell::new(Symbol::Var(name)));
         },
         SExp::Compound(sexps) |
         SExp::BExp(_, sexps) => {
             for sexp in sexps {
-                rc_se(sexp, vng)
+                rc_se(&mut *sexp.borrow_mut(), vng)
             }
         }
         _ => (),
@@ -237,12 +243,12 @@ fn bav_se(sexp: &mut SExp, vng : &mut VarNameGenerator, bavs : &mut Vec<(String,
             let sec = SExp::BExp(bop.clone(), sexps.clone());
             bavs.push((name, sec));
             for sexp in sexps {
-                bav_se(sexp, vng, bavs);
+                bav_se(&mut *sexp.borrow_mut(), vng, bavs);
             }
         },
         SExp::Compound(sexps) => {
             for sexp in sexps {
-                bav_se(sexp, vng, bavs);
+                bav_se(&mut *sexp.borrow_mut(), vng, bavs);
             }
         },
         SExp::Let(_, _) => panic!("Let statments should be filtered out!"),
@@ -284,7 +290,9 @@ fn add_ba(script : &mut Script, bavs : Vec<(String, SExp)>) {
 
     let mut baveq_iter = bavs.into_iter()
         .map(|(vname, sexp)| {
-            SExp::BExp(BoolOp::Equals(), vec![SExp::Symbol(Symbol::Var(vname)), sexp])
+            SExp::BExp(RefCell::new(BoolOp::Equals()),
+                vec![RefCell::new(SExp::Symbol(RefCell::new(Symbol::Var(vname)))), RefCell::new(sexp)]
+            )
         });
 
     cmds.borrow_mut().insert(cs_pos, assert_many(&mut baveq_iter));
@@ -297,7 +305,7 @@ fn assert_many(iter: &mut dyn Iterator<Item = SExp>) -> Command {
     };
 
     let intersection = iter
-        .fold(init, |acc, curr| SExp::BExp(BoolOp::And(), vec![acc, curr]));
+        .fold(init, |acc, curr| SExp::BExp(RefCell::new(BoolOp::And()), vec![RefCell::new(acc), RefCell::new(curr)]));
 
     return Command::Assert(RefCell::new(intersection))
 }
@@ -318,7 +326,7 @@ fn get_bav_assign(bavns : &Vec<String>, ta : BitVec) -> Command {
     let mut baveq = bavs.into_iter()
         .map(|(vname, bval)| {
             let val = if bval { SExp::true_sexp() } else { SExp::false_sexp() };
-            SExp::BExp(BoolOp::Equals(), vec![SExp::Symbol(Symbol::Var(vname.clone())), val])
+            SExp::BExp(RefCell::new(BoolOp::Equals()), vec![RefCell::new(SExp::Symbol(RefCell::new(Symbol::Var(vname.clone())))), RefCell::new(val)])
         });
 
     assert_many(&mut baveq)
@@ -482,9 +490,9 @@ mod tests {
     #[test]
     fn qc_rls() {
         let v = Symbol::Var("x".to_owned());
-        let e = SExp::Symbol(Symbol::Token("changed".to_owned()));
+        let e = SExp::Symbol(RefCell::new(Symbol::Token("changed".to_owned())));
         let expected = e.clone();
-        let mut sexp = SExp::Let(vec![(v.clone(), e)], Box::new(SExp::Symbol(v)));
+        let mut sexp = SExp::Let(vec![(RefCell::new(v.clone()), RefCell::new(e))], RefCell::new(Box::new(SExp::Symbol(RefCell::new(v)))));
         rl_s(&mut sexp, &mut BTreeMap::new());
         assert_eq!(sexp, expected);
     }
