@@ -540,7 +540,93 @@ pub fn rmv_comments(s: &str) -> IResult<&str, Vec<&str>> {
     many1(alt((not_comment, map(comment, |_| ""))))(s)
 }
 
+fn get_children(node : &AstNode) -> Vec<AstNode> {
+    match node {
+        AstNode::Script(s_rc) => match &*s_rc.borrow() {
+            Script::Commands(cmds) => cmds.iter()
+                .map(|cmd| AstNode::Command(Rc::clone(cmd)))
+                .rev()
+                .collect(),
+        },
+        AstNode::Command(c_rc) => match &*c_rc.borrow() {
+            Command::Logic(l_rc) => vec![AstNode::Logic(Rc::clone(l_rc))],
+            Command::Assert(a) |
+            Command::CheckSatAssuming(a) => vec![AstNode::SExp(Rc::clone(a))],
+            Command::DeclConst(_, s) => vec![AstNode::Sort(Rc::clone(s))],
+            _ => vec![],
+        },
+        AstNode::Sort(s_rc) => match &*s_rc.borrow() {
+            Sort::Compound(ss) => ss.iter()
+                .map(|s| AstNode::Sort(Rc::clone(s)))
+                .rev()
+                .collect(),
+            _ => vec![],
+        }
+        AstNode::SExp(s_rc) => match &*s_rc.borrow() {
+            SExp::Compound(ss) => ss.iter()
+                .map(|s| AstNode::SExp(Rc::clone(s)))
+                .rev()
+                .collect(),
+            SExp::BExp(bop, ss) => ss.iter()
+                .map(|s| AstNode::SExp(Rc::clone(s)))
+                .rev()
+                .chain(once(AstNode::BoolOp(Rc::clone(bop))))
+                .collect(),
+            SExp::Let(vs, s) => { 
+                let mut astns = vs.iter()
+                    .fold(vec![], |mut asts, (vr, vl)| {
+                        asts.push(AstNode::Symbol(Rc::clone(vr))); 
+                        asts.push(AstNode::SExp(Rc::clone(vl))); 
+                        asts
+                    });
+                astns.push(AstNode::SExp(rccell!(*(s.borrow()).clone())));
+                astns.into_iter().rev().collect()
+            },
+            SExp::Constant(c) => vec![AstNode::Constant(Rc::clone(c))],
+            SExp::Symbol(s) => vec![AstNode::Symbol(Rc::clone(s))],
+        },
+        _ => vec![],
+    }
+}
 
+fn traverse(node : AstNode, mut visitor : &mut dyn Visitor) {
+    let mut to_visit = vec![node];
+    let mut visiting = vec![];
+
+    while let Some(mut node) = to_visit.pop() {
+        visitor.entry(&mut node);
+        to_visit.extend(get_children(&node));
+        visiting.push(node);
+    }
+
+    while let Some(mut node) = visiting.pop() {
+        visitor.exit(&mut node);
+
+        while let Some(mut node) = to_visit.pop() {
+            visitor.entry(&mut node);
+            to_visit.extend(get_children(&node));
+            visiting.push(node);
+        }
+    }
+}
+
+trait Visitor {
+    fn entry(&mut self, node: &mut AstNode) -> bool;
+    fn exit(&mut self, node: &mut AstNode);
+}
+
+struct DebugVisitor {}
+
+impl Visitor for DebugVisitor {
+        fn entry(&mut self, node : &mut AstNode) -> bool {
+            println!("ENTER: {:?}", node);
+            false
+        }
+
+        fn exit(&mut self, node : &mut AstNode) {
+            println!("EXIT: {:?}", node);
+        }
+}
 
 #[cfg(test)]
 mod tests {
@@ -558,6 +644,7 @@ mod tests {
     #[test]
     fn traversal() {
         let mut s = parse_file("samples/ex.smt2");
+        traverse(AstNode::Script(rccell!(s)), &mut DebugVisitor{});
     }
 }
  
