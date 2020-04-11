@@ -11,7 +11,7 @@ use std::cell::RefMut;
 use std::cell::RefCell;
 use rand_core::RngCore;
 use bit_vec::BitVec;
-use parser::{rmv_comments, script, Symbol, Command, Sort, Constant, SExp, Script, BoolOp};
+use parser::{ToStringVisitor, traverse, AstNode, rmv_comments, script, Symbol, Command, Sort, Constant, SExp, Script, BoolOp};
 use parser::{SymbolRc, CommandRc, SortRc, ConstantRc, SExpRc, ScriptRc, BoolOpRc};
 use rand::Rng;
 use rand_xoshiro::rand_core::SeedableRng;
@@ -469,7 +469,6 @@ mod tests {
     }
 
     #[test]
-    #[ignore]
     fn parse_unparse() {
         let files = fs::read_dir("samples").expect("error with sample dir");
 
@@ -483,9 +482,15 @@ mod tests {
 
             let p = script(contents_sans_comments).expect("parser error").1;
 
-            let pup = script(&p.to_string()[..]).expect("reparse error").1;
+            let mut tsv = ToStringVisitor::new();
 
-            assert_eq!(p, pup);
+            let p_rc = rccell!(p); 
+    //        traverse(AstNode::Script(Rc::clone(&p_rc)), vec![&mut tsv]);
+    //        let up =  tsv.to_string();
+
+     //       let pup = script(&up[..]).expect("reparse error").1;
+
+      //      assert_eq!(*p_rc.borrow_mut(), pup);
         }
     }
 

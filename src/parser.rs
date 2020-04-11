@@ -50,7 +50,7 @@ pub enum Command {
     Assert(SExpRc),
     GetModel(),
     DeclConst(String, SortRc),
-    Generic(Vec<String>),
+    Generic(String),
 }
 
 #[derive(Debug, Eq, PartialEq, Clone)]
@@ -112,7 +112,7 @@ pub enum Logic {
 }
 
 #[derive(Debug, Eq, PartialEq)]
-enum AstNode {
+pub enum AstNode {
     Script(ScriptRc),
     Command(CommandRc),
     Constant(ConstantRc),
@@ -121,6 +121,8 @@ enum AstNode {
     Logic(LogicRc),
     BoolOp(BoolOpRc),
     Sort(SortRc),
+    Open(),
+    Close(),
 }
 
 
@@ -179,8 +181,30 @@ impl Command {
             Command::DeclConst(v, s) => {
                 ("(declare-const ".to_string() + v + " " + &s.borrow().to_string()[..] + ")").to_string()
             }
-            Command::Generic(v) => v.join(""),
+            Command::Generic(s) => s.clone(),
             Command::Assert(s) => ("(assert ".to_string() + &s.borrow().to_string()[..] + ")").to_string(),
+        }
+    }
+
+    pub fn entry_string(&self) -> String {
+        match self {
+            Command::Logic(_) => "(set-logic ".to_owned(),
+            Command::CheckSat() => "(check-sat)".to_owned(),
+            Command::GetModel() => "(get-model)".to_owned(),
+            Command::CheckSatAssuming(_) => "(check-sat-assuming ".to_owned(),
+            Command::DeclConst(s, _) => format!("(declare-const {} ", s),
+            Command::Assert(_) => "(assert ".to_owned(),
+            Command::Generic(s) => s.clone(),
+        }
+    }
+
+    pub fn exit_str(&self) -> &str {
+        match self {
+            Command::CheckSatAssuming(_) |
+            Command::DeclConst(_, _) |
+            Command::Assert(_) |
+            Command::Logic(_) => ")\n",
+            _ => "\n",
         }
     }
 
@@ -233,6 +257,26 @@ impl Sort {
             }
         }
     }
+
+    pub fn entry_str(&self) -> &str {
+        match self {
+            Sort::UInt() => "Int",
+            Sort::Dec() => "Real",
+            Sort::Bool() => "Bool",
+            Sort::Str() => "String",
+            Sort::BitVec() => "BitVec",
+            Sort::Array() => "Array",
+            Sort::UserDef(s) => &s,
+            Sort::Compound(_) => "(",
+        }
+    }
+
+    pub fn exit_str(&self) -> &str {
+        match self {
+            Sort::Compound(_) => ")",
+            _ => "",
+        }
+    }
 }
 
 impl SExp {
@@ -276,6 +320,24 @@ impl SExp {
                 format!("({} {})", o.borrow().to_string(), rec_s)
             },
             SExp::Symbol(s) => s.borrow().to_string(),
+        }
+    }
+
+    pub fn entry_str(&self) -> &str {
+        match self {
+            SExp::Let(_, _) => "(let ",
+            SExp::Compound(_) |
+            SExp::BExp(_, _) => "(",
+            _ => "",
+        }
+    }
+
+    pub fn exit_str(&self) -> &str {
+        match self {
+            SExp::Let(_, _) |
+            SExp::Compound(_) |
+            SExp::BExp(_, _) => ")",
+            _ => "",
         }
     }
 }
@@ -523,7 +585,7 @@ fn command(s: &str) -> IResult<&str, Command> {
         map(unknown_balanced, |v| Command::Generic(
                 v.into_iter()
                     .map(|g| g.to_owned())
-                    .collect::<Vec<String>>())),
+                    .collect::<String>())),
     ))(s)
 }
 
@@ -574,11 +636,14 @@ fn get_children(node : &AstNode) -> Vec<AstNode> {
                 .collect(),
             SExp::Let(vs, s) => { 
                 let mut astns = vs.iter()
-                    .fold(vec![], |mut asts, (vr, vl)| {
-                        asts.push(AstNode::Symbol(Rc::clone(vr))); 
-                        asts.push(AstNode::SExp(Rc::clone(vl))); 
+                    .fold(vec![AstNode::Open()], |mut asts, (vr, vl)| {
+                        asts.push(AstNode::Open());
+                        asts.push(AstNode::Symbol(Rc::clone(vr)));
+                        asts.push(AstNode::SExp(Rc::clone(vl)));
+                        asts.push(AstNode::Close());
                         asts
                     });
+                astns.push(AstNode::Close());
                 astns.push(AstNode::SExp(rccell!(*(s.borrow()).clone())));
                 astns.into_iter().rev().collect()
             },
@@ -589,44 +654,97 @@ fn get_children(node : &AstNode) -> Vec<AstNode> {
     }
 }
 
-fn traverse(node : AstNode, mut visitor : &mut dyn Visitor) {
-    let mut to_visit = vec![node];
+pub fn traverse(node : AstNode, mut visitors : Vec<&mut dyn Visitor>) {
+    let mut to_visit = vec![vec![node]];
     let mut visiting = vec![];
 
-    while let Some(mut node) = to_visit.pop() {
-        visitor.entry(&mut node);
-        to_visit.extend(get_children(&node));
-        visiting.push(node);
-    }
-
-    while let Some(mut node) = visiting.pop() {
-        visitor.exit(&mut node);
-
-        while let Some(mut node) = to_visit.pop() {
-            visitor.entry(&mut node);
-            to_visit.extend(get_children(&node));
-            visiting.push(node);
+    while let Some(child_group) = to_visit.last_mut() {
+        match child_group.pop() {
+            Some(node) => {
+                visitors.iter_mut()
+                    .for_each(|v| v.entry(&node));
+                to_visit.push(get_children(&node));
+                visiting.push(node);
+            },
+            None => {
+                to_visit.pop();
+                visiting.pop()
+                    .map(|node| visitors.iter_mut()
+                         .for_each(|v| v.exit(&node)));
+            },
         }
     }
 }
 
-trait Visitor {
-    fn entry(&mut self, node: &mut AstNode) -> bool;
-    fn exit(&mut self, node: &mut AstNode);
+pub trait Visitor {
+    fn entry(&mut self, node: &AstNode);
+    fn exit(&mut self, node: &AstNode);
 }
 
 struct DebugVisitor {}
 
 impl Visitor for DebugVisitor {
-        fn entry(&mut self, node : &mut AstNode) -> bool {
+        fn entry(&mut self, node : &AstNode) {
             println!("ENTER: {:?}", node);
-            false
         }
 
-        fn exit(&mut self, node : &mut AstNode) {
+        fn exit(&mut self, node : &AstNode) {
             println!("EXIT: {:?}", node);
         }
 }
+
+pub struct ToStringVisitor {
+    node_strings : Vec<String>,
+}
+
+impl ToStringVisitor {
+    pub fn new() -> Self {
+        ToStringVisitor {
+            node_strings : vec![],
+        }
+    }
+
+    pub fn to_string(&self) -> String {
+        self.node_strings.join(" ")
+    }
+}
+
+impl Visitor for ToStringVisitor {
+        fn entry(&mut self, node : &AstNode) {
+        let maybe_entry_str = match node {
+            AstNode::Script(_) => None,
+            AstNode::Command(c) => Some(c.borrow().entry_string()),
+            AstNode::SExp(c) => Some(c.borrow().entry_str().to_owned()),
+            AstNode::Constant(c) => Some(c.borrow().to_string()),
+            AstNode::Sort(c) => Some(c.borrow().entry_str().to_owned()),
+            AstNode::Logic(c) => Some(c.borrow().to_string()),
+            AstNode::BoolOp(c) => Some(c.borrow().to_string()),
+            AstNode::Symbol(c) => Some(c.borrow().to_string()),
+            AstNode::Open() => Some("(".to_owned()),
+            AstNode::Close() => Some(")".to_owned()),
+        };
+
+        maybe_entry_str.map(|entry_str| self.node_strings.push(entry_str));
+    }
+
+    fn exit(&mut self, node : &AstNode) {
+        let maybe_exit_str = match node {
+            AstNode::Command(c) => Some(c.borrow().exit_str().to_owned()),
+            AstNode::SExp(c) => Some(c.borrow().exit_str().to_owned()),
+            AstNode::Sort(c) => Some(c.borrow().exit_str().to_owned()),
+            AstNode::Logic(_) => None,
+            AstNode::BoolOp(_) => None,
+            AstNode::Symbol(_) => None,
+            AstNode::Script(_) => None,
+            AstNode::Constant(_) => None,
+            AstNode::Open() => None,
+            AstNode::Close() => None,
+        };
+
+        maybe_exit_str.map(|exit_str| self.node_strings.push(exit_str));
+    }
+}
+
 
 #[cfg(test)]
 mod tests {
@@ -643,8 +761,10 @@ mod tests {
 
     #[test]
     fn traversal() {
-        let mut s = parse_file("samples/ex.smt2");
-        traverse(AstNode::Script(rccell!(s)), &mut DebugVisitor{});
+        let mut s = parse_file("samples/bug272.minimized.smtv1.smt2");
+        let mut tsv = ToStringVisitor::new();
+        traverse(AstNode::Script(rccell!(s)), vec![&mut tsv]);
+        println!("\n\n STRINGIFIED: {} \n\n", tsv.to_string());
     }
 }
  
