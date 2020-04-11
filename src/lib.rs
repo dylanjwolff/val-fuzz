@@ -455,6 +455,26 @@ pub fn exec() {
     }
 }
 
+pub fn perf_exec() {
+    let files = fs::read_dir("perf").expect("error with sample dir");
+
+    for file_res in files {
+        match file_res {
+            Ok(file) => {
+                let filepath = file.path();
+                println!("starting file {:?}", filepath);
+                let contents: String =
+                fs::read_to_string(&filepath).expect("Something went wrong reading the file");
+                let stripped_contents = &rmv_comments(&contents[..]).expect("Error stripping comments").1.join(" ")[..];
+                let mut script = script(&stripped_contents[..]).expect("Parsing error").1;
+               
+                rl(&mut script, &mut BTreeMap::new());
+            }
+            Err(_) => (),
+        }
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
