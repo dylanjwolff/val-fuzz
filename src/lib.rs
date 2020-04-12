@@ -23,6 +23,7 @@ use std::fs;
 use std::path::PathBuf;
 use std::process;
 use std::str::from_utf8;
+use std::str::from_utf8_unchecked;
 use transforms::{end_insert_pt, get_bav_assign, to_skel};
 
 #[allow(unused)]
@@ -92,7 +93,7 @@ impl RandUniqPermGen {
 fn solve(filename: &str) {
     let cvc4_res = process::Command::new("timeout")
         .args(&[
-            "5s",
+            "6s",
             "cvc4",
             filename,
             "--produce-model",
@@ -101,8 +102,8 @@ fn solve(filename: &str) {
         ])
         .output();
 
-    let z3_res = process::Command::new("z3")
-        .args(&["timeout", "5s", filename, "-T:5"])
+    let z3_res = process::Command::new("timeout")
+        .args(&["6s", "z3", filename, "-T:5"])
         .output();
 
     let cvc4_stdout_res = cvc4_res
@@ -123,7 +124,6 @@ fn solve(filename: &str) {
     let z3_stdout_res = z3_res
         .and_then(|out| {
             if !out.status.success() && out.stderr.len() > 0 {
-                println!("z3 error on file {}", filename);
                 Err(std::io::Error::last_os_error()) // really sloppy hack for now, needs to be fixed
             } else {
                 Ok(out)
@@ -141,7 +141,6 @@ fn solve(filename: &str) {
             } else {
                 fs::remove_file(filename)
                     .unwrap_or(());
-                println!("remd");
             }
             ()
         }
