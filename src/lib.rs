@@ -10,22 +10,18 @@ pub mod ast;
 pub mod parser;
 pub mod transforms;
 
-
 use bit_vec::BitVec;
 use parser::{
     rmv_comments, script,
 };
-
+#[allow(unused)]
 use ast::Script;
-
 use rand::Rng;
 use rand_xoshiro::rand_core::SeedableRng;
-
 use std::collections::BTreeSet;
 use std::fs;
 use std::path::PathBuf;
 use std::process;
-
 use std::str::from_utf8;
 use transforms::{end_insert_pt, get_bav_assign, to_skel};
 

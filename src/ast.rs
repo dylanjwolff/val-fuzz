@@ -85,6 +85,7 @@ pub enum Constant {
     Bool(bool),
 }
 
+#[allow(non_camel_case_types)]
 #[derive(Debug, Eq, PartialEq, Clone)]
 pub enum Logic {
     QF_SLIA(),
@@ -259,7 +260,6 @@ impl SExp {
                     .join(" ");
                 format!("({} {})", o.borrow().to_string(), rec_s)
             }
-            SExp::Symbol(s) => s.borrow().to_string(),
         }
     }
 }

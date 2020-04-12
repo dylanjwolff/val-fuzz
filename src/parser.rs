@@ -266,6 +266,7 @@ mod tests {
     use super::*;
     use std::fs;
 
+    #[allow(unused)]
     fn parse_file(f: &str) -> Script {
         let contents = &fs::read_to_string(f).expect("error reading file")[..];
         let contents_sans_comments = &rmv_comments(contents)

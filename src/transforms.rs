@@ -1,14 +1,11 @@
 use crate::ast::{
     AstNode, BoolOp, Command, Constant, SExp, Script, Sort, Symbol,
 };
-use crate::ast::{BoolOpRc, CommandRc, ConstantRc, SExpRc, ScriptRc, SortRc, SymbolRc};
+use crate::ast::{CommandRc, SExpRc, SymbolRc};
 use bit_vec::BitVec;
-
 use std::iter::once;
-use std::cell::RefCell;
 use std::collections::BTreeMap;
 use std::rc::Rc;
-
 
 pub struct VarNameGenerator {
     basename: String,
