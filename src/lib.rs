@@ -1,59 +1,63 @@
 #[macro_use]
 extern crate nom;
 extern crate itertools;
-extern crate rand_xoshiro;
-extern crate rand_core;
 extern crate rand;
+extern crate rand_core;
+extern crate rand_xoshiro;
 #[macro_use]
 pub mod parser;
 pub mod transforms;
 
 use bit_vec::BitVec;
-use parser::{ToStringVisitor, traverse, AstNode, rmv_comments, script, Symbol, Command, Sort, Constant, SExp, Script, BoolOp};
-use parser::{SymbolRc, CommandRc, SortRc, ConstantRc, SExpRc, ScriptRc, BoolOpRc};
+use parser::{
+    rmv_comments, script, traverse, AstNode, BoolOp, Command, Constant, SExp, Script, Sort, Symbol,
+    ToStringVisitor,
+};
+use parser::{BoolOpRc, CommandRc, ConstantRc, SExpRc, ScriptRc, SortRc, SymbolRc};
 use rand::Rng;
 use rand_xoshiro::rand_core::SeedableRng;
-use std::path::PathBuf;
-use std::fs;
 use std::collections::BTreeMap;
 use std::collections::BTreeSet;
+use std::fs;
+use std::path::PathBuf;
 use std::process;
-use std::str::from_utf8;
 use std::rc::Rc;
-use transforms::{to_skel, get_bav_assign, end_insert_pt};
+use std::str::from_utf8;
+use transforms::{end_insert_pt, get_bav_assign, to_skel};
 
 struct RandUniqPermGen {
-    rng : Xoshiro256Plus,
-    numbits : usize,
-    buf : Vec<u8>,
-    seen : BTreeSet<BitVec>,
-    retries : u16,
-    max : u32,
-    use_max : bool,
-    use_retries : bool,
+    rng: Xoshiro256Plus,
+    numbits: usize,
+    buf: Vec<u8>,
+    seen: BTreeSet<BitVec>,
+    retries: u16,
+    max: u32,
+    use_max: bool,
+    use_retries: bool,
 }
 
 use rand_xoshiro::Xoshiro256Plus;
 impl RandUniqPermGen {
-
-    fn new_definite(numbits : usize, maxiter: u32) -> Self {
+    fn new_definite(numbits: usize, maxiter: u32) -> Self {
         let buf = BitVec::from_elem(numbits, false).to_bytes();
         let seen = BTreeSet::new();
         let rng = Xoshiro256Plus::seed_from_u64(9999);
 
-        let true_max = if (maxiter as f64).log2() < (numbits as f64)  {
-            maxiter 
-        } else { (numbits as f64).exp2() as u32 };
+        let true_max = if (maxiter as f64).log2() < (numbits as f64) {
+            maxiter
+        } else {
+            (numbits as f64).exp2() as u32
+        };
 
         RandUniqPermGen {
-            rng : rng,
-            numbits : numbits,
-            buf : buf,
-            seen : seen,
-            retries : 0,
-            max : true_max,
-            use_max : true,
-            use_retries : false,
+            rng: rng,
+            numbits: numbits,
+            buf: buf,
+            seen: seen,
+            retries: 0,
+            max: true_max,
+            use_max: true,
+            use_retries: false,
         }
     }
 
@@ -61,31 +65,38 @@ impl RandUniqPermGen {
         self.seen.len() as u32
     }
 
-
     fn sample(&mut self) -> Option<BitVec> {
-          if self.max <= self.seen.len() as u32 { return None }
+        if self.max <= self.seen.len() as u32 {
+            return None;
+        }
 
-          let mut is_new = false;
-          let mut attempt = 0;
-          while true || (self.use_retries && attempt < self.retries) {
-              self.rng.fill(&mut self.buf[..]);
-              let mut bv = BitVec::from_bytes(&self.buf[..]);
-              bv.truncate(self.numbits);
-              is_new = self.seen.insert(bv.clone());
-              if is_new {
-                  return Some(bv)
-              }
-              attempt = attempt + 1;
-          }
+        let mut is_new = false;
+        let mut attempt = 0;
+        while true || (self.use_retries && attempt < self.retries) {
+            self.rng.fill(&mut self.buf[..]);
+            let mut bv = BitVec::from_bytes(&self.buf[..]);
+            bv.truncate(self.numbits);
+            is_new = self.seen.insert(bv.clone());
+            if is_new {
+                return Some(bv);
+            }
+            attempt = attempt + 1;
+        }
 
-          None
+        None
     }
 }
 
-
 fn solve(filename: &str) {
     let cvc4_res = process::Command::new("timeout")
-        .args(&["5s", "cvc4", filename, "--produce-model", "--tlimit", "5000"])
+        .args(&[
+            "5s",
+            "cvc4",
+            filename,
+            "--produce-model",
+            "--tlimit",
+            "5000",
+        ])
         .output();
 
     let z3_res = process::Command::new("z3")
@@ -135,15 +146,19 @@ fn solve(filename: &str) {
     }
 }
 
-
 pub fn strip_and_test_file(source_file: &PathBuf) {
     let contents: String =
         fs::read_to_string(source_file).expect("Something went wrong reading the file");
-    let stripped_contents = &rmv_comments(&contents[..]).expect("Error stripping comments").1.join(" ")[..];
+    let stripped_contents = &rmv_comments(&contents[..])
+        .expect("Error stripping comments")
+        .1
+        .join(" ")[..];
     let mut script = script(&stripped_contents[..]).expect("Parsing error").1;
     // TODO error handling here on prev 3 lines
 
-    if script.is_unsupported_logic() { return }
+    if script.is_unsupported_logic() {
+        return;
+    }
 
     let bavns = to_skel(&mut script);
     let eip = end_insert_pt(&script);
@@ -160,15 +175,13 @@ pub fn strip_and_test_file(source_file: &PathBuf) {
     }
 }
 
-fn get_iter_fileout_name(source_file : &PathBuf, iter : u32) -> String {
+fn get_iter_fileout_name(source_file: &PathBuf, iter: u32) -> String {
     let source_filename = match source_file.file_name().and_then(|n| n.to_str()) {
         Some(name) => name,
         None => "unknown",
     };
     (iter).to_string() + "_" + source_filename
 }
-
-
 
 pub fn exec() {
     let files = fs::read_dir("test").expect("error with sample dir");
@@ -194,8 +207,11 @@ pub fn perf_exec() {
                 let filepath = file.path();
                 println!("starting file {:?}", filepath);
                 let contents: String =
-                fs::read_to_string(&filepath).expect("Something went wrong reading the file");
-                let stripped_contents = &rmv_comments(&contents[..]).expect("Error stripping comments").1.join(" ")[..];
+                    fs::read_to_string(&filepath).expect("Something went wrong reading the file");
+                let stripped_contents = &rmv_comments(&contents[..])
+                    .expect("Error stripping comments")
+                    .1
+                    .join(" ")[..];
                 let mut script = script(&stripped_contents[..]).expect("Parsing error").1;
             }
             Err(_) => (),
@@ -223,12 +239,14 @@ mod tests {
         child.join().unwrap();
     }
 
-    fn parse_file(f : &str) -> Script {
-            let contents = &fs::read_to_string(f).expect("error reading file")[..];
-            let contents_sans_comments = &rmv_comments(contents)
-                .expect("failed to rmv comments").1.join(" ")[..];
+    fn parse_file(f: &str) -> Script {
+        let contents = &fs::read_to_string(f).expect("error reading file")[..];
+        let contents_sans_comments = &rmv_comments(contents)
+            .expect("failed to rmv comments")
+            .1
+            .join(" ")[..];
 
-            script(contents_sans_comments).expect("parser error").1
+        script(contents_sans_comments).expect("parser error").1
     }
 
     fn parse_unparse() {
@@ -240,11 +258,13 @@ mod tests {
             let filepath = file.path();
             let contents = &fs::read_to_string(filepath).expect("error reading file")[..];
             let contents_sans_comments = &rmv_comments(contents)
-                .expect("failed to rmv comments").1.join(" ")[..];
+                .expect("failed to rmv comments")
+                .1
+                .join(" ")[..];
 
             let p = script(contents_sans_comments).expect("parser error").1;
 
-            let up =  p.to_string();
+            let up = p.to_string();
             let pup = script(&up[..]).expect("reparse error").1;
             assert_eq!(p, pup);
         }

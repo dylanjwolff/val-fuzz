@@ -1,18 +1,21 @@
-use std::cell::RefMut;
-use std::cell::RefCell;
-use rand_core::RngCore;
+use crate::parser::{
+    rmv_comments, script, traverse, AstNode, BoolOp, Command, Constant, SExp, Script, Sort, Symbol,
+    ToStringVisitor,
+};
+use crate::parser::{BoolOpRc, CommandRc, ConstantRc, SExpRc, ScriptRc, SortRc, SymbolRc};
 use bit_vec::BitVec;
-use crate::parser::{ToStringVisitor, traverse, AstNode, rmv_comments, script, Symbol, Command, Sort, Constant, SExp, Script, BoolOp};
-use crate::parser::{SymbolRc, CommandRc, SortRc, ConstantRc, SExpRc, ScriptRc, BoolOpRc};
 use rand::Rng;
+use rand_core::RngCore;
 use rand_xoshiro::rand_core::SeedableRng;
-use std::path::PathBuf;
-use std::fs;
+use std::cell::RefCell;
+use std::cell::RefMut;
 use std::collections::BTreeMap;
 use std::collections::BTreeSet;
+use std::fs;
+use std::path::PathBuf;
 use std::process;
-use std::str::from_utf8;
 use std::rc::Rc;
+use std::str::from_utf8;
 
 pub struct VarNameGenerator {
     basename: String,
@@ -21,25 +24,27 @@ pub struct VarNameGenerator {
 }
 
 impl VarNameGenerator {
-    pub fn get_name(&mut self, sort : Sort) -> String {
+    pub fn get_name(&mut self, sort: Sort) -> String {
         self.counter = self.counter + 1;
         let name = format!("{}{}", self.basename, self.counter);
         self.vars_generated.push((name.clone(), sort));
         name
     }
 
-    pub fn new(base : &str) -> VarNameGenerator {
+    pub fn new(base: &str) -> VarNameGenerator {
         VarNameGenerator {
-            basename : base.to_owned(),
-            counter : 0,
-            vars_generated : vec![],
+            basename: base.to_owned(),
+            counter: 0,
+            vars_generated: vec![],
         }
     }
 }
 
-fn init_vars(script : &mut Script, vars : Vec<(String, Sort)>) {
+fn init_vars(script: &mut Script, vars: Vec<(String, Sort)>) {
     let Script::Commands(cmds) = script;
-    if cmds.len() == 0 { return }
+    if cmds.len() == 0 {
+        return;
+    }
 
     let maybe_log_pos = cmds.iter().position(|cmd| cmd.borrow().is_logic());
 
@@ -50,7 +55,8 @@ fn init_vars(script : &mut Script, vars : Vec<(String, Sort)>) {
 
     let mut end = cmds.split_off(log_pos + 1);
 
-    let mut decls = vars.into_iter()
+    let mut decls = vars
+        .into_iter()
         .map(|(vname, sort)| Command::DeclConst(vname, rccell!(sort)))
         .map(|cmd| rccell!(cmd))
         .collect::<Vec<CommandRc>>();
@@ -59,7 +65,7 @@ fn init_vars(script : &mut Script, vars : Vec<(String, Sort)>) {
     cmds.append(&mut end);
 }
 
-fn add_ba(script : &mut Script, bavs : Vec<(String, SExp)>) {
+fn add_ba(script: &mut Script, bavs: Vec<(String, SExp)>) {
     let Script::Commands(cmds) = script;
 
     let maybe_cs_pos = cmds.iter().position(|cmd| cmd.borrow().is_checksat());
@@ -69,12 +75,15 @@ fn add_ba(script : &mut Script, bavs : Vec<(String, SExp)>) {
         None => cmds.len(),
     };
 
-    let mut baveq_iter = bavs.into_iter()
-        .map(|(vname, sexp)| {
-            SExp::BExp(rccell!(BoolOp::Equals()),
-                vec![rccell!(SExp::Symbol(rccell!(Symbol::Var(vname)))), rccell!(sexp)]
-            )
-        });
+    let mut baveq_iter = bavs.into_iter().map(|(vname, sexp)| {
+        SExp::BExp(
+            rccell!(BoolOp::Equals()),
+            vec![
+                rccell!(SExp::Symbol(rccell!(Symbol::Var(vname)))),
+                rccell!(sexp),
+            ],
+        )
+    });
 
     cmds.insert(cs_pos, rccell!(assert_many(&mut baveq_iter)));
 }
@@ -85,13 +94,14 @@ fn assert_many(iter: &mut dyn Iterator<Item = SExp>) -> Command {
         _ => SExp::true_sexp(), // shouldn't ever actually be added
     };
 
-    let intersection = iter
-        .fold(init, |acc, curr| SExp::BExp(rccell!(BoolOp::And()), vec![rccell!(acc), rccell!(curr)]));
+    let intersection = iter.fold(init, |acc, curr| {
+        SExp::BExp(rccell!(BoolOp::And()), vec![rccell!(acc), rccell!(curr)])
+    });
 
-    return Command::Assert(rccell!(intersection))
+    return Command::Assert(rccell!(intersection));
 }
 
-pub fn end_insert_pt(script : &Script) -> usize {
+pub fn end_insert_pt(script: &Script) -> usize {
     let Script::Commands(cmds) = script;
 
     let maybe_cs_pos = cmds.iter().position(|cmd| cmd.borrow().is_checksat());
@@ -102,19 +112,28 @@ pub fn end_insert_pt(script : &Script) -> usize {
     }
 }
 
-pub fn get_bav_assign(bavns : &Vec<String>, ta : BitVec) -> Command {
+pub fn get_bav_assign(bavns: &Vec<String>, ta: BitVec) -> Command {
     let bavs = bavns.into_iter().zip(ta.into_iter());
-    let mut baveq = bavs.into_iter()
-        .map(|(vname, bval)| {
-            let val = if bval { SExp::true_sexp() } else { SExp::false_sexp() };
-            SExp::BExp(rccell!(BoolOp::Equals()), vec![rccell!(SExp::Symbol(rccell!(Symbol::Var(vname.clone())))), rccell!(val)])
-        });
+    let mut baveq = bavs.into_iter().map(|(vname, bval)| {
+        let val = if bval {
+            SExp::true_sexp()
+        } else {
+            SExp::false_sexp()
+        };
+        SExp::BExp(
+            rccell!(BoolOp::Equals()),
+            vec![
+                rccell!(SExp::Symbol(rccell!(Symbol::Var(vname.clone())))),
+                rccell!(val),
+            ],
+        )
+    });
 
     assert_many(&mut baveq)
 }
 
-/// returns the Boolean Abstract Variables added as vector of their names 
-pub fn to_skel(script : &mut Script) -> Vec<String> {
+/// returns the Boolean Abstract Variables added as vector of their names
+pub fn to_skel(script: &mut Script) -> Vec<String> {
     let mut vng = VarNameGenerator::new("GEN");
     rc(script, &mut vng);
 
@@ -126,15 +145,15 @@ pub fn to_skel(script : &mut Script) -> Vec<String> {
     bav(script, &mut vng, &mut bavs);
 
     init_vars(script, vng.vars_generated);
-    let bavns = bavs.iter()
-        .map(|(name, _)| name.clone()).collect::<Vec<String>>();
+    let bavns = bavs
+        .iter()
+        .map(|(name, _)| name.clone())
+        .collect::<Vec<String>>();
     add_ba(script, bavs);
     bavns
 }
 
-
-
-pub fn rl(script: &mut Script, scoped_vars: &mut BTreeMap<String, Vec<SExp>>){
+pub fn rl(script: &mut Script, scoped_vars: &mut BTreeMap<String, Vec<SExp>>) {
     match script {
         Script::Commands(cmds) => {
             for cmd in cmds.iter_mut() {
@@ -144,14 +163,16 @@ pub fn rl(script: &mut Script, scoped_vars: &mut BTreeMap<String, Vec<SExp>>){
     }
 }
 
-fn rl_c(cmd: &mut Command, scoped_vars: &mut BTreeMap<String, Vec<SExp>>){
+fn rl_c(cmd: &mut Command, scoped_vars: &mut BTreeMap<String, Vec<SExp>>) {
     match cmd {
-        Command::Assert(s) | Command::CheckSatAssuming(s) => rl_s(&mut *s.borrow_mut(), scoped_vars),
+        Command::Assert(s) | Command::CheckSatAssuming(s) => {
+            rl_s(&mut *s.borrow_mut(), scoped_vars)
+        }
         _ => (),
     }
 }
 
-fn rl_s(sexp: &mut SExp, scoped_vars: &mut BTreeMap<String, Vec<SExp>>){
+fn rl_s(sexp: &mut SExp, scoped_vars: &mut BTreeMap<String, Vec<SExp>>) {
     match sexp {
         SExp::Let(v, rest) => {
             // This looks a bit strange, but if we don't explore these first, those expressions are
@@ -161,7 +182,7 @@ fn rl_s(sexp: &mut SExp, scoped_vars: &mut BTreeMap<String, Vec<SExp>>){
             // at least O(2n) before the recursive call on rest, and this one at least is clear,
             // and n = number of variables in a let expression = typically a very small number anyways.
 
-            let mut new_vars : Vec<(&SymbolRc, &SExpRc)> = vec![];
+            let mut new_vars: Vec<(&SymbolRc, &SExpRc)> = vec![];
             for (var, val) in v {
                 rl_s(&mut *val.borrow_mut(), scoped_vars); // first make sure the val is "let-free"
                 new_vars.push((var, val)); // make note of the mapping to add to the rest
@@ -172,7 +193,9 @@ fn rl_s(sexp: &mut SExp, scoped_vars: &mut BTreeMap<String, Vec<SExp>>){
                 let maybe_vals = scoped_vars.get_mut(&var.borrow().to_string()[..]);
                 match maybe_vals {
                     Some(vals) => vals.push((*val).borrow().clone()),
-                    None => {scoped_vars.insert(var.borrow().to_string(), vec![val.borrow().clone()]);},
+                    None => {
+                        scoped_vars.insert(var.borrow().to_string(), vec![val.borrow().clone()]);
+                    }
                 };
             }
 
@@ -181,12 +204,14 @@ fn rl_s(sexp: &mut SExp, scoped_vars: &mut BTreeMap<String, Vec<SExp>>){
 
             // Pop our variables off of the stack
             for (var, _) in new_vars {
-                scoped_vars.get_mut(&var.borrow().to_string()[..]).map(|v| v.pop());
+                scoped_vars
+                    .get_mut(&var.borrow().to_string()[..])
+                    .map(|v| v.pop());
             }
 
-            let b =(**rest.borrow()).clone();
+            let b = (**rest.borrow()).clone();
             *sexp = b; // the let expression isn't doing anything anymore, replace it with rest
-        },
+        }
         SExp::Symbol(s) => {
             let new_s = scoped_vars
                 .get(&s.borrow().to_string()[..])
@@ -196,18 +221,21 @@ fn rl_s(sexp: &mut SExp, scoped_vars: &mut BTreeMap<String, Vec<SExp>>){
                 Some(e) => {
                     let b = e.clone();
                     *sexp = b;
-                },
+                }
                 None => (),
             }
-        },
+        }
 
-        SExp::Compound(v) |
-        SExp::BExp(_, v) => for e in v { rl_s(&mut *e.borrow_mut(), scoped_vars) },
+        SExp::Compound(v) | SExp::BExp(_, v) => {
+            for e in v {
+                rl_s(&mut *e.borrow_mut(), scoped_vars)
+            }
+        }
         SExp::Constant(_) => (),
     }
 }
 
-pub fn rc(script: &mut Script, vng : &mut VarNameGenerator){
+pub fn rc(script: &mut Script, vng: &mut VarNameGenerator) {
     match script {
         Script::Commands(cmds) => {
             for cmd in cmds.iter_mut() {
@@ -217,14 +245,16 @@ pub fn rc(script: &mut Script, vng : &mut VarNameGenerator){
     }
 }
 
-fn rc_c(cmd: &mut Command, vng : &mut  VarNameGenerator) {
+fn rc_c(cmd: &mut Command, vng: &mut VarNameGenerator) {
     match cmd {
-        Command::Assert(sexp) | Command::CheckSatAssuming(sexp) => rc_se(&mut *sexp.borrow_mut(), vng),
+        Command::Assert(sexp) | Command::CheckSatAssuming(sexp) => {
+            rc_se(&mut *sexp.borrow_mut(), vng)
+        }
         _ => (),
     }
 }
 
-fn rc_se(sexp: &mut SExp, vng : &mut VarNameGenerator) {
+fn rc_se(sexp: &mut SExp, vng: &mut VarNameGenerator) {
     match sexp {
         SExp::Constant(c) => {
             let sort = match *c.borrow_mut() {
@@ -232,14 +262,12 @@ fn rc_se(sexp: &mut SExp, vng : &mut VarNameGenerator) {
                 Constant::Dec(_) => Sort::Dec(),
                 Constant::Str(_) => Sort::Str(),
                 Constant::Bool(_) => Sort::Bool(),
-                Constant::Bin(_) |
-                Constant::Hex(_) => Sort::BitVec(),
+                Constant::Bin(_) | Constant::Hex(_) => Sort::BitVec(),
             };
             let name = vng.get_name(sort);
             *sexp = SExp::Symbol(rccell!(Symbol::Var(name)));
-        },
-        SExp::Compound(sexps) |
-        SExp::BExp(_, sexps) => {
+        }
+        SExp::Compound(sexps) | SExp::BExp(_, sexps) => {
             for sexp in sexps {
                 rc_se(&mut *sexp.borrow_mut(), vng)
             }
@@ -248,7 +276,7 @@ fn rc_se(sexp: &mut SExp, vng : &mut VarNameGenerator) {
     }
 }
 
-pub fn bav(script: &mut Script, vng : &mut VarNameGenerator, bava : &mut Vec<(String, SExp)>){
+pub fn bav(script: &mut Script, vng: &mut VarNameGenerator, bava: &mut Vec<(String, SExp)>) {
     match script {
         Script::Commands(cmds) => {
             for cmd in cmds.iter_mut() {
@@ -258,14 +286,16 @@ pub fn bav(script: &mut Script, vng : &mut VarNameGenerator, bava : &mut Vec<(St
     }
 }
 
-fn bav_c(cmd: &mut Command, vng : &mut  VarNameGenerator, bava : &mut Vec<(String, SExp)>){
+fn bav_c(cmd: &mut Command, vng: &mut VarNameGenerator, bava: &mut Vec<(String, SExp)>) {
     match cmd {
-        Command::Assert(sexp) | Command::CheckSatAssuming(sexp) => bav_se(&mut *sexp.borrow_mut(), vng, bava),
+        Command::Assert(sexp) | Command::CheckSatAssuming(sexp) => {
+            bav_se(&mut *sexp.borrow_mut(), vng, bava)
+        }
         _ => (),
     }
 }
 
-fn bav_se(sexp: &mut SExp, vng : &mut VarNameGenerator, bavs : &mut Vec<(String, SExp)>) {
+fn bav_se(sexp: &mut SExp, vng: &mut VarNameGenerator, bavs: &mut Vec<(String, SExp)>) {
     match sexp {
         SExp::BExp(bop, sexps) => {
             let name = vng.get_name(Sort::Bool());
@@ -274,12 +304,12 @@ fn bav_se(sexp: &mut SExp, vng : &mut VarNameGenerator, bavs : &mut Vec<(String,
             for sexp in sexps {
                 bav_se(&mut *sexp.borrow_mut(), vng, bavs);
             }
-        },
+        }
         SExp::Compound(sexps) => {
             for sexp in sexps {
                 bav_se(&mut *sexp.borrow_mut(), vng, bavs);
             }
-        },
+        }
         SExp::Let(_, _) => panic!("Let statments should be filtered out!"),
         _ => (),
     }
@@ -295,7 +325,10 @@ mod tests {
         let v = Symbol::Var("x".to_owned());
         let e = SExp::Symbol(rccell!(Symbol::Token("changed".to_owned())));
         let expected = e.clone();
-        let mut sexp = SExp::Let(vec![(rccell!(v.clone()), rccell!(e))], rccell!(Box::new(SExp::Symbol(rccell!(v)))));
+        let mut sexp = SExp::Let(
+            vec![(rccell!(v.clone()), rccell!(e))],
+            rccell!(Box::new(SExp::Symbol(rccell!(v)))),
+        );
         rl_s(&mut sexp, &mut BTreeMap::new());
         assert_eq!(sexp, expected);
     }
