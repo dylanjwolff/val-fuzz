@@ -162,28 +162,6 @@ impl Command {
         }
     }
 
-    pub fn entry_string(&self) -> String {
-        match self {
-            Command::Logic(_) => "(set-logic ".to_owned(),
-            Command::CheckSat() => "(check-sat)".to_owned(),
-            Command::GetModel() => "(get-model)".to_owned(),
-            Command::CheckSatAssuming(_) => "(check-sat-assuming ".to_owned(),
-            Command::DeclConst(s, _) => format!("(declare-const {} ", s),
-            Command::Assert(_) => "(assert ".to_owned(),
-            Command::Generic(s) => s.clone(),
-        }
-    }
-
-    pub fn exit_str(&self) -> &str {
-        match self {
-            Command::CheckSatAssuming(_)
-            | Command::DeclConst(_, _)
-            | Command::Assert(_)
-            | Command::Logic(_) => ")\n",
-            _ => "\n",
-        }
-    }
-
     pub fn is_logic(&self) -> bool {
         match self {
             Command::Logic(_) => true,
@@ -231,26 +209,6 @@ impl Sort {
                     .join(" ");
                 format!("({})", rec_s)
             }
-        }
-    }
-
-    pub fn entry_str(&self) -> &str {
-        match self {
-            Sort::UInt() => "Int",
-            Sort::Dec() => "Real",
-            Sort::Bool() => "Bool",
-            Sort::Str() => "String",
-            Sort::BitVec() => "BitVec",
-            Sort::Array() => "Array",
-            Sort::UserDef(s) => &s,
-            Sort::Compound(_) => "(",
-        }
-    }
-
-    pub fn exit_str(&self) -> &str {
-        match self {
-            Sort::Compound(_) => ")",
-            _ => "",
         }
     }
 }
@@ -302,21 +260,6 @@ impl SExp {
                 format!("({} {})", o.borrow().to_string(), rec_s)
             }
             SExp::Symbol(s) => s.borrow().to_string(),
-        }
-    }
-
-    pub fn entry_str(&self) -> &str {
-        match self {
-            SExp::Let(_, _) => "(let ",
-            SExp::Compound(_) | SExp::BExp(_, _) => "(",
-            _ => "",
-        }
-    }
-
-    pub fn exit_str(&self) -> &str {
-        match self {
-            SExp::Let(_, _) | SExp::Compound(_) | SExp::BExp(_, _) => ")",
-            _ => "",
         }
     }
 }
