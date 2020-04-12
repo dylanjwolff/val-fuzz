@@ -15,323 +15,7 @@ use nom::number::complete::recognize_float;
 use nom::sequence::delimited;
 use nom::sequence::preceded;
 use nom::{bytes::complete::tag, combinator::map, sequence::tuple, IResult};
-use std::iter::once;
-
-#[derive(Debug, Eq, PartialEq, Clone)]
-pub enum Script {
-    Commands(Vec<Command>),
-}
-
-#[derive(Debug, Eq, PartialEq, Clone)]
-pub enum Command {
-    Logic(Logic),
-    CheckSat(),
-    CheckSatAssuming(SExp),
-    Assert(SExp),
-    GetModel(),
-    DeclConst(String, Sort),
-    Generic(Vec<String>),
-}
-
-#[derive(Debug, Eq, PartialEq, Clone)]
-pub enum Sort {
-    UInt(),
-    Dec(),
-    Str(),
-    Bool(),
-    BitVec(),
-    Array(),
-    UserDef(String),
-    Compound(Vec<Sort>),
-}
-
-#[derive(Debug, Eq, PartialEq, Clone)]
-pub enum SExp {
-    Compound(Vec<SExp>),
-    Let(Vec<(Symbol, SExp)>, Box<SExp>),
-    BExp(BoolOp, Vec<SExp>),
-    Constant(Constant),
-    Symbol(Symbol),
-}
-
-#[derive(Debug, Eq, PartialEq, Clone)]
-pub enum Symbol {
-    Var(String), // Currently, it is hard to detect all variables, so some Tokens may also be
-                     // variables too
-    Token(String),
-}
-
-#[derive(Debug, Eq, PartialEq, Clone)]
-pub enum BoolOp {
-    Equals(),
-    And(),
-    Or(),
-    Xor(),
-    Implies(),
-    Distinct(),
-    Gt(),
-    Lt(),
-    Gte(),
-    Lte(),
-}
-
-#[derive(Debug, Eq, PartialEq, Clone)]
-pub enum Constant {
-    UInt(String),
-    Dec(String),
-    Hex(String),
-    Bin(Vec<char>),
-    Str(String),
-    Bool(bool),
-}
-
-#[derive(Debug, Eq, PartialEq, Clone)]
-pub enum Logic {
-    QF_SLIA(),
-    Other(String),
-}
-
-#[derive(Debug, Eq, PartialEq)]
-enum AstNode<'a> {
-    Script(&'a mut Script),
-    Command(&'a mut Command),
-    Constant(&'a mut Constant),
-    Symbol(&'a mut Symbol),
-    SExp(&'a mut SExp),
-    Logic(&'a mut Logic),
-    BoolOp(&'a mut BoolOp),
-    Sort(&'a mut Sort),
-}
-
-fn get_children(node : AstNode) -> Vec<AstNode> {
-    match node {
-        AstNode::Script(Script::Commands(cmds)) => cmds.iter_mut().map(|cmd| AstNode::Command(cmd)).rev().collect(),
-        AstNode::Command(Command::Logic(l)) => vec![AstNode::Logic(l)],
-        AstNode::Command(Command::Assert(a)) |
-        AstNode::Command(Command::CheckSatAssuming(a)) => vec![AstNode::SExp(a)],
-        AstNode::Command(Command::DeclConst(_, s)) => vec![AstNode::Sort(s)],
-        AstNode::Sort(Sort::Compound(ss)) => ss.iter_mut().map(|s| AstNode::Sort(s)).rev().collect(),
-        AstNode::SExp(SExp::Compound(ss)) => ss.iter_mut().map(|s| AstNode::SExp(s)).rev().collect(),
-        AstNode::SExp(SExp::BExp(bop, ss)) => { 
-                ss.iter_mut()
-                    .map(|s| AstNode::SExp(s))
-                    .rev()
-                    .chain(once(AstNode::BoolOp(bop)))
-                    .collect()
-        },
-        AstNode::SExp(SExp::Let(vs, s)) => { 
-            let mut astns = vs.iter_mut()
-                .fold(vec![], |mut asts, (vr, vl)| {
-                    asts.push(AstNode::Symbol(vr)); 
-                    asts.push(AstNode::SExp(vl)); 
-                    asts
-                });
-            astns.push(AstNode::SExp(s));
-            astns.into_iter().rev().collect()
-        },
-        AstNode::SExp(SExp::Constant(c)) => vec![AstNode::Constant(c)],
-        AstNode::SExp(SExp::Symbol(s)) => vec![AstNode::Symbol(s)],
-        _ => vec![],
-    }
-}
-
-fn traverse(node : AstNode) {
-    let mut visiting = vec![node];
-
-    while let Some(node) = visiting.pop() {
-        println!("pre {:?}", node);
-        visiting.extend(get_children(node));
-        println!("post");
-    }
-}
-
-
-
-impl Script {
-    pub fn to_string(&self) -> String {
-        match self {
-            Script::Commands(cmds) => cmds
-                .iter()
-                .map(|cmd| cmd.to_string())
-                .collect::<Vec<String>>()
-                .join("\n"),
-        }
-    }
-
-    pub fn insert(&mut self, i : usize, cmd : Command) {
-        let Script::Commands(cmds) = self;
-        cmds.insert(i, cmd);
-    }
-
-    pub fn replace(&mut self, i : usize, cmd : Command) {
-        let Script::Commands(cmds) = self;
-        cmds[i] = cmd;
-    }
-
-    pub fn init(&mut self, i : usize) {
-        let Script::Commands(cmds) = self;
-        cmds.insert(i, Command::Assert(SExp::true_sexp()));
-    }
-
-    pub fn is_unsupported_logic(&self) -> bool {
-        let Script::Commands(cmds) = self;
-        let maybe_logic = cmds.iter().find(|cmd| cmd.is_logic());
-        match maybe_logic {
-            Some(Command::Logic(Logic::QF_SLIA())) => true,
-            _ => false,
-        }
-    }
-}
-
-impl Command {
-    pub fn to_string(&self) -> String {
-        match self {
-            Command::Logic(l) => "(set-logic ".to_owned() + &l.to_string()[..] + ")",
-            Command::CheckSat() => "(check-sat)".to_string(),
-            Command::CheckSatAssuming(sexp) => {
-                ("(check-sat-assuming ".to_owned() + &sexp.to_string()[..] + ")").to_string()
-            } // TODO
-            Command::GetModel() => "(get-model)".to_string(),
-            Command::DeclConst(v, s) => {
-                ("(declare-const ".to_string() + v + " " + &s.to_string()[..] + ")").to_string()
-            }
-            Command::Generic(v) => v.join(""),
-            Command::Assert(s) => ("(assert ".to_string() + &s.to_string()[..] + ")").to_string(),
-        }
-    }
-
-    pub fn is_logic(&self) -> bool {
-        match self {
-            Command::Logic(_) => true,
-            _ => false,
-        }
-    }
-
-    pub fn is_checksat(&self) -> bool {
-        match self {
-            Command::CheckSat() | Command::CheckSatAssuming(_) => true,
-            _ => false,
-        }
-    }
-}
-
-impl Constant {
-    pub fn to_string(&self) -> String {
-        match self {
-            Constant::UInt(s) => s.to_string(),
-            Constant::Dec(d) => d.to_string(),
-            Constant::Hex(s) => "#x".to_string() + &s.to_string()[..],
-            Constant::Str(s) => "\"".to_string() + &s.to_string()[..] + "\"",
-            Constant::Bool(b) => b.to_string(),
-            Constant::Bin(bv) => "#b".to_string() + &bv.into_iter().collect::<String>()[..],
-        }
-    }
-}
-
-impl Sort {
-    pub fn to_string(&self) -> String {
-        match self {
-            Sort::UInt() => "Int".to_string(),
-            Sort::Dec() => "Real".to_string(),
-            Sort::Bool() => "Bool".to_string(),
-            Sort::Str() => "String".to_string(),
-            Sort::BitVec() => "BitVec".to_string(),
-            Sort::Array() => "Array".to_string(),
-            Sort::UserDef(s) => s.to_string(),
-            Sort::Compound(v) => {
-                let mut rec_s = v
-                    .iter()
-                    .map(|sort| sort.to_string())
-                    .collect::<Vec<String>>()
-                    .join(" ");
-                rec_s.insert(0, '('); // TODO
-                rec_s.push(')');
-                rec_s
-            }
-        }
-    }
-}
-
-impl SExp {
-    pub fn true_sexp() -> SExp {
-        SExp::Symbol(Symbol::Token("true".to_owned()))
-    }
-
-    pub fn false_sexp() -> SExp {
-        SExp::Symbol(Symbol::Token("false".to_owned()))
-    }
-
-    pub fn to_string(&self) -> String {
-        match self {
-            SExp::Constant(c) => c.to_string(),
-            SExp::Symbol(s) => s.to_string(),
-            SExp::Let(vbs, s) => {
-                let vbss = vbs.iter()
-                    .map(|(v, s)| {
-                       format!("({} {})", v.to_string(), s.to_string())
-                    }).collect::<String>();
-                format!("(let ({}) {})", vbss, s.to_string())
-            },
-            SExp::Compound(v) => {
-                let mut rec_s = v
-                    .iter()
-                    .map(|sexp| sexp.to_string())
-                    .collect::<Vec<String>>()
-                    .join(" ");
-                rec_s.insert(0, '('); // TODO
-                rec_s.push(')');
-                rec_s
-            }
-            SExp::BExp(o, v) => {
-                let rec_s = v
-                    .iter()
-                    .map(|sexp| sexp.to_string())
-                    .collect::<Vec<String>>()
-                    .join(" ");
-                let mut s = o.to_string() + " " + &rec_s[..];
-                s.insert(0, '('); // TODO
-                s.push(')');
-                s
-            },
-            SExp::Symbol(Symbol::Var(s)) => s.clone(),
-        }
-    }
-}
-
-impl Symbol {
-    pub fn to_string(&self) -> String {
-        match self {
-            Symbol::Var(s) |
-            Symbol::Token(s) => s.clone(),
-        }
-    }
-}
-
-impl BoolOp {
-    pub fn to_string(&self) -> String {
-        match self {
-            BoolOp::And() => "and".to_owned(),
-            BoolOp::Or() => "or".to_owned(),
-            BoolOp::Xor() => "xor".to_owned(),
-            BoolOp::Implies() => "=>".to_owned(),
-            BoolOp::Distinct() => "distinct".to_owned(),
-            BoolOp::Equals() => "=".to_owned(),
-            BoolOp::Gt() => ">".to_owned(),
-            BoolOp::Lt() => "<".to_owned(),
-            BoolOp::Gte() => ">=".to_owned(),
-            BoolOp::Lte() => "<=".to_owned(),
-        }
-    }
-}
-
-impl Logic {
-    fn to_string(&self) -> String {
-        match self {
-            Logic::QF_SLIA() => "QF_SLIA".to_owned(),
-            Logic::Other(s) => s.clone(),
-        }
-    }
-}
+use super::ast::{Script, Command, Constant, Symbol, BoolOp, SExp, SymbolRc, Sort, Logic, SExpBoxRc, SExpRc};
 
 fn integer(s: &str) -> IResult<&str, &str> {
     // let inner = |(sn, _peek): (&str, ())| {
@@ -385,24 +69,28 @@ fn symbol(s: &str) -> IResult<&str, &str> {
 
 fn bool_int_ops(s: &str) -> IResult<&str, BoolOp> {
     let naked_bop_tags = alt((
-            map(tag(">="), |_| BoolOp::Gte()),
-            map(tag("<="), |_| BoolOp::Lte()),
+        map(tag(">="), |_| BoolOp::Gte()),
+        map(tag("<="), |_| BoolOp::Lte()),
     ));
     let naked_bop_chars = alt((
-            map(char('<'), |_| BoolOp::Lt()),
-            map(char('>'), |_| BoolOp::Gt()),
+        map(char('<'), |_| BoolOp::Lt()),
+        map(char('>'), |_| BoolOp::Gt()),
     ));
 
-    delimited(multispace0, alt((naked_bop_tags, naked_bop_chars)), multispace0)(s)
+    delimited(
+        multispace0,
+        alt((naked_bop_tags, naked_bop_chars)),
+        multispace0,
+    )(s)
 }
 
 fn bool_core_ops(s: &str) -> IResult<&str, BoolOp> {
     let naked_bool_tags = alt((
-            map(tag("and"), |_| BoolOp::And()),
-            map(tag("or"), |_| BoolOp::Or()),
-            map(tag("xor"), |_| BoolOp::Xor()),
-            map(tag("=>"), |_| BoolOp::Implies()),
-            map(tag("distinct"), |_| BoolOp::Distinct()),
+        map(tag("and"), |_| BoolOp::And()),
+        map(tag("or"), |_| BoolOp::Or()),
+        map(tag("xor"), |_| BoolOp::Xor()),
+        map(tag("=>"), |_| BoolOp::Implies()),
+        map(tag("distinct"), |_| BoolOp::Distinct()),
     ));
     let naked_eq = map(char('='), |_| BoolOp::Equals());
 
@@ -410,31 +98,37 @@ fn bool_core_ops(s: &str) -> IResult<&str, BoolOp> {
 }
 
 fn bool_sexp(s: &str) -> IResult<&str, SExp> {
-    let inner_int = map(tuple((bool_int_ops, many1(sexp))), 
-                        |(o, v)| SExp::BExp(o, v));
-    let inner_core = map(tuple((bool_core_ops, many1(sexp))), 
-                        |(o, v)| SExp::BExp(o, v));
+    let inner_int = map(tuple((bool_int_ops, many1(sexp))), |(o, v)| {
+        SExp::BExp(rccell!(o), v.into_iter().map(|s| rccell!(s)).collect())
+    });
+    let inner_core = map(tuple((bool_core_ops, many1(sexp))), |(o, v)| {
+        SExp::BExp(rccell!(o), v.into_iter().map(|s| rccell!(s)).collect())
+    });
 
     let naked_b = alt((inner_int, inner_core));
     delimited(char('('), naked_b, char(')'))(s)
 }
 
-
-fn let_sexp(s : &str) -> IResult<&str, (Vec<(Symbol, SExp)>, SExp)> {
+fn let_sexp(s: &str) -> IResult<&str, (Vec<(SymbolRc, SExpRc)>, SExpBoxRc)> {
     let ws_symbol = delimited(multispace0, symbol, multispace0);
     let mapped_ws_symbol = map(ws_symbol, |s| Symbol::Var(s.to_owned()));
     let ws_sexp = delimited(multispace0, sexp, multispace0);
-    let var_binding = delimited(char('('),
-                        tuple((mapped_ws_symbol, ws_sexp)),
-                    char(')'));
+    let var_binding = delimited(char('('), tuple((mapped_ws_symbol, ws_sexp)), char(')'));
     let ws_var_b = delimited(multispace0, var_binding, multispace0);
     let var_bs = delimited(char('('), many1(ws_var_b), char(')'));
     let ws_var_bs = delimited(multispace0, var_bs, multispace0);
     let inner = preceded(tag("let"), tuple((ws_var_bs, sexp)));
     let ws_inner = delimited(multispace0, inner, multispace0);
     let wrapped = delimited(char('('), ws_inner, char(')'));
-
-    wrapped(s)
+    let mapped = map(wrapped, |(a, b)| {
+        (
+            a.into_iter()
+                .map(|(x, y)| (rccell!(x), rccell!(y)))
+                .collect(),
+            rccell!(Box::new(b)),
+        )
+    });
+    mapped(s)
 }
 
 fn sexp(s: &str) -> IResult<&str, SExp> {
@@ -446,10 +140,14 @@ fn sexp(s: &str) -> IResult<&str, SExp> {
     let ws_let_sexp = delimited(multispace0, let_sexp, multispace0);
     alt((
         ws_bexp,
-        map(ws_let_sexp, |(tbs, sexp)| SExp::Let(tbs, Box::new(sexp))),
-        map(ws_rec_sexp, |e| SExp::Compound(e)),
-        map(ws_constant, |c| SExp::Constant(c)),
-        map(ws_symbol, |s| SExp::Symbol(Symbol::Token(s.to_owned()))),
+        map(ws_let_sexp, |(tbs, sexp)| SExp::Let(tbs, sexp)),
+        map(ws_rec_sexp, |es| {
+            SExp::Compound(es.into_iter().map(|e| rccell!(e)).collect())
+        }),
+        map(ws_constant, |c| SExp::Constant(rccell!(c))),
+        map(ws_symbol, |s| {
+            SExp::Symbol(rccell!(Symbol::Token(s.to_owned())))
+        }),
     ))(s)
 }
 
@@ -463,7 +161,9 @@ fn sort(s: &str) -> IResult<&str, Sort> {
         map(ws_int, |_| Sort::UInt()),
         map(ws_dec, |_| Sort::Dec()),
         map(ws_userdef, |s| Sort::UserDef(s.to_owned())),
-        map(ws_rec_sort, |s| Sort::Compound(s)),
+        map(ws_rec_sort, |ss| {
+            Sort::Compound(ss.into_iter().map(|s| rccell!(s)).collect())
+        }),
     ))(s)
 }
 
@@ -494,25 +194,29 @@ fn naked_logic(s: &str) -> IResult<&str, Logic> {
     preceded(ws_ltag, ws_l)(s)
 }
 
-fn set_info_status(s : &str) -> IResult<&str, (&str, &str)> {
+fn set_info_status(s: &str) -> IResult<&str, (&str, &str)> {
     let ws_val = delimited(multispace0, alt((tag("sat"), tag("unsat"))), multispace0);
     let ws_status = delimited(multispace0, tag(":status"), multispace0);
     let naked_si = preceded(tag("set-info"), tuple((ws_status, ws_val)));
 
-    let wrapped = delimited(char('('),
-              delimited(multispace0, naked_si, multispace0),
-              char(')'));
+    let wrapped = delimited(
+        char('('),
+        delimited(multispace0, naked_si, multispace0),
+        char(')'),
+    );
     delimited(multispace0, wrapped, multispace0)(s)
 }
 
 fn naked_command(s: &str) -> IResult<&str, Command> {
     alt((
-        map(naked_assert, |a| Command::Assert(a)),
-        map(naked_csa, |a| Command::CheckSatAssuming(a)),
+        map(naked_assert, |a| Command::Assert(rccell!(a))),
+        map(naked_csa, |a| Command::CheckSatAssuming(rccell!(a))),
         map(tag("check-sat"), |_| Command::CheckSat()),
         map(tag("get-model"), |_| Command::GetModel()),
-        map(naked_logic, |l| Command::Logic(l)),
-        map(naked_decl_const, |(v, s)| Command::DeclConst(v.to_owned(), s)),
+        map(naked_logic, |l| Command::Logic(rccell!(l))),
+        map(naked_decl_const, |(v, s)| {
+            Command::DeclConst(v.to_owned(), rccell!(s))
+        }),
     ))(s)
 }
 
@@ -538,17 +242,16 @@ fn command(s: &str) -> IResult<&str, Command> {
     alt((
         preceded(set_info_status, command), // just drop for now
         delimited(multispace0, delim_command, multispace0),
-        map(unknown_balanced, |v| Command::Generic(
-                v.into_iter()
-                    .map(|g| g.to_owned())
-                    .collect::<Vec<String>>())),
+        map(unknown_balanced, |v| {
+            Command::Generic(v.into_iter().map(|g| g.to_owned()).collect::<String>())
+        }),
     ))(s)
 }
 
 pub fn script(s: &str) -> IResult<&str, Script> {
     map(
         many0(delimited(multispace0, command, multispace0)),
-        |cmds| Script::Commands(cmds),
+        |cmds| Script::Commands(cmds.into_iter().map(|cmd| rccell!(cmd)).collect()),
     )(s)
 }
 
@@ -558,24 +261,19 @@ pub fn rmv_comments(s: &str) -> IResult<&str, Vec<&str>> {
     many1(alt((not_comment, map(comment, |_| ""))))(s)
 }
 
-
 #[cfg(test)]
 mod tests {
     use super::*;
     use std::fs;
 
-    fn parse_file(f : &str) -> Script {
-            let contents = &fs::read_to_string(f).expect("error reading file")[..];
-            let contents_sans_comments = &rmv_comments(contents)
-                .expect("failed to rmv comments").1.join(" ")[..];
+    #[allow(unused)]
+    fn parse_file(f: &str) -> Script {
+        let contents = &fs::read_to_string(f).expect("error reading file")[..];
+        let contents_sans_comments = &rmv_comments(contents)
+            .expect("failed to rmv comments")
+            .1
+            .join(" ")[..];
 
-            script(contents_sans_comments).expect("parser error").1
-    }
-
-    #[test]
-    fn traversal() {
-        let mut s = parse_file("samples/ex.smt2");
-        traverse(AstNode::Script(&mut s));
+        script(contents_sans_comments).expect("parser error").1
     }
 }
- 

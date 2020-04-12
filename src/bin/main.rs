@@ -1,4 +1,3 @@
-use cswap::exec;
 use cswap::perf_exec;
 
 fn main() {

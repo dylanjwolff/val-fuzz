@@ -1,80 +1,64 @@
-#[macro_use]
 extern crate nom;
 extern crate itertools;
-extern crate rand_xoshiro;
-extern crate rand_core;
 extern crate rand;
-pub mod parser;
+extern crate rand_core;
+extern crate rand_xoshiro;
 
-use rand_core::RngCore;
+#[macro_use]
+pub mod ast;
+
+pub mod parser;
+pub mod transforms;
+
 use bit_vec::BitVec;
-use parser::{rmv_comments, script, Symbol, Command, Sort, Constant, SExp, Script, BoolOp};
+use parser::{
+    rmv_comments, script,
+};
+#[allow(unused)]
+use ast::Script;
 use rand::Rng;
 use rand_xoshiro::rand_core::SeedableRng;
-use std::path::PathBuf;
-use std::fs;
-use std::collections::BTreeMap;
 use std::collections::BTreeSet;
+use std::fs;
+use std::path::PathBuf;
 use std::process;
 use std::str::from_utf8;
-use itertools::Itertools;
+use transforms::{end_insert_pt, get_bav_assign, to_skel};
 
-
-struct VarNameGenerator {
-    basename: String,
-    counter: u32,
-    vars_generated: Vec<(String, Sort)>,
-}
-
-impl VarNameGenerator {
-    fn get_name(&mut self, sort : Sort) -> String {
-        self.counter = self.counter + 1;
-        let name = format!("{}{}", self.basename, self.counter);
-        self.vars_generated.push((name.clone(), sort));
-        name
-    }
-
-    fn new(base : &str) -> VarNameGenerator {
-        VarNameGenerator {
-            basename : base.to_owned(),
-            counter : 0,
-            vars_generated : vec![],
-        }
-    }
-}
-
+#[allow(unused)]
 struct RandUniqPermGen {
-    rng : Xoshiro256Plus,
-    numbits : usize,
-    buf : Vec<u8>,
-    seen : BTreeSet<BitVec>,
-    retries : u16,
-    max : u32,
-    use_max : bool,
-    use_retries : bool,
+    rng: Xoshiro256Plus,
+    numbits: usize,
+    buf: Vec<u8>,
+    seen: BTreeSet<BitVec>,
+    retries: u16,
+    max: u32,
+    use_max: bool,
+    use_retries: bool,
 }
 
 use rand_xoshiro::Xoshiro256Plus;
 impl RandUniqPermGen {
-
-    fn new_definite(numbits : usize, maxiter: u32) -> Self {
+    fn new_definite(numbits: usize, maxiter: u32) -> Self {
         let buf = BitVec::from_elem(numbits, false).to_bytes();
         let seen = BTreeSet::new();
         let rng = Xoshiro256Plus::seed_from_u64(9999);
 
-        let true_max = if (maxiter as f64).log2() < (numbits as f64)  {
-            maxiter 
-        } else { (numbits as f64).exp2() as u32 };
+        let true_max = if (maxiter as f64).log2() < (numbits as f64) {
+            maxiter
+        } else {
+            (numbits as f64).exp2() as u32
+        };
 
         RandUniqPermGen {
-            rng : rng,
-            numbits : numbits,
-            buf : buf,
-            seen : seen,
-            retries : 0,
-            max : true_max,
-            use_max : true,
-            use_retries : false,
+            rng: rng,
+            numbits: numbits,
+            buf: buf,
+            seen: seen,
+            retries: 0,
+            max: true_max,
+            use_max: true,
+            use_retries: false,
         }
     }
 
@@ -82,268 +66,39 @@ impl RandUniqPermGen {
         self.seen.len() as u32
     }
 
-
+    #[allow(unused)]
     fn sample(&mut self) -> Option<BitVec> {
-          if self.max <= self.seen.len() as u32 { return None }
-
-          let mut is_new = false;
-          let mut attempt = 0;
-          while true || (self.use_retries && attempt < self.retries) {
-              self.rng.fill(&mut self.buf[..]);
-              let mut bv = BitVec::from_bytes(&self.buf[..]);
-              bv.truncate(self.numbits);
-              is_new = self.seen.insert(bv.clone());
-              if is_new {
-                  return Some(bv)
-              }
-              attempt = attempt + 1;
-          }
-
-          None
-    }
-}
-
-fn rl(script: &mut Script, scoped_vars: &mut BTreeMap<String, Vec<SExp>>){
-    match script {
-        Script::Commands(cmds) => {
-            for cmd in cmds {
-                rl_c(cmd, scoped_vars);
-            }
+        if self.max <= self.seen.len() as u32 {
+            return None;
         }
-    }
-}
 
-fn rl_c(cmd: &mut Command, scoped_vars: &mut BTreeMap<String, Vec<SExp>>){
-    match cmd {
-        Command::Assert(s) | Command::CheckSatAssuming(s) => rl_s(s, scoped_vars),
-        _ => (),
-    }
-}
-
-fn rl_s(sexp: &mut SExp, scoped_vars: &mut BTreeMap<String, Vec<SExp>>){
-    match sexp {
-        SExp::Let(v, rest) => {
-            // This looks a bit strange, but if we don't explore these first, those expressions are
-            // each copied multiple times. By doing the exploration on these originals first, we
-            // don't need to later on the copies. We can't add the variable values to the tree yet,
-            // because they may overwrite variables in the original expressions. All solutions are
-            // at least O(2n) before the recursive call on rest, and this one at least is clear,
-            // and n = number of variables in a let expression = typically a very small number anyways.
-
-            let mut new_vars : Vec<(&Symbol, &SExp)> = vec![];
-            for (var, val) in v {
-                rl_s(val, scoped_vars); // first make sure the val is "let-free"
-                new_vars.push((var, val)); // make note of the mapping to add to the rest
+        let mut is_new = false;
+        let mut attempt = 0;
+        while true || (self.use_retries && attempt < self.retries) {
+            self.rng.fill(&mut self.buf[..]);
+            let mut bv = BitVec::from_bytes(&self.buf[..]);
+            bv.truncate(self.numbits);
+            is_new = self.seen.insert(bv.clone());
+            if is_new {
+                return Some(bv);
             }
-
-            // Add all of the allocated variabled to the scope
-            for (var, val) in new_vars.iter() {
-                let maybe_vals = scoped_vars.get_mut(&var.to_string()[..]);
-                match maybe_vals {
-                    Some(vals) => vals.push((*val).clone()),
-                    None => {scoped_vars.insert(var.to_string(), vec![(*val).clone()]);},
-                };
-            }
-
-            // Recurse on the rest of the SExp
-            rl_s(rest, scoped_vars);
-
-            // Pop our variables off of the stack
-            for (var, _) in new_vars {
-                scoped_vars.get_mut(&var.to_string()[..]).map(|v| v.pop());
-            }
-
-            *sexp = (**rest).clone(); // the let expression isn't doing anything anymore
-        },
-        SExp::Symbol(s) => {
-            match scoped_vars.get(&s.to_string()[..]).and_then(|v| v.last()) {
-                Some(e) => {
-                    *sexp = e.clone();
-                },
-                None => (),
-            }
-        },
-
-        SExp::Compound(v) |
-        SExp::BExp(_, v) => for e in v { rl_s(e, scoped_vars) },
-        SExp::Constant(_) => (),
-    }
-}
-
-fn rc(script: &mut Script, vng : &mut VarNameGenerator){
-    match script {
-        Script::Commands(cmds) => {
-            for cmd in cmds {
-                rc_c(cmd, vng);
-            }
+            attempt = attempt + 1;
         }
+
+        None
     }
-}
-
-fn rc_c(cmd: &mut Command, vng : &mut  VarNameGenerator) {
-    match cmd {
-        Command::Assert(sexp) | Command::CheckSatAssuming(sexp) => rc_se(sexp, vng),
-        _ => (),
-    }
-}
-
-fn rc_se(sexp: &mut SExp, vng : &mut VarNameGenerator) {
-    match sexp {
-        SExp::Constant(c) => {
-            let sort = match c {
-                Constant::UInt(_) => Sort::UInt(),
-                Constant::Dec(_) => Sort::Dec(),
-                Constant::Str(_) => Sort::Str(),
-                Constant::Bool(_) => Sort::Bool(),
-                Constant::Bin(_) |
-                Constant::Hex(_) => Sort::BitVec(),
-            };
-            let name = vng.get_name(sort);
-            *sexp = SExp::Symbol(Symbol::Var(name));
-        },
-        SExp::Compound(sexps) |
-        SExp::BExp(_, sexps) => {
-            for sexp in sexps {
-                rc_se(sexp, vng)
-            }
-        }
-        _ => (),
-    }
-}
-
-fn bav(script: &mut Script, vng : &mut VarNameGenerator, bava : &mut Vec<(String, SExp)>){
-    match script {
-        Script::Commands(cmds) => {
-            for cmd in cmds {
-                bav_c(cmd, vng, bava);
-            }
-        }
-    }
-}
-
-fn bav_c(cmd: &mut Command, vng : &mut  VarNameGenerator, bava : &mut Vec<(String, SExp)>){
-    match cmd {
-        Command::Assert(sexp) | Command::CheckSatAssuming(sexp) => bav_se(sexp, vng, bava),
-        _ => (),
-    }
-}
-
-fn bav_se(sexp: &mut SExp, vng : &mut VarNameGenerator, bavs : &mut Vec<(String, SExp)>) {
-    match sexp {
-        SExp::BExp(bop, sexps) => {
-            let name = vng.get_name(Sort::Bool());
-            let sec = SExp::BExp(bop.clone(), sexps.clone());
-            bavs.push((name, sec));
-            for sexp in sexps {
-                bav_se(sexp, vng, bavs);
-            }
-        },
-        SExp::Compound(sexps) => {
-            for sexp in sexps {
-                bav_se(sexp, vng, bavs);
-            }
-        },
-        SExp::Let(_, _) => panic!("Let statments should be filtered out!"),
-        _ => (),
-    }
-}
-
-
-fn init_vars(script : &mut Script, vars : Vec<(String, Sort)>) {
-    let Script::Commands(cmds) = script;
-    if cmds.len() == 0 { return }
-
-    let maybe_log_pos = cmds.iter().position(|cmd| cmd.is_logic());
-
-    let log_pos = match maybe_log_pos {
-        Some(pos) => pos,
-        None => 0,
-    };
-
-    let mut end = cmds.split_off(log_pos + 1);
-
-    let mut decls = vars.into_iter()
-        .map(|(vname, sort)| Command::DeclConst(vname, sort))
-        .collect::<Vec<Command>>();
-
-    cmds.append(&mut decls);
-    cmds.append(&mut end);
-}
-
-fn add_ba(script : &mut Script, bavs : Vec<(String, SExp)>) {
-    let Script::Commands(cmds) = script;
-
-    let maybe_cs_pos = cmds.iter().position(|cmd| cmd.is_checksat());
-
-    let cs_pos = match maybe_cs_pos {
-        Some(pos) => pos,
-        None => cmds.len(),
-    };
-
-    let mut baveq_iter = bavs.into_iter()
-        .map(|(vname, sexp)| {
-            SExp::BExp(BoolOp::Equals(), vec![SExp::Symbol(Symbol::Var(vname)), sexp])
-        });
-
-    cmds.insert(cs_pos, assert_many(&mut baveq_iter));
-}
-
-fn assert_many(iter: &mut dyn Iterator<Item = SExp>) -> Command {
-    let init = match iter.next() {
-        Some(bav_eq) => bav_eq,
-        _ => SExp::true_sexp(), // shouldn't ever actually be added
-    };
-
-    let intersection = iter
-        .fold(init, |acc, curr| SExp::BExp(BoolOp::And(), vec![acc, curr]));
-
-    return Command::Assert(intersection)
-}
-
-fn end_insert_pt(script : &Script) -> usize {
-    let Script::Commands(cmds) = script;
-
-    let maybe_cs_pos = cmds.iter().position(|cmd| cmd.is_checksat());
-
-    match maybe_cs_pos {
-        Some(pos) => pos,
-        None => cmds.len(),
-    }
-}
-
-fn get_bav_assign(bavns : &Vec<String>, ta : BitVec) -> Command {
-    let bavs = bavns.into_iter().zip(ta.into_iter());
-    let mut baveq = bavs.into_iter()
-        .map(|(vname, bval)| {
-            let val = if bval { SExp::true_sexp() } else { SExp::false_sexp() };
-            SExp::BExp(BoolOp::Equals(), vec![SExp::Symbol(Symbol::Var(vname.clone())), val])
-        });
-
-    assert_many(&mut baveq)
-}
-
-/// returns the Boolean Abstract Variables added as vector of their names 
-fn to_skel(script : &mut Script) -> Vec<String> {
-    let mut vng = VarNameGenerator::new("GEN");
-    rc(script, &mut vng);
-
-    let mut scopes = BTreeMap::new();
-    rl(script, &mut scopes);
-
-    vng.basename = "BAV".to_owned();
-    let mut bavs = vec![];
-    bav(script, &mut vng, &mut bavs);
-
-    init_vars(script, vng.vars_generated);
-    let bavns = bavs.iter()
-        .map(|(name, _)| name.clone()).collect::<Vec<String>>();
-    add_ba(script, bavs);
-    bavns
 }
 
 fn solve(filename: &str) {
     let cvc4_res = process::Command::new("timeout")
-        .args(&["5s", "cvc4", filename, "--produce-model", "--tlimit", "5000"])
+        .args(&[
+            "5s",
+            "cvc4",
+            filename,
+            "--produce-model",
+            "--tlimit",
+            "5000",
+        ])
         .output();
 
     let z3_res = process::Command::new("z3")
@@ -384,7 +139,8 @@ fn solve(filename: &str) {
             } else if cvc4_stdout.contains("sat") && !z3_stdout.contains("sat") {
                 println!("file {} has soundness problem!!!", filename);
             } else {
-                fs::remove_file(filename);
+                fs::remove_file(filename)
+                    .unwrap_or(());
                 println!("remd");
             }
             ()
@@ -393,15 +149,19 @@ fn solve(filename: &str) {
     }
 }
 
-
 pub fn strip_and_test_file(source_file: &PathBuf) {
     let contents: String =
         fs::read_to_string(source_file).expect("Something went wrong reading the file");
-    let stripped_contents = &rmv_comments(&contents[..]).expect("Error stripping comments").1.join(" ")[..];
+    let stripped_contents = &rmv_comments(&contents[..])
+        .expect("Error stripping comments")
+        .1
+        .join(" ")[..];
     let mut script = script(&stripped_contents[..]).expect("Parsing error").1;
     // TODO error handling here on prev 3 lines
 
-    if script.is_unsupported_logic() { return }
+    if script.is_unsupported_logic() {
+        return;
+    }
 
     let bavns = to_skel(&mut script);
     let eip = end_insert_pt(&script);
@@ -413,20 +173,18 @@ pub fn strip_and_test_file(source_file: &PathBuf) {
     while let Some(truth_values) = urng.sample() {
         let filename = get_iter_fileout_name(source_file, urng.get_count());
         script.replace(eip, get_bav_assign(&bavns, truth_values));
-        fs::write(&filename, script.to_string());
+        fs::write(&filename, script.to_string()).unwrap_or(());
         solve(&filename);
     }
 }
 
-fn get_iter_fileout_name(source_file : &PathBuf, iter : u32) -> String {
+fn get_iter_fileout_name(source_file: &PathBuf, iter: u32) -> String {
     let source_filename = match source_file.file_name().and_then(|n| n.to_str()) {
         Some(name) => name,
         None => "unknown",
     };
     (iter).to_string() + "_" + source_filename
 }
-
-
 
 pub fn exec() {
     let files = fs::read_dir("known").expect("error with sample dir");
@@ -453,8 +211,11 @@ pub fn perf_exec() {
                 println!("starting file {:?}", filepath);
                 let contents: String =
                 fs::read_to_string(&filepath).expect("Something went wrong reading the file");
-                let stripped_contents = &rmv_comments(&contents[..]).expect("Error stripping comments").1.join(" ")[..];
-                let mut script = script(&stripped_contents[..]).expect("Parsing error").1;
+                let stripped_contents = &rmv_comments(&contents[..])
+                    .expect("Error stripping comments")
+                    .1
+                    .join(" ")[..];
+                let _script = script(&stripped_contents[..]).expect("Parsing error").1;
             }
             Err(_) => (),
         }
@@ -465,44 +226,51 @@ pub fn perf_exec() {
 mod tests {
     use super::*;
     use std::fs;
+    use std::thread;
 
-    fn parse_file(f : &str) -> Script {
-            let contents = &fs::read_to_string(f).expect("error reading file")[..];
-            let contents_sans_comments = &rmv_comments(contents)
-                .expect("failed to rmv comments").1.join(" ")[..];
-
-            script(contents_sans_comments).expect("parser error").1
-    }
+    const STACK_SIZE: usize = 20 * 1024 * 1024;
 
     #[test]
-    #[ignore]
+    fn parse_unparse_test() {
+        // Spawn thread with explicit stack size
+        let child = thread::Builder::new()
+            .stack_size(STACK_SIZE)
+            .spawn(parse_unparse)
+            .unwrap();
+
+        // Wait for thread to join
+        child.join().unwrap();
+    }
+
+    fn parse_file(f: &str) -> Script {
+        let contents = &fs::read_to_string(f).expect("error reading file")[..];
+        let contents_sans_comments = &rmv_comments(contents)
+            .expect("failed to rmv comments")
+            .1
+            .join(" ")[..];
+
+        script(contents_sans_comments).expect("parser error").1
+    }
+
     fn parse_unparse() {
         let files = fs::read_dir("samples").expect("error with sample dir");
 
-        for file_res in files {
+        for file_res in files.into_iter().take(10) {
             let file = file_res.expect("problem with file");
             println!("Starting {:?}", file);
             let filepath = file.path();
             let contents = &fs::read_to_string(filepath).expect("error reading file")[..];
             let contents_sans_comments = &rmv_comments(contents)
-                .expect("failed to rmv comments").1.join(" ")[..];
+                .expect("failed to rmv comments")
+                .1
+                .join(" ")[..];
 
             let p = script(contents_sans_comments).expect("parser error").1;
 
-            let pup = script(&p.to_string()[..]).expect("reparse error").1;
-
+            let up = p.to_string();
+            let pup = script(&up[..]).expect("reparse error").1;
             assert_eq!(p, pup);
         }
-    }
-
-    #[test]
-    fn qc_rls() {
-        let v = Symbol::Var("x".to_owned());
-        let e = SExp::Symbol(Symbol::Token("changed".to_owned()));
-        let expected = e.clone();
-        let mut sexp = SExp::Let(vec![(v.clone(), e)], Box::new(SExp::Symbol(v)));
-        rl_s(&mut sexp, &mut BTreeMap::new());
-        assert_eq!(sexp, expected);
     }
 
     #[test]
@@ -513,11 +281,35 @@ mod tests {
     }
 
     #[test]
-    fn rando_calrissian() {
+    fn ru_definite_reaches_maxiter() {
         let mut rng = RandUniqPermGen::new_definite(10, 1);
-        println!("samples {:?} {:?}", rng.sample(), rng.sample());
+        assert!(rng.sample().is_some());
+        assert!(rng.sample().is_none());
+    }
+
+    #[test]
+    fn ru_definite_reaches_maxpossible() {
         let mut rng = RandUniqPermGen::new_definite(1, 100);
-        println!("samples {:?} {:?} {:?}", rng.sample(), rng.sample(), rng.sample());
+        assert!(rng.sample().is_some());
+        assert!(rng.sample().is_some());
+        assert!(rng.sample().is_none());
+    }
+
+    #[test]
+    fn ru_definite_correct_size() {
+        let mut rng = RandUniqPermGen::new_definite(9, 1);
+        assert_eq!(rng.sample().expect("Should hold value").len(), 9);
+    }
+
+    #[test]
+    fn ru_definite_distinct() {
+        let mut set = BTreeSet::new();
+        let mut rng = RandUniqPermGen::new_definite(2, 4);
+        set.insert(rng.sample().expect("Should hold value"));
+        set.insert(rng.sample().expect("Should hold value"));
+        set.insert(rng.sample().expect("Should hold value"));
+        set.insert(rng.sample().expect("Should hold value"));
+        assert_eq!(set.len(), 4);
     }
 
     #[test]
