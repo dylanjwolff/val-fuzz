@@ -1,6 +1,6 @@
-use cswap::perf_exec;
+use cswap::exec;
 
 fn main() {
     println!("STARTING RUN");
-    perf_exec();
+    exec();
 }
