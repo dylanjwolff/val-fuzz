@@ -10,18 +10,17 @@ pub mod transforms;
 
 use bit_vec::BitVec;
 use parser::{
-    rmv_comments, script, traverse, AstNode, BoolOp, Command, Constant, SExp, Script, Sort, Symbol,
-    ToStringVisitor,
+    rmv_comments, script,
 };
-use parser::{BoolOpRc, CommandRc, ConstantRc, SExpRc, ScriptRc, SortRc, SymbolRc};
+
 use rand::Rng;
 use rand_xoshiro::rand_core::SeedableRng;
-use std::collections::BTreeMap;
+
 use std::collections::BTreeSet;
 use std::fs;
 use std::path::PathBuf;
 use std::process;
-use std::rc::Rc;
+
 use std::str::from_utf8;
 use transforms::{end_insert_pt, get_bav_assign, to_skel};
 
@@ -212,7 +211,7 @@ pub fn perf_exec() {
                     .expect("Error stripping comments")
                     .1
                     .join(" ")[..];
-                let mut script = script(&stripped_contents[..]).expect("Parsing error").1;
+                let _script = script(&stripped_contents[..]).expect("Parsing error").1;
             }
             Err(_) => (),
         }

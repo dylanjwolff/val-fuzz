@@ -4,18 +4,18 @@ use crate::parser::{
 };
 use crate::parser::{BoolOpRc, CommandRc, ConstantRc, SExpRc, ScriptRc, SortRc, SymbolRc};
 use bit_vec::BitVec;
-use rand::Rng;
-use rand_core::RngCore;
-use rand_xoshiro::rand_core::SeedableRng;
+
+
+
 use std::cell::RefCell;
-use std::cell::RefMut;
+
 use std::collections::BTreeMap;
-use std::collections::BTreeSet;
-use std::fs;
-use std::path::PathBuf;
-use std::process;
+
+
+
+
 use std::rc::Rc;
-use std::str::from_utf8;
+
 
 pub struct VarNameGenerator {
     basename: String,
@@ -318,7 +318,7 @@ fn bav_se(sexp: &mut SExp, vng: &mut VarNameGenerator, bavs: &mut Vec<(String, S
 #[cfg(test)]
 mod tests {
     use super::*;
-    use std::fs;
+    
 
     #[test]
     fn qc_rls() {

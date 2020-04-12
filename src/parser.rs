@@ -308,7 +308,7 @@ impl SExp {
                 format!("(let ({}) {})", vbss, s.borrow().to_string())
             }
             SExp::Compound(v) => {
-                let mut rec_s = v
+                let rec_s = v
                     .iter()
                     .map(|sexp| Box::new(sexp.borrow().to_string()))
                     .map(|bs| *bs)
@@ -784,7 +784,7 @@ mod tests {
 
     #[test]
     fn traversal() {
-        let mut s = parse_file("samples/bug272.minimized.smtv1.smt2");
+        let s = parse_file("samples/bug272.minimized.smtv1.smt2");
         let mut tsv = ToStringVisitor::new();
         traverse(AstNode::Script(rccell!(s)), vec![&mut tsv]);
         println!("\n\n STRINGIFIED: {} \n\n", tsv.to_string());
