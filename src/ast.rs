@@ -150,21 +150,15 @@ impl Script {
 impl Command {
     pub fn to_string(&self) -> String {
         match self {
-            Command::Logic(l) => "(set-logic ".to_owned() + &l.borrow().to_string()[..] + ")",
+            Command::Logic(l) => format!("(set-logic {})", l.borrow().to_string()),
             Command::CheckSat() => "(check-sat)".to_string(),
-            Command::CheckSatAssuming(sexp) => {
-                ("(check-sat-assuming ".to_owned() + &sexp.borrow().to_string()[..] + ")")
-                    .to_string()
-            } // TODO
+            Command::CheckSatAssuming(sexp) =>
+                format!("(check-sat-assuming {})", sexp.borrow().to_string()),
             Command::GetModel() => "(get-model)".to_string(),
-            Command::DeclConst(v, s) => {
-                ("(declare-const ".to_string() + v + " " + &s.borrow().to_string()[..] + ")")
-                    .to_string()
-            }
+            Command::DeclConst(v, s) => 
+                format!("(declare-const {} {})", v, s.borrow().to_string()),
             Command::Generic(s) => s.clone(),
-            Command::Assert(s) => {
-                ("(assert ".to_string() + &s.borrow().to_string()[..] + ")").to_string()
-            }
+            Command::Assert(s) => format!("(assert {})", s.borrow().to_string()),
         }
     }
 
