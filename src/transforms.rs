@@ -1,7 +1,7 @@
-use crate::parser::{
+use crate::ast::{
     AstNode, BoolOp, Command, Constant, SExp, Script, Sort, Symbol,
 };
-use crate::parser::{BoolOpRc, CommandRc, ConstantRc, SExpRc, ScriptRc, SortRc, SymbolRc};
+use crate::ast::{BoolOpRc, CommandRc, ConstantRc, SExpRc, ScriptRc, SortRc, SymbolRc};
 use bit_vec::BitVec;
 
 use std::iter::once;

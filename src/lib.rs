@@ -3,14 +3,20 @@ extern crate itertools;
 extern crate rand;
 extern crate rand_core;
 extern crate rand_xoshiro;
+
 #[macro_use]
+pub mod ast;
+
 pub mod parser;
 pub mod transforms;
 
+
 use bit_vec::BitVec;
 use parser::{
-    rmv_comments, script, Script,
+    rmv_comments, script,
 };
+
+use ast::Script;
 
 use rand::Rng;
 use rand_xoshiro::rand_core::SeedableRng;
