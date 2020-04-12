@@ -1,4 +1,3 @@
-#[macro_use]
 extern crate nom;
 extern crate itertools;
 extern crate rand;
@@ -10,7 +9,7 @@ pub mod transforms;
 
 use bit_vec::BitVec;
 use parser::{
-    rmv_comments, script,
+    rmv_comments, script, Script,
 };
 
 use rand::Rng;
@@ -24,6 +23,7 @@ use std::process;
 use std::str::from_utf8;
 use transforms::{end_insert_pt, get_bav_assign, to_skel};
 
+#[allow(unused)]
 struct RandUniqPermGen {
     rng: Xoshiro256Plus,
     numbits: usize,
@@ -64,6 +64,7 @@ impl RandUniqPermGen {
         self.seen.len() as u32
     }
 
+    #[allow(unused)]
     fn sample(&mut self) -> Option<BitVec> {
         if self.max <= self.seen.len() as u32 {
             return None;
@@ -136,7 +137,8 @@ fn solve(filename: &str) {
             } else if cvc4_stdout.contains("sat") && !z3_stdout.contains("sat") {
                 println!("file {} has soundness problem!!!", filename);
             } else {
-                fs::remove_file(filename);
+                fs::remove_file(filename)
+                    .unwrap_or(());
                 println!("remd");
             }
             ()
@@ -169,7 +171,7 @@ pub fn strip_and_test_file(source_file: &PathBuf) {
     while let Some(truth_values) = urng.sample() {
         let filename = get_iter_fileout_name(source_file, urng.get_count());
         script.replace(eip, get_bav_assign(&bavns, truth_values));
-        fs::write(&filename, script.to_string());
+        fs::write(&filename, script.to_string()).unwrap_or(());
         solve(&filename);
     }
 }
