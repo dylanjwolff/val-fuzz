@@ -154,6 +154,11 @@ fn solve(filename: &str) {
                fs::remove_file(filename)
                     .unwrap_or(());
             }
+
+            if cvc4_succ && z3_succ {
+                println!("parse success for file :{}", filename);
+            }
+
         },
         (Err(e), _) => println!("cvc4 process error on file {} : {}", filename, e),
         (_, Err(e)) => println!("z3 process error on file {} : {}", filename, e),
