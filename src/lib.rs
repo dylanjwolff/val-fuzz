@@ -124,7 +124,12 @@ fn solve(filename: &str) {
     let z3_stdout_res = z3_res
         .and_then(|out| {
             if !out.status.success() && out.stderr.len() > 0 {
-                Err(std::io::Error::last_os_error()) // really sloppy hack for now, needs to be fixed
+               println!(
+                    "z3 error on file {} : {}",
+                    filename,
+                    from_utf8(&out.stderr[..]).unwrap()
+               );
+               Err(std::io::Error::last_os_error()) // really sloppy hack for now, needs to be fixed
             } else {
                 Ok(out)
             }
@@ -134,19 +139,23 @@ fn solve(filename: &str) {
     match (cvc4_stdout_res, z3_stdout_res) {
         (Ok(Ok(cvc4_stdout)), Ok(Ok(z3_stdout))) => {
             // also sloppy hack above
-            if cvc4_stdout.contains("unsat") && !z3_stdout.contains("unsat") {
+            println!("std out {}", z3_stdout);
+            if cvc4_stdout.contains("unknown") || z3_stdout.contains("unknown") {
+                println!("file {} resulted in unknown", filename);
+            } else if cvc4_stdout.contains("unsat") && !z3_stdout.contains("unsat") &&
+                !z3_stdout.contains("unknown function/constant"){ 
+                // z3 treats unknowns as uninterpreted, often reporting SAT when the constrains
+                // actually mean it is unsat
                 println!("file {} has soundness problem!!!", filename);
             } else if cvc4_stdout.contains("sat") && !z3_stdout.contains("sat") {
                 println!("file {} has soundness problem!!!", filename);
-            } else if cvc4_stdout.contains("unknown") || !z3_stdout.contains("unknown") {
-                println!("file {} resulted in unknown", filename);
             } else {
                 fs::remove_file(filename)
                     .unwrap_or(());
             }
             ()
         }
-        _ => println!("Error with file {}", filename),
+        _ => (),
     }
 }
 
@@ -190,7 +199,7 @@ fn get_iter_fileout_name(source_file: &PathBuf, iter: u32) -> String {
 }
 
 pub fn exec() {
-    let files = fs::read_dir("known").expect("error with sample dir");
+    let files = fs::read_dir("test").expect("error with sample dir");
 
     for file_res in files {
         match file_res {
