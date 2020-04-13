@@ -106,57 +106,54 @@ fn solve(filename: &str) {
         .args(&["6s", "z3", filename, "-T:5"])
         .output();
 
-    let cvc4_stdout_res = cvc4_res
-        .and_then(|out| {
-            if !out.status.success() && out.stderr.len() > 0 {
-                println!(
-                    "cvc4 error on file {} : {}",
-                    filename,
-                    from_utf8(&out.stderr[..]).unwrap()
-                );
-                Err(std::io::Error::last_os_error()) // really sloppy hack for now, needs to be fixed
-            } else {
-                Ok(out)
-            }
-        })
-        .map(|out| from_utf8(&out.stdout.clone()[..]).map(|s| s.to_string()));
 
-    let z3_stdout_res = z3_res
-        .and_then(|out| {
-            if !out.status.success() && out.stderr.len() > 0 {
-               println!(
-                    "z3 error on file {} : {}",
-                    filename,
-                    from_utf8(&out.stderr[..]).unwrap()
-               );
-               Err(std::io::Error::last_os_error()) // really sloppy hack for now, needs to be fixed
-            } else {
-                Ok(out)
-            }
-        })
-        .map(|out| from_utf8(&out.stdout.clone()[..]).map(|s| s.to_string()));
+    let cvc4mrs = cvc4_res.map(|out| {
+        let stderr = from_utf8(&out.stderr[..]).unwrap();
+        let stdout = from_utf8(&out.stdout[..]).unwrap();
+        let success = out.status.success();
+        (success, stderr.to_owned(), stdout.to_owned())
+    });
 
-    match (cvc4_stdout_res, z3_stdout_res) {
-        (Ok(Ok(cvc4_stdout)), Ok(Ok(z3_stdout))) => {
-            // also sloppy hack above
-            println!("std out {}", z3_stdout);
-            if cvc4_stdout.contains("unknown") || z3_stdout.contains("unknown") {
-                println!("file {} resulted in unknown", filename);
-            } else if cvc4_stdout.contains("unsat") && !z3_stdout.contains("unsat") &&
-                !z3_stdout.contains("unknown function/constant"){ 
-                // z3 treats unknowns as uninterpreted, often reporting SAT when the constrains
-                // actually mean it is unsat
-                println!("file {} has soundness problem!!!", filename);
-            } else if cvc4_stdout.contains("sat") && !z3_stdout.contains("sat") {
-                println!("file {} has soundness problem!!!", filename);
+    let z3mrs = z3_res.map(|out| {
+        let stderr = from_utf8(&out.stderr[..]).unwrap();
+        let stdout = from_utf8(&out.stdout[..]).unwrap();
+        let success = out.status.success();
+        (success, stderr.to_owned(), stdout.to_owned())
+    });
+
+    match (cvc4mrs, z3mrs) {
+        (Ok((cvc4_succ, cvc4_out, cvc4_err)), Ok((z3_succ, z3_out, z3_err))) => {
+            let z3_unsat = z3_out.contains("unsat");
+            let z3_sat = !z3_unsat && z3_out.contains("sat");
+            let z3_unknown = !z3_unsat && !z3_sat && z3_out.contains("unknown");
+            let cvc4_unsat = cvc4_out.contains("unsat");
+            let cvc4_sat = !cvc4_unsat && cvc4_out.contains("sat");
+            let cvc4_unknown = !cvc4_unsat && !cvc4_sat && cvc4_out.contains("unknown");
+
+            if !z3_succ && z3_err.len() > 0 && !z3_sat && !z3_unsat {
+               println!("z3 unsuccessful on file {} : {}", filename, z3_err);
+            } else if !cvc4_succ && cvc4_err.len() > 0 && !cvc4_sat && !cvc4_unsat {
+               println!("cvc4 unsuccessful on file {} : {}", filename, cvc4_err);
+            } else if z3_unknown || cvc4_unknown {
+               println!("unknown result for file {}", filename);
+               fs::remove_file(filename)
+                    .unwrap_or(());
+            } else if cvc4_sat && z3_unsat {
+               println!("file {} has soundness problem!!!", filename);
+            } else if cvc4_unsat && z3_sat && !z3_out.contains("unknown function/constant") {
+               println!("file {} has soundness problem!!!", filename);
+            } else if cvc4_out.contains("timeout") || z3_out.contains("timeout") {
+               println!("timeout on file {}", filename);
+               fs::remove_file(filename)
+                    .unwrap_or(());
             } else {
-                fs::remove_file(filename)
+               fs::remove_file(filename)
                     .unwrap_or(());
             }
-            ()
-        }
-        _ => (),
-    }
+        },
+        (Err(e), _) => println!("cvc4 process error on file {} : {}", filename, e),
+        (_, Err(e)) => println!("z3 process error on file {} : {}", filename, e),
+    };
 }
 
 pub fn strip_and_test_file(source_file: &PathBuf) {
