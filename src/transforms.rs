@@ -273,12 +273,13 @@ fn rc_c(cmd: &mut Command, vng: &mut VarNameGenerator) {
 fn rc_se(sexp: &mut SExp, vng: &mut VarNameGenerator) {
     match sexp {
         SExp::Constant(c) => {
-            let sort = match *c.borrow_mut() {
+            let sort = match &*c.borrow_mut() {
                 Constant::UInt(_) => Sort::UInt(),
                 Constant::Dec(_) => Sort::Dec(),
                 Constant::Str(_) => Sort::Str(),
                 Constant::Bool(_) => Sort::Bool(),
-                Constant::Bin(_) | Constant::Hex(_) => Sort::BitVec(),
+                Constant::Bin(bit_s)  => Sort::BitVec(bit_s.len() as u32),
+                Constant::Hex(hit_s) => Sort::BitVec((hit_s.len() as u32)*4),
             };
             let name = vng.get_name(sort);
             *sexp = SExp::Symbol(rccell!(Symbol::Var(name)));

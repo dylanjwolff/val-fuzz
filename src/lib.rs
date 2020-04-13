@@ -198,7 +198,7 @@ fn get_iter_fileout_name(source_file: &PathBuf, iter: u32) -> String {
 }
 
 pub fn exec() {
-    let files = fs::read_dir("samples").expect("error with sample dir");
+    let files = fs::read_dir("test").expect("error with sample dir");
 
     for file_res in files {
         match file_res {

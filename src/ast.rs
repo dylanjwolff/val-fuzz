@@ -39,7 +39,7 @@ pub enum Sort {
     Dec(),
     Str(),
     Bool(),
-    BitVec(),
+    BitVec(u32),
     Array(),
     UserDef(String),
     Compound(Vec<SortRc>),
@@ -199,7 +199,7 @@ impl Sort {
             Sort::Dec() => "Real".to_string(),
             Sort::Bool() => "Bool".to_string(),
             Sort::Str() => "String".to_string(),
-            Sort::BitVec() => "BitVec".to_string(),
+            Sort::BitVec(len) => format!("(_ BitVec {})", len),
             Sort::Array() => "Array".to_string(),
             Sort::UserDef(s) => s.to_string(),
             Sort::Compound(v) => {
