@@ -123,12 +123,14 @@ fn solve(filename: &str) {
 
     match (cvc4mrs, z3mrs) {
         (Ok((cvc4_succ, cvc4_out, cvc4_err)), Ok((z3_succ, z3_out, z3_err))) => {
-            let z3_unsat = z3_out.contains("unsat");
-            let z3_sat = !z3_unsat && z3_out.contains("sat");
-            let z3_unknown = !z3_unsat && !z3_sat && z3_out.contains("unknown");
-            let cvc4_unsat = cvc4_out.contains("unsat");
-            let cvc4_sat = !cvc4_unsat && cvc4_out.contains("sat");
-            let cvc4_unknown = !cvc4_unsat && !cvc4_sat && cvc4_out.contains("unknown");
+            let z3_unsat = z3_out.contains("unsat") || z3_err.contains("\nunsat");
+            let z3_sat = !z3_unsat && (z3_out.contains("sat") || z3_err.contains("\nsat"));
+            let z3_unknown = !z3_unsat && !z3_sat && (z3_out.contains("unknown")
+                                                      || z3_err.contains("\nunknown"));
+            let cvc4_unsat = cvc4_out.contains("unsat") || cvc4_err.contains("\nunsat");
+            let cvc4_sat = !cvc4_unsat && (cvc4_out.contains("sat") || cvc4_err.contains("\nsat"));
+            let cvc4_unknown = !cvc4_unsat && !cvc4_sat && (cvc4_out.contains("unknown")
+                                                      || cvc4_err.contains("\nunknown"));
 
             if !z3_succ && z3_err.len() > 0 && !z3_sat && !z3_unsat {
                println!("z3 unsuccessful on file {} : {}", filename, z3_err);
@@ -175,7 +177,7 @@ pub fn strip_and_test_file(source_file: &PathBuf) {
     script.init(eip);
 
     let num_bavs = bavns.len();
-    const MAX_ITER : u32 =10;
+    const MAX_ITER : u32 =1;
     println!("starting max(2^{}, {}) iterations", num_bavs, MAX_ITER);
     let mut urng = RandUniqPermGen::new_definite(num_bavs, MAX_ITER);
     while let Some(truth_values) = urng.sample() {
