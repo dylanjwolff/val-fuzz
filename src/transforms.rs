@@ -1,5 +1,5 @@
 use crate::ast::{
-    AstNode, BoolOp, Command, Constant, SExp, Script, Sort, Symbol,
+    AstNode, BoolOp, Command, Constant, SExp, Script, Logic, Sort, Symbol,
 };
 use crate::ast::{CommandRc, SExpRc, SymbolRc, SortRc};
 use crate::parser::{script};
@@ -29,6 +29,15 @@ impl VarNameGenerator {
             vars_generated: vec![],
         }
     }
+}
+
+fn set_logic_all(script : &mut Script) {
+    let Script::Commands(cmds) = script;
+    let maybe_log_pos = cmds.iter()
+        .find(|cmd| cmd.borrow().is_logic())
+        .map(|cmd|
+             cmd.replace(Command::Logic(rccell!(Logic::Other("ALL".to_owned()))))
+         );
 }
 
 fn init_vars(script: &mut Script, vars: Vec<(String, Sort)>) {
@@ -140,6 +149,8 @@ pub fn get_bav_assign(bavns: &Vec<String>, ta: BitVec) -> Command {
 pub fn to_skel(script: &mut Script) -> Vec<String> {
     let mut vng = VarNameGenerator::new("GEN");
     rc(script, &mut vng);
+
+    set_logic_all(script);
 
     let mut scopes = BTreeMap::new();
     rl(script, &mut scopes);
