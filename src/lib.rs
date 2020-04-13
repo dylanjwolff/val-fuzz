@@ -138,6 +138,8 @@ fn solve(filename: &str) {
                 println!("file {} has soundness problem!!!", filename);
             } else if cvc4_stdout.contains("sat") && !z3_stdout.contains("sat") {
                 println!("file {} has soundness problem!!!", filename);
+            } else if cvc4_stdout.contains("unknown") || !z3_stdout.contains("unknown") {
+                println!("file {} resulted in unknown", filename);
             } else {
                 fs::remove_file(filename)
                     .unwrap_or(());
@@ -168,7 +170,6 @@ pub fn strip_and_test_file(source_file: &PathBuf) {
 
     let num_bavs = bavns.len();
     const MAX_ITER : u32 =10;
-    println!("skel {}", script.to_string());
     println!("starting max(2^{}, {}) iterations", num_bavs, MAX_ITER);
     let mut urng = RandUniqPermGen::new_definite(num_bavs, MAX_ITER);
     while let Some(truth_values) = urng.sample() {
@@ -177,6 +178,7 @@ pub fn strip_and_test_file(source_file: &PathBuf) {
         fs::write(&filename, script.to_string()).unwrap_or(());
         solve(&filename);
     }
+    println!("Done with seed file");
 }
 
 fn get_iter_fileout_name(source_file: &PathBuf, iter: u32) -> String {

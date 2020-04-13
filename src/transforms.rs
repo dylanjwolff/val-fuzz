@@ -82,7 +82,14 @@ fn add_ba(script: &mut Script, bavs: Vec<(String, SExp, VarBindings)>) {
         )
     });
 
-    cmds.insert(cs_pos, rccell!(assert_many(&mut baveq_iter)));
+//    cmds.insert(cs_pos, rccell!(assert_many(&mut baveq_iter)));
+    let mut end = cmds.split_off(cs_pos);
+    cmds.append(&mut many_assert(&mut baveq_iter));
+    cmds.append(&mut end);
+}
+
+fn many_assert(iter: &mut dyn Iterator<Item = SExp>) -> Vec<CommandRc> {
+    iter.map(|bexp| rccell!(Command::Assert(rccell!(bexp)))).collect()
 }
 
 fn assert_many(iter: &mut dyn Iterator<Item = SExp>) -> Command {
@@ -269,7 +276,14 @@ fn rc_se(sexp: &mut SExp, vng: &mut VarNameGenerator) {
             for sexp in sexps {
                 rc_se(&mut *sexp.borrow_mut(), vng)
             }
-        }
+        },
+        SExp::Let(vbs, rest) => {
+            for (_, sexp) in vbs {
+                rc_se(&mut *sexp.borrow_mut(), vng)
+            }
+            rc_se(&mut *rest.borrow_mut(), vng);
+        },
+        SExp::QForAll(_, rest) => rc_se(&mut *rest.borrow_mut(), vng),
         _ => (),
     }
 }
