@@ -127,11 +127,13 @@ fn solve(filename: &str) {
             let z3_sat = !z3_unsat && (z3_out.contains("sat") || z3_err.contains("\nsat"));
             let z3_unknown = !z3_unsat && !z3_sat && (z3_out.contains("unknown")
                                                       || z3_err.contains("\nunknown"));
-            let cvc4_unsat = cvc4_out.contains("unsat") || cvc4_err.contains("\nunsat");
-            let cvc4_sat = !cvc4_unsat && (cvc4_out.contains("sat") || cvc4_err.contains("\nsat"));
+            let cvc4_unsat = cvc4_out.contains("unsat") || cvc4_err.contains("unsat\n");
+            let cvc4_sat = !cvc4_unsat && (cvc4_out.contains("sat") || cvc4_err.contains("sat\n"));
             let cvc4_unknown = !cvc4_unsat && !cvc4_sat && (cvc4_out.contains("unknown")
-                                                      || cvc4_err.contains("\nunknown"));
+                                                      || cvc4_err.contains("unknown\n"));
 
+           println!("VCCV {} e {:?}", cvc4_out, cvc4_err);
+           println!("VCCV us {} su {} uk {}", cvc4_unsat, cvc4_unsat, cvc4_unknown);
             if !z3_succ && z3_err.len() > 0 && !z3_sat && !z3_unsat {
                println!("z3 unsuccessful on file {} : {}", filename, z3_err);
             } else if !cvc4_succ && cvc4_err.len() > 0 && !cvc4_sat && !cvc4_unsat {
