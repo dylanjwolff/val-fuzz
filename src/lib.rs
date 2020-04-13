@@ -132,8 +132,6 @@ fn solve(filename: &str) {
             let cvc4_unknown = !cvc4_unsat && !cvc4_sat && (cvc4_out.contains("unknown")
                                                       || cvc4_err.contains("unknown\n"));
 
-           println!("VCCV {} e {:?}", cvc4_out, cvc4_err);
-           println!("VCCV us {} su {} uk {}", cvc4_unsat, cvc4_unsat, cvc4_unknown);
             if !z3_succ && z3_err.len() > 0 && !z3_sat && !z3_unsat {
                println!("z3 unsuccessful on file {} : {}", filename, z3_err);
             } else if !cvc4_succ && cvc4_err.len() > 0 && !cvc4_sat && !cvc4_unsat {
@@ -144,7 +142,9 @@ fn solve(filename: &str) {
                     .unwrap_or(());
             } else if cvc4_sat && z3_unsat {
                println!("file {} has soundness problem!!!", filename);
-            } else if cvc4_unsat && z3_sat && !z3_out.contains("unknown function/constant") {
+            } else if cvc4_unsat && z3_sat && !z3_err.contains("unknown function/constant")
+                && !z3_err.contains("unknown constant")
+                && !z3_err.contains("unknown parameter") {
                println!("file {} has soundness problem!!!", filename);
             } else if cvc4_out.contains("timeout") || z3_out.contains("timeout") {
                println!("timeout on file {}", filename);
@@ -200,7 +200,7 @@ fn get_iter_fileout_name(source_file: &PathBuf, iter: u32) -> String {
 }
 
 pub fn exec() {
-    let files = fs::read_dir("test").expect("error with sample dir");
+    let files = fs::read_dir("samples").expect("error with sample dir");
 
     for file_res in files {
         match file_res {
