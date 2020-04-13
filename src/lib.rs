@@ -168,6 +168,7 @@ pub fn strip_and_test_file(source_file: &PathBuf) {
 
     let num_bavs = bavns.len();
     const MAX_ITER : u32 =10;
+    println!("skel {}", script.to_string());
     println!("starting max(2^{}, {}) iterations", num_bavs, MAX_ITER);
     let mut urng = RandUniqPermGen::new_definite(num_bavs, MAX_ITER);
     while let Some(truth_values) = urng.sample() {

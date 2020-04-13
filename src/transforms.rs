@@ -1,7 +1,8 @@
 use crate::ast::{
     AstNode, BoolOp, Command, Constant, SExp, Script, Sort, Symbol,
 };
-use crate::ast::{CommandRc, SExpRc, SymbolRc};
+use crate::ast::{CommandRc, SExpRc, SymbolRc, SortRc};
+use crate::parser::{script};
 use bit_vec::BitVec;
 use std::iter::once;
 use std::collections::BTreeMap;
@@ -55,7 +56,7 @@ fn init_vars(script: &mut Script, vars: Vec<(String, Sort)>) {
     cmds.append(&mut end);
 }
 
-fn add_ba(script: &mut Script, bavs: Vec<(String, SExp)>) {
+fn add_ba(script: &mut Script, bavs: Vec<(String, SExp, VarBindings)>) {
     let Script::Commands(cmds) = script;
 
     let maybe_cs_pos = cmds.iter().position(|cmd| cmd.borrow().is_checksat());
@@ -65,12 +66,18 @@ fn add_ba(script: &mut Script, bavs: Vec<(String, SExp)>) {
         None => cmds.len(),
     };
 
-    let mut baveq_iter = bavs.into_iter().map(|(vname, sexp)| {
+    let mut baveq_iter = bavs.into_iter().map(|(vname, sexp, vbs)| {
+        let rhs = if vbs.len() > 0 {
+            SExp::QForAll(vbs, rccell!(Box::new(sexp)))
+        } else {
+            sexp
+        };
+
         SExp::BExp(
             rccell!(BoolOp::Equals()),
             vec![
                 rccell!(SExp::Symbol(rccell!(Symbol::Var(vname)))),
-                rccell!(sexp),
+                rccell!(rhs),
             ],
         )
     });
@@ -137,7 +144,7 @@ pub fn to_skel(script: &mut Script) -> Vec<String> {
     init_vars(script, vng.vars_generated);
     let bavns = bavs
         .iter()
-        .map(|(name, _)| name.clone())
+        .map(|(name, _, _)| name.clone())
         .collect::<Vec<String>>();
     add_ba(script, bavs);
     bavns
@@ -221,6 +228,7 @@ fn rl_s(sexp: &mut SExp, scoped_vars: &mut BTreeMap<String, Vec<SExp>>) {
                 rl_s(&mut *e.borrow_mut(), scoped_vars)
             }
         }
+        SExp::QForAll(_, s) => rl_s(&mut s.borrow_mut(), scoped_vars),
         SExp::Constant(_) => (),
     }
 }
@@ -266,41 +274,52 @@ fn rc_se(sexp: &mut SExp, vng: &mut VarNameGenerator) {
     }
 }
 
-pub fn bav(script: &mut Script, vng: &mut VarNameGenerator, bava: &mut Vec<(String, SExp)>) {
+pub fn bav(script: &mut Script, vng: &mut VarNameGenerator,
+           bava: &mut Vec<(String, SExp, VarBindings)>) {
+    let mut qvars = vec![];
     match script {
         Script::Commands(cmds) => {
             for cmd in cmds.iter_mut() {
-                bav_c(&mut *cmd.borrow_mut(), vng, bava);
+                bav_c(&mut *cmd.borrow_mut(), vng, bava, &mut qvars);
             }
         }
     }
 }
 
-fn bav_c(cmd: &mut Command, vng: &mut VarNameGenerator, bava: &mut Vec<(String, SExp)>) {
+type VarBindings = Vec<(SymbolRc, SortRc)>;
+
+fn bav_c(cmd: &mut Command, vng: &mut VarNameGenerator,
+         bava: &mut Vec<(String, SExp, VarBindings)>, qvars : &mut VarBindings) {
     match cmd {
         Command::Assert(sexp) | Command::CheckSatAssuming(sexp) => {
-            bav_se(&mut *sexp.borrow_mut(), vng, bava)
+            bav_se(&mut *sexp.borrow_mut(), vng, bava, qvars)
         }
         _ => (),
     }
 }
 
-fn bav_se(sexp: &mut SExp, vng: &mut VarNameGenerator, bavs: &mut Vec<(String, SExp)>) {
+fn bav_se(sexp: &mut SExp, vng: &mut VarNameGenerator,
+          bavs: &mut Vec<(String, SExp, VarBindings)>, qvars : &mut VarBindings) {
     match sexp {
         SExp::BExp(bop, sexps) => {
             let name = vng.get_name(Sort::Bool());
             let sec = SExp::BExp(bop.clone(), sexps.clone());
-            bavs.push((name, sec));
+            bavs.push((name, sec, qvars.clone()));
             for sexp in sexps {
-                bav_se(&mut *sexp.borrow_mut(), vng, bavs);
+                bav_se(&mut *sexp.borrow_mut(), vng, bavs, qvars);
             }
         }
         SExp::Compound(sexps) => {
             for sexp in sexps {
-                bav_se(&mut *sexp.borrow_mut(), vng, bavs);
+                bav_se(&mut *sexp.borrow_mut(), vng, bavs, qvars);
             }
         }
         SExp::Let(_, _) => panic!("Let statments should be filtered out!"),
+        SExp::QForAll(vbs, rest) => {
+            qvars.extend(vbs.clone());
+            bav_se(&mut *rest.borrow_mut(), vng, bavs, qvars);
+            qvars.truncate(qvars.len() - vbs.len());
+        },
         _ => (),
     }
 }
@@ -351,6 +370,18 @@ fn get_children(node: &AstNode) -> Vec<AstNode> {
                 astns.push(AstNode::Close());
                 astns.push(AstNode::SExp(rccell!(*(s.borrow()).clone())));
                 astns.into_iter().rev().collect()
+            },
+            SExp::QForAll(vs, s) => {
+                let mut astns = vs.iter().fold(vec![AstNode::Open()], |mut asts, (vr, vl)| {
+                    asts.push(AstNode::Open());
+                    asts.push(AstNode::Symbol(Rc::clone(vr)));
+                    asts.push(AstNode::Sort(Rc::clone(vl)));
+                    asts.push(AstNode::Close());
+                    asts
+                });
+                astns.push(AstNode::Close());
+                astns.push(AstNode::SExp(rccell!(*(s.borrow()).clone())));
+                astns.into_iter().rev().collect()
             }
             SExp::Constant(c) => vec![AstNode::Constant(Rc::clone(c))],
             SExp::Symbol(s) => vec![AstNode::Symbol(Rc::clone(s))],
@@ -389,7 +420,31 @@ pub trait Visitor {
 #[cfg(test)]
 mod tests {
     use super::*;
-    
+
+    #[test]
+    fn bav_qual() {
+        let str_script = "(assert (forall ((x Real)) (= x 4)))";
+        let mut p = script(str_script).unwrap().1;
+
+        let mut vng = VarNameGenerator::new("BAV");
+        let mut bavs = vec![];
+        bav(&mut p, &mut vng, &mut bavs);
+        add_ba(&mut p, bavs);
+
+        let Script::Commands(mut cmds) = p;
+
+        let assertion_cmd = cmds.last().unwrap();
+        match & *assertion_cmd.borrow() {
+            Command::Assert(s) => match &*s.borrow() {
+                SExp::BExp(v, rest) => match &*rest[1].borrow() {
+                    SExp::QForAll(v, rest) => assert!(v.len() > 0),
+                    _ => panic!("inner should be qual"),
+                }
+                _ => panic!("Assert should be BExp"),
+            }
+            _ => panic!("No assert!"),
+        };
+    }
 
     #[test]
     fn qc_rls() {

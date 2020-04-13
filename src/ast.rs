@@ -49,6 +49,7 @@ pub enum Sort {
 pub enum SExp {
     Compound(Vec<SExpRc>),
     Let(Vec<(SymbolRc, SExpRc)>, SExpBoxRc),
+    QForAll(Vec<(SymbolRc, SortRc)>, SExpBoxRc),
     BExp(BoolOpRc, Vec<SExpRc>),
     Constant(ConstantRc),
     Symbol(SymbolRc),
@@ -259,7 +260,19 @@ impl SExp {
                     .collect::<Vec<String>>()
                     .join(" ");
                 format!("({} {})", o.borrow().to_string(), rec_s)
+            },
+            SExp::QForAll(v, s) => {
+                let vbss = v.iter()
+                    .map(|(va, vl)| format!(
+                            "({} {})",
+                            va.borrow().to_string(),
+                            vl.borrow().to_string())
+                        )
+                    .collect::<Vec<String>>()
+                    .join("");
+                format!("(forall ({}) {})", vbss, s.borrow().to_string())
             }
+
         }
     }
 }

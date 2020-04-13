@@ -15,7 +15,7 @@ use nom::number::complete::recognize_float;
 use nom::sequence::delimited;
 use nom::sequence::preceded;
 use nom::{bytes::complete::tag, combinator::map, sequence::tuple, IResult};
-use super::ast::{Script, Command, Constant, Symbol, BoolOp, SExp, SymbolRc, Sort, Logic, SExpBoxRc, SExpRc};
+use super::ast::{Script, SortRc, Command, Constant, Symbol, BoolOp, SExp, SymbolRc, Sort, Logic, SExpBoxRc, SExpRc};
 
 fn integer(s: &str) -> IResult<&str, &str> {
     // let inner = |(sn, _peek): (&str, ())| {
@@ -109,6 +109,16 @@ fn bool_sexp(s: &str) -> IResult<&str, SExp> {
     delimited(char('('), naked_b, char(')'))(s)
 }
 
+fn var_binding(s: &str) -> IResult<&str, (SymbolRc, SortRc)> {
+    let ws_symbol = delimited(multispace0, symbol, multispace0);
+    let mapped_ws_symbol = map(ws_symbol, |s| Symbol::Var(s.to_owned()));
+    let ws_sort = delimited(multispace0, sort, multispace0);
+    map(
+        delimited(char('('), tuple((mapped_ws_symbol, ws_sort)), char(')')),
+        |(sy, se)| (rccell!(sy), rccell!(se))
+    )(s)
+}
+
 fn let_sexp(s: &str) -> IResult<&str, (Vec<(SymbolRc, SExpRc)>, SExpBoxRc)> {
     let ws_symbol = delimited(multispace0, symbol, multispace0);
     let mapped_ws_symbol = map(ws_symbol, |s| Symbol::Var(s.to_owned()));
@@ -136,11 +146,13 @@ fn sexp(s: &str) -> IResult<&str, SExp> {
     let ws_rec_sexp = delimited(multispace0, rec_sexp, multispace0);
     let ws_constant = delimited(multispace0, constant, multispace0);
     let ws_symbol = delimited(multispace0, symbol, multispace0);
+    let ws_quant = delimited(multispace0, quantifier, multispace0);
     let ws_bexp = delimited(multispace0, bool_sexp, multispace0);
     let ws_let_sexp = delimited(multispace0, let_sexp, multispace0);
     alt((
         ws_bexp,
         map(ws_let_sexp, |(tbs, sexp)| SExp::Let(tbs, sexp)),
+        map(ws_quant, |(tbs, sexp)| SExp::QForAll(tbs, rccell!(Box::new(sexp)))),
         map(ws_rec_sexp, |es| {
             SExp::Compound(es.into_iter().map(|e| rccell!(e)).collect())
         }),
@@ -248,6 +260,14 @@ fn command(s: &str) -> IResult<&str, Command> {
     ))(s)
 }
 
+pub fn quantifier(s : &str) -> IResult<&str, (Vec<(SymbolRc, SortRc)>, SExp)> {
+    let ws_var_binding = delimited(multispace0, var_binding, multispace0);
+    let var_bindings = delimited(char('('), many1(ws_var_binding), char(')'));
+    let ws_var_bindings = delimited(multispace0, var_bindings, multispace0);
+    let naked_quant = preceded(tag("forall"), tuple((ws_var_bindings, sexp)));
+    delimited(char('('), naked_quant, char(')'))(s)
+}
+
 pub fn script(s: &str) -> IResult<&str, Script> {
     map(
         many0(delimited(multispace0, command, multispace0)),
@@ -261,12 +281,12 @@ pub fn rmv_comments(s: &str) -> IResult<&str, Vec<&str>> {
     many1(alt((not_comment, map(comment, |_| ""))))(s)
 }
 
+
 #[cfg(test)]
 mod tests {
     use super::*;
     use std::fs;
 
-    #[allow(unused)]
     fn parse_file(f: &str) -> Script {
         let contents = &fs::read_to_string(f).expect("error reading file")[..];
         let contents_sans_comments = &rmv_comments(contents)
@@ -275,5 +295,20 @@ mod tests {
             .join(" ")[..];
 
         script(contents_sans_comments).expect("parser error").1
+    }
+
+    #[test]
+    fn quant() {
+        quantifier("(forall ((ah Real)) (= ah 4))").unwrap();
+    }
+
+    #[test]
+    fn equant() {
+        let r =
+            script("(assert (forall ((ah Real)) (= ah 4)))(assert (exists ((ah Real)) (= ah 4)))")
+            .unwrap();
+        let Script::Commands(cmds) = r.1;
+        println!("CEXSIT {:?}", cmds.last());
+        println!("not p {:?}", r.0);
     }
 }
