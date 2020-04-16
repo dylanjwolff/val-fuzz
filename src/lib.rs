@@ -43,7 +43,7 @@ impl RandUniqPermGen {
     fn new_definite(numbits: usize, maxiter: u32) -> Self {
         let buf = BitVec::from_elem(numbits, false).to_bytes();
         let seen = BTreeSet::new();
-        let rng = Xoshiro256Plus::seed_from_u64(9999);
+        let rng = Xoshiro256Plus::seed_from_u64(99990);
 
         let true_max = if (maxiter as f64).log2() < (numbits as f64) {
             maxiter
@@ -184,7 +184,7 @@ pub fn strip_and_test_file(source_file: &PathBuf) {
     script.init(eip);
 
     let num_bavs = bavns.len();
-    const MAX_ITER : u32 =1;
+    const MAX_ITER : u32 = 250;
     println!("starting max(2^{}, {}) iterations", num_bavs, MAX_ITER);
     let mut urng = RandUniqPermGen::new_definite(num_bavs, MAX_ITER);
     while let Some(truth_values) = urng.sample() {
@@ -205,7 +205,7 @@ fn get_iter_fileout_name(source_file: &PathBuf, iter: u32) -> String {
 }
 
 pub fn exec() {
-    let files = fs::read_dir("samples").expect("error with sample dir");
+    let files = fs::read_dir("samples/no-errors").expect("error with sample dir");
 
     for file_res in files {
         match file_res {
