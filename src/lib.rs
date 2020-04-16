@@ -3,6 +3,7 @@ extern crate itertools;
 extern crate rand;
 extern crate rand_core;
 extern crate rand_xoshiro;
+extern crate walkdir;
 
 #[macro_use]
 pub mod ast;
@@ -10,6 +11,7 @@ pub mod ast;
 pub mod parser;
 pub mod transforms;
 
+use std::io;
 use bit_vec::BitVec;
 use parser::{
     rmv_comments, script,
@@ -21,6 +23,8 @@ use rand_xoshiro::rand_core::SeedableRng;
 use std::collections::BTreeSet;
 use std::fs;
 use std::path::PathBuf;
+use std::path::Path;
+use walkdir::WalkDir;
 use std::process;
 use std::str::from_utf8;
 use std::str::from_utf8_unchecked;
@@ -95,15 +99,16 @@ fn solve(filename: &str) {
         .args(&[
             "6s",
             "cvc4",
-            filename,
+            "--incremental",
             "--produce-model",
             "--tlimit",
             "5000",
+            filename,
         ])
         .output();
 
     let z3_res = process::Command::new("timeout")
-        .args(&["6s", "z3", filename, "-T:5"])
+        .args(&["6s", "z3", "smt.string_solver=z3str3", "model_validate=true", "-T:5", filename ])
         .output();
 
 
@@ -123,18 +128,24 @@ fn solve(filename: &str) {
 
     match (cvc4mrs, z3mrs) {
         (Ok((cvc4_succ, cvc4_out, cvc4_err)), Ok((z3_succ, z3_out, z3_err))) => {
-            let z3_unsat = z3_out.contains("unsat") || z3_err.contains("\nunsat");
-            let z3_sat = !z3_unsat && (z3_out.contains("sat") || z3_err.contains("\nsat"));
+            // TODO This isn't correct for incremental formulas... nor is it a good way to parse
+            // these responses... leaving for now until we have firmly proved the concept
+            let z3_unsat = z3_out.contains("unsat") || z3_err.contains("unsat\n");
+            let z3_sat = !z3_unsat && (z3_out.contains("sat") || z3_err.contains("sat\n"));
             let z3_unknown = !z3_unsat && !z3_sat && (z3_out.contains("unknown")
-                                                      || z3_err.contains("\nunknown"));
+                                                      || z3_err.contains("unknown\n"));
             let cvc4_unsat = cvc4_out.contains("unsat") || cvc4_err.contains("unsat\n");
             let cvc4_sat = !cvc4_unsat && (cvc4_out.contains("sat") || cvc4_err.contains("sat\n"));
             let cvc4_unknown = !cvc4_unsat && !cvc4_sat && (cvc4_out.contains("unknown")
                                                       || cvc4_err.contains("unknown\n"));
 
-            if !z3_succ && z3_err.len() > 0 && !z3_sat && !z3_unsat {
+            if z3_err.contains("invalid model") {
+               println!("file {} has invalid model problem!!!", filename);
+            } else if z3_out.contains("dumped core") || cvc4_out.contains("dumped core") {
+               println!("file {} cause segfault!!!", filename);
+            } else if !z3_succ && z3_err.len() > 0 && !z3_sat && !z3_unsat && !z3_unknown {
                println!("z3 unsuccessful on file {} : {}", filename, z3_err);
-            } else if !cvc4_succ && cvc4_err.len() > 0 && !cvc4_sat && !cvc4_unsat {
+            } else if !cvc4_succ && cvc4_err.len() > 0 && !cvc4_sat && !cvc4_unsat && !cvc4_unknown {
                println!("cvc4 unsuccessful on file {} : {}", filename, cvc4_err);
             } else if z3_unknown || cvc4_unknown {
                println!("unknown result for file {}", filename);
@@ -147,7 +158,7 @@ fn solve(filename: &str) {
                 && !z3_err.contains("unknown parameter") {
                println!("file {} has soundness problem!!!", filename);
             } else if cvc4_out.contains("timeout") || z3_out.contains("timeout") {
-               println!("timeout on file {}", filename);
+               println!("timeout on file {} o {} e {}", filename, z3_out, z3_err);
                fs::remove_file(filename)
                     .unwrap_or(());
             } else {
@@ -165,7 +176,7 @@ fn solve(filename: &str) {
     };
 }
 
-pub fn strip_and_test_file(source_file: &PathBuf) {
+pub fn strip_and_test_file(source_file: &Path) {
     let contents: String =
         fs::read_to_string(source_file).expect("Something went wrong reading the file");
     let stripped_contents = &rmv_comments(&contents[..])
@@ -196,7 +207,7 @@ pub fn strip_and_test_file(source_file: &PathBuf) {
     println!("Done with seed file");
 }
 
-fn get_iter_fileout_name(source_file: &PathBuf, iter: u32) -> String {
+fn get_iter_fileout_name(source_file: &Path, iter: u32) -> String {
     let source_filename = match source_file.file_name().and_then(|n| n.to_str()) {
         Some(name) => name,
         None => "unknown",
@@ -205,38 +216,13 @@ fn get_iter_fileout_name(source_file: &PathBuf, iter: u32) -> String {
 }
 
 pub fn exec() {
-    let files = fs::read_dir("known").expect("error with sample dir");
-
-    for file_res in files {
-        match file_res {
-            Ok(file) => {
-                let filepath = file.path();
+    for entry in WalkDir::new("known/8")
+            .into_iter()
+            .filter_map(Result::ok)
+            .filter(|e| !e.file_type().is_dir()) {
+                let filepath = entry.path();
                 println!("starting file {:?}", filepath);
                 strip_and_test_file(&filepath);
-            }
-            Err(_) => (),
-        }
-    }
-}
-
-pub fn perf_exec() {
-    let files = fs::read_dir("perf").expect("error with sample dir");
-
-    for file_res in files {
-        match file_res {
-            Ok(file) => {
-                let filepath = file.path();
-                println!("starting file {:?}", filepath);
-                let contents: String =
-                fs::read_to_string(&filepath).expect("Something went wrong reading the file");
-                let stripped_contents = &rmv_comments(&contents[..])
-                    .expect("Error stripping comments")
-                    .1
-                    .join(" ")[..];
-                let _script = script(&stripped_contents[..]).expect("Parsing error").1;
-            }
-            Err(_) => (),
-        }
     }
 }
 
@@ -247,6 +233,18 @@ mod tests {
     use std::thread;
 
     const STACK_SIZE: usize = 20 * 1024 * 1024;
+
+    #[test]
+    fn solver_test() {
+        for entry in WalkDir::new("known/8")
+            .into_iter()
+            .filter_map(Result::ok)
+            .filter(|e| !e.file_type().is_dir()) {
+                let filepath = entry.path();
+                println!("starting file {:?}", filepath);
+                solve(filepath.to_str().unwrap());
+        }
+    }
 
     #[test]
     fn parse_unparse_test() {
