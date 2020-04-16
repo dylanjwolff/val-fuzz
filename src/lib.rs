@@ -94,7 +94,7 @@ impl RandUniqPermGen {
     }
 }
 
-fn solve(filename: &str) {
+fn solve(filename: &str) -> bool {
     let cvc4_res = process::Command::new("timeout")
         .args(&[
             "6s",
@@ -126,6 +126,7 @@ fn solve(filename: &str) {
         (success, stderr.to_owned(), stdout.to_owned())
     });
 
+    let mut rmv_file = false;
     match (cvc4mrs, z3mrs) {
         (Ok((cvc4_succ, cvc4_out, cvc4_err)), Ok((z3_succ, z3_out, z3_err))) => {
             // TODO This isn't correct for incremental formulas... nor is it a good way to parse
@@ -149,8 +150,7 @@ fn solve(filename: &str) {
                println!("cvc4 unsuccessful on file {} : {}", filename, cvc4_err);
             } else if z3_unknown || cvc4_unknown {
                println!("unknown result for file {}", filename);
-               fs::remove_file(filename)
-                    .unwrap_or(());
+               rmv_file = true;
             } else if cvc4_sat && z3_unsat {
                println!("file {} has soundness problem!!!", filename);
             } else if cvc4_unsat && z3_sat && !z3_err.contains("unknown function/constant")
@@ -159,21 +159,21 @@ fn solve(filename: &str) {
                println!("file {} has soundness problem!!!", filename);
             } else if cvc4_out.contains("timeout") || z3_out.contains("timeout") {
                println!("timeout on file {} o {} e {}", filename, z3_out, z3_err);
-               fs::remove_file(filename)
-                    .unwrap_or(());
+               rmv_file = true;
             } else {
-               fs::remove_file(filename)
-                    .unwrap_or(());
+               rmv_file = true;
             }
 
             if cvc4_succ && z3_succ {
                 println!("parse success for file :{}", filename);
             }
 
+
         },
         (Err(e), _) => println!("cvc4 process error on file {} : {}", filename, e),
         (_, Err(e)) => println!("z3 process error on file {} : {}", filename, e),
     };
+    return rmv_file;
 }
 
 pub fn strip_and_test_file(source_file: &Path) {
@@ -202,7 +202,9 @@ pub fn strip_and_test_file(source_file: &Path) {
         let filename = get_iter_fileout_name(source_file, urng.get_count());
         script.replace(eip, get_bav_assign(&bavns, truth_values));
         fs::write(&filename, script.to_string()).unwrap_or(());
-        solve(&filename);
+        if solve(&filename) {
+            fs::remove_file(filename).unwrap_or(());
+        }
     }
     println!("Done with seed file");
 }
