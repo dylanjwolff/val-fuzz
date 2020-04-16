@@ -1,0 +1,7 @@
+(set-option :smt.string_solver z3str3)
+(set-option :proof true)
+(declare-fun a () String)
+(declare-fun b () String)
+(declare-fun c () String)
+(assert (= (str.replace "B" (str.replace "B" c "") "") (str.at (str.replace (str.replace a b "") "" "") 0)))
+(check-sat)

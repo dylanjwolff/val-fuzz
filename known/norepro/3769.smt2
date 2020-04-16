@@ -1,0 +1,12 @@
+(set-option :smt.string_solver z3str3)
+(declare-const i0 Int)
+(declare-const i1 Int)
+(declare-const Str1 String)
+(declare-const Str19 String)
+(declare-const v6 Bool)
+(assert-soft (= (not (= "" Str1 "")) (= i1 i0) v6 (not (= "" Str1 "")) (< i0 56) (= "" Str1 "") v6 (= "" Str1 "") v6))
+(declare-const i4 Int)
+(assert (>= (str.len Str19) i4))
+(assert (> i4 (* i1 502 502 i0 i0)))
+(check-sat)
+
