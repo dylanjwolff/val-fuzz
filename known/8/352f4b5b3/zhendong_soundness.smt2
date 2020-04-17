@@ -24,3 +24,4 @@
 (assert (= a (* m f af)))
 (assert (distinct c (/ j ad)))
 (check-sat)
+(get-model)

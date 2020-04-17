@@ -101,14 +101,13 @@ fn solve(filename: &str) -> bool {
             "cvc4",
             "--incremental",
             "--produce-model",
-            "--tlimit",
-            "5000",
             filename,
         ])
         .output();
 
+    
     let z3_res = process::Command::new("timeout")
-        .args(&["6s", "z3", "smt.string_solver=z3str3", "model_validate=true", "-T:5", filename ])
+        .args(&["6s", "z3", "smt.string_solver=z3str3", "model_validate=true", filename ])
         .output();
 
 
@@ -140,7 +139,10 @@ fn solve(filename: &str) -> bool {
             let cvc4_unknown = !cvc4_unsat && !cvc4_sat && (cvc4_out.contains("unknown")
                                                       || cvc4_err.contains("unknown\n"));
 
-            if z3_err.contains("invalid model") {
+            println!("z3 on file {} o {} e {}", filename, z3_out, z3_err);
+            if z3_out.contains("ASSERTION VIOLATION") {
+               println!("file {} has assertion violation problem!!!", filename);
+            } else if z3_err.contains("invalid model") {
                println!("file {} has invalid model problem!!!", filename);
             } else if z3_out.contains("dumped core") || cvc4_out.contains("dumped core") {
                println!("file {} cause segfault!!!", filename);
@@ -158,8 +160,10 @@ fn solve(filename: &str) -> bool {
                 && !z3_err.contains("unknown parameter") {
                println!("file {} has soundness problem!!!", filename);
             } else if cvc4_out.contains("timeout") || z3_out.contains("timeout") {
-               println!("timeout on file {} o {} e {}", filename, z3_out, z3_err);
-               rmv_file = true;
+                // TODO look for timeouts in stderr in robust manner (shouldn't happen, but good to
+                // be safe). Can't because some error messages have timeout in them that aren't
+                // timeouts
+               println!("timeout on file {}", filename);
             } else {
                rmv_file = true;
             }
@@ -195,7 +199,7 @@ pub fn strip_and_test_file(source_file: &Path) {
     script.init(eip);
 
     let num_bavs = bavns.len();
-    const MAX_ITER : u32 = 1;
+    const MAX_ITER : u32 = 64;
     println!("starting max(2^{}, {}) iterations", num_bavs, MAX_ITER);
     let mut urng = RandUniqPermGen::new_definite(num_bavs, MAX_ITER);
     while let Some(truth_values) = urng.sample() {
@@ -203,7 +207,7 @@ pub fn strip_and_test_file(source_file: &Path) {
         script.replace(eip, get_bav_assign(&bavns, truth_values));
         fs::write(&filename, script.to_string()).unwrap_or(());
         if solve(&filename) {
-            fs::remove_file(filename).unwrap_or(());
+            // fs::remove_file(filename).unwrap_or(());
         }
     }
     println!("Done with seed file");
