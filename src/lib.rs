@@ -112,15 +112,15 @@ fn solve(filename: &str) -> bool {
 
 
     let cvc4mrs = cvc4_res.map(|out| {
-        let stderr = from_utf8(&out.stderr[..]).unwrap();
-        let stdout = from_utf8(&out.stdout[..]).unwrap();
+        let stderr = from_utf8(&out.stderr[..]).unwrap_or("");
+        let stdout = from_utf8(&out.stdout[..]).unwrap_or("");
         let success = out.status.success();
         (success, stderr.to_owned(), stdout.to_owned())
     });
 
     let z3mrs = z3_res.map(|out| {
-        let stderr = from_utf8(&out.stderr[..]).unwrap();
-        let stdout = from_utf8(&out.stdout[..]).unwrap();
+        let stderr = from_utf8(&out.stderr[..]).unwrap_or("");
+        let stdout = from_utf8(&out.stdout[..]).unwrap_or("");
         let success = out.status.success();
         (success, stderr.to_owned(), stdout.to_owned())
     });
@@ -139,7 +139,6 @@ fn solve(filename: &str) -> bool {
             let cvc4_unknown = !cvc4_unsat && !cvc4_sat && (cvc4_out.contains("unknown")
                                                       || cvc4_err.contains("unknown\n"));
 
-            println!("z3 on file {} o {} e {}", filename, z3_out, z3_err);
             if z3_out.contains("ASSERTION VIOLATION") {
                println!("file {} has assertion violation problem!!!", filename);
             } else if z3_err.contains("invalid model") {
@@ -180,18 +179,17 @@ fn solve(filename: &str) -> bool {
     return rmv_file;
 }
 
-pub fn strip_and_test_file(source_file: &Path) {
+pub fn strip_and_test_file(source_file: &Path) -> Option<()> {
     let contents: String =
-        fs::read_to_string(source_file).expect("Something went wrong reading the file");
-    let stripped_contents = &rmv_comments(&contents[..])
-        .expect("Error stripping comments")
+        fs::read_to_string(source_file).ok()?;
+    let stripped_contents = &rmv_comments(&contents[..]).ok()?
         .1
         .join(" ")[..];
-    let mut script = script(&stripped_contents[..]).expect("Parsing error").1;
+    let mut script = script(&stripped_contents[..]).ok()?.1;
     // TODO error handling here on prev 3 lines
 
     if script.is_unsupported_logic() {
-        return;
+        return Some(());
     }
 
     let bavns = to_skel(&mut script);
@@ -199,7 +197,7 @@ pub fn strip_and_test_file(source_file: &Path) {
     script.init(eip);
 
     let num_bavs = bavns.len();
-    const MAX_ITER : u32 = 64;
+    const MAX_ITER : u32 = 1;
     println!("starting max(2^{}, {}) iterations", num_bavs, MAX_ITER);
     let mut urng = RandUniqPermGen::new_definite(num_bavs, MAX_ITER);
     while let Some(truth_values) = urng.sample() {
@@ -207,10 +205,11 @@ pub fn strip_and_test_file(source_file: &Path) {
         script.replace(eip, get_bav_assign(&bavns, truth_values));
         fs::write(&filename, script.to_string()).unwrap_or(());
         if solve(&filename) {
-            // fs::remove_file(filename).unwrap_or(());
+            fs::remove_file(filename).unwrap_or(());
         }
     }
     println!("Done with seed file");
+    Some(())
 }
 
 fn get_iter_fileout_name(source_file: &Path, iter: u32) -> String {
@@ -222,7 +221,7 @@ fn get_iter_fileout_name(source_file: &Path, iter: u32) -> String {
 }
 
 pub fn exec() {
-    for entry in WalkDir::new("known/8")
+    for entry in WalkDir::new("test/ooo.tag10.smt2")
             .into_iter()
             .filter_map(Result::ok)
             .filter(|e| !e.file_type().is_dir()) {
