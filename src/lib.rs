@@ -26,6 +26,62 @@ use std::fs;
 use std::path::Path;
 use walkdir::WalkDir;
 use transforms::{end_insert_pt, get_bav_assign, to_skel};
+use crossbeam::queue::SegQueue;
+use std::path::PathBuf;
+use std::thread;
+use std::sync::Arc;
+use std::sync::atomic::AtomicU8;
+use std::sync::atomic::Ordering;
+use crossbeam::utils::Backoff;
+
+pub fn exec() {
+    let q = SegQueue::new();
+    for entry in WalkDir::new("test/ooo.tag10.smt2")
+            .into_iter()
+            .filter_map(Result::ok)
+            .filter(|e| !e.file_type().is_dir()) {
+                let filepath = entry.into_path();
+                q.push(Ok(filepath));
+    }
+    q.push(Err(PoisonPill{}));
+
+    let aq = Arc::new(q);
+
+    const STACK_SIZE: usize = 20 * 1024 * 1024; // 20mb
+    let handles = (0..2).map(|_| {
+             let t_q = Arc::clone(&aq);
+
+             thread::Builder::new()
+                .stack_size(STACK_SIZE)
+                .spawn(|| mutator_worker(t_q))
+    });
+
+    for h in handles {
+        h.unwrap().join().unwrap();
+    }
+}
+
+fn mutator_worker(q : Arc<SegQueue<Result<PathBuf, PoisonPill>>>) {
+    let backoff = Backoff::new();
+
+    let mut stage_finished = false; 
+    while !stage_finished {
+        let filepath = match q.pop() {
+            Ok(Ok(filepath)) => filepath,
+            Ok(Err(poison_pill)) => {
+                q.push(Err(poison_pill));
+                stage_finished = true;
+                continue;
+            },
+            Err(_) => { backoff.snooze(); continue; },
+        };
+
+        println!("fp {:?}", filepath);
+        backoff.reset();
+    }
+}
+
+pub struct PoisonPill {}
 
 #[allow(unused)]
 struct RandUniqPermGen {
@@ -91,7 +147,7 @@ impl RandUniqPermGen {
     }
 }
 
-pub fn strip_and_test_file(source_file: &Path) -> Option<()> {
+pub fn strip_and_transform(source_file: &Path) -> Option<()> {
     let contents: String =
         fs::read_to_string(source_file).ok()?;
     let stripped_contents = &rmv_comments(&contents[..]).ok()?
@@ -132,16 +188,7 @@ fn get_iter_fileout_name(source_file: &Path, iter: u32) -> String {
     (iter).to_string() + "_" + source_filename
 }
 
-pub fn exec() {
-    for entry in WalkDir::new("test/ooo.tag10.smt2")
-            .into_iter()
-            .filter_map(Result::ok)
-            .filter(|e| !e.file_type().is_dir()) {
-                let filepath = entry.path();
-                println!("starting file {:?}", filepath);
-                strip_and_test_file(&filepath);
-    }
-}
+
 
 #[cfg(test)]
 mod tests {
@@ -151,6 +198,11 @@ mod tests {
     use std::path::PathBuf;
 
     const STACK_SIZE: usize = 20 * 1024 * 1024;
+
+    #[test]
+    fn debug() {
+        exec();
+    }
 
     #[test]
     fn parse_unparse_test() {
