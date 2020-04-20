@@ -1,7 +1,7 @@
 use std::process;
 use std::str::from_utf8;
 
-
+#[derive(Debug, Eq, PartialEq, Clone)]
 pub enum SolveResult {
     SoundnessBug,
     ErrorBug,
@@ -114,12 +114,12 @@ fn solve_cvc4(cvc4path : &str, filename : &str) -> SolveResult {
 
 pub fn solve(filename: &str) -> SolveResult {
     match (solve_z3("z3", filename), solve_cvc4("cvc4", filename)) {
-        (ErrorBug, _) | (_, ErrorBug) => SolveResult::ErrorBug,
-        (Sat, Unsat) | (Unsat, Sat) => SolveResult::SoundnessBug,
-        (ProcessError, _) | (_, ProcessError) => SolveResult::ProcessError,
-        (Error, _) | (_, Error) => SolveResult::Error,
-        (Sat, _) | (_, Sat) => SolveResult::Sat,
-        (Unsat, _) | (_, Unsat) => SolveResult::Unsat,
+        (SolveResult::ErrorBug, _) | (_, SolveResult::ErrorBug) => SolveResult::ErrorBug,
+        (SolveResult::Sat, SolveResult::Unsat) | (SolveResult::Unsat, SolveResult::Sat) => SolveResult::SoundnessBug,
+        (SolveResult::ProcessError, _) | (_, SolveResult::ProcessError) => SolveResult::ProcessError,
+        (SolveResult::Error, _) | (_, SolveResult::Error) => SolveResult::Error,
+        (SolveResult::Sat, _) | (_, SolveResult::Sat) => SolveResult::Sat,
+        (SolveResult::Unsat, _) | (_, SolveResult::Unsat) => SolveResult::Unsat,
         _ => SolveResult::Unknown,
     }
 }

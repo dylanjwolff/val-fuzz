@@ -28,10 +28,16 @@ use std::path::Path;
 use walkdir::WalkDir;
 use transforms::{end_insert_pt, get_bav_assign, to_skel};
 use crossbeam::queue::SegQueue;
+use crossbeam::queue::ArrayQueue;
+use crossbeam::queue::PushError;
 use std::path::PathBuf;
 use std::thread;
 use std::sync::Arc;
 use crossbeam::utils::Backoff;
+
+type InputPPQ = Arc<SegQueue<Result<PathBuf, PoisonPill>>>;
+type SkeletonQueue = Arc<SegQueue<(PathBuf, Vec<String>)>>;
+type BavAssingedQ = Arc<ArrayQueue<(PathBuf, Vec<String>)>>;
 
 pub fn exec() {
     let q = SegQueue::new();
@@ -46,29 +52,49 @@ pub fn exec() {
 
     let aq = Arc::new(q);
 
+    let q2 = SegQueue::new();
+    let aq2 = Arc::new(q2);
+
+    let baq = ArrayQueue::new(100);
+    let a_baq = Arc::new(baq);
+
     const STACK_SIZE: usize = 20 * 1024 * 1024; // 20mb
     let handles = (0..2).map(|_| {
              let t_q = Arc::clone(&aq);
+             let t_q2 = Arc::clone(&aq2);
 
              thread::Builder::new()
                 .stack_size(STACK_SIZE)
-                .spawn(|| mutator_worker(t_q))
+                .spawn(|| mutator_worker(t_q, t_q2))
+    });
+
+    let bav_handles = (0..2).map(|_| {
+             let t_q2 = Arc::clone(&aq2);
+             let t_baq= Arc::clone(&a_baq);
+
+             thread::Builder::new()
+                .stack_size(STACK_SIZE)
+                .spawn(|| bav_assign_worker(t_q2, t_baq))
     });
 
     for h in handles {
         h.unwrap().join().unwrap();
     }
+
+    for h in bav_handles {
+        h.unwrap().join().unwrap();
+    }
 }
 
-fn mutator_worker(q : Arc<SegQueue<Result<PathBuf, PoisonPill>>>) {
+fn mutator_worker(qin : InputPPQ, qout : SkeletonQueue) {
     let backoff = Backoff::new();
 
-    let mut stage_finished = false; 
+    let mut stage_finished = false;
     while !stage_finished {
-        let filepath = match q.pop() {
+        let filepath = match qin.pop() {
             Ok(Ok(filepath)) => filepath,
             Ok(Err(poison_pill)) => {
-                q.push(Err(poison_pill));
+                qin.push(Err(poison_pill));
                 stage_finished = true;
                 continue;
             },
@@ -80,12 +106,78 @@ fn mutator_worker(q : Arc<SegQueue<Result<PathBuf, PoisonPill>>>) {
         match strip_and_transform(&filepath) {
             Some((script, bavns)) => {
                 let skel_name = get_new_name(&filepath, "skel");
-                fs::write(skel_name, script.to_string())
+                fs::write(&skel_name[..], script.to_string())
                     .unwrap_or(());
+                let mut to_push =(Path::new(&skel_name[..]).to_path_buf(), bavns);
+                qout.push(to_push);
             },
             None => continue,
         }
     }
+}
+
+fn bav_assign_worker(qin : SkeletonQueue, qout : BavAssingedQ) {
+    let backoff = Backoff::new();
+
+    //TODO hack
+    let mut BO = 1000000;
+    while true {
+        let (filepath, bavns) = match qin.pop() {
+            Ok(item) => item,
+            Err(_) => {
+                backoff.snooze();
+                BO = BO -1;
+                println!("BO {}", BO);
+                if BO == 0 { break; }
+                continue;
+            }
+        };
+
+
+        match solve(filepath.to_str().unwrap()) {
+            SolveResult::Error | SolveResult::ProcessError => {
+                fs::remove_file(filepath).unwrap_or(());
+            },
+            SolveResult::ErrorBug =>
+                report_bug(filepath.as_path(), SolveResult::ErrorBug),
+            SolveResult::SoundnessBug =>
+                report_bug(filepath.as_path(), SolveResult::SoundnessBug),
+            _ => { add_iterations_to_q(filepath.as_path(), bavns, Arc::clone(&qout)); () },
+        }
+    }
+}
+
+fn add_iterations_to_q(filepath : &Path, bavns : Vec<String>, qout : BavAssingedQ) -> Option<()> {
+    let backoff = Backoff::new();
+    let contents = fs::read_to_string(filepath).ok()?;
+    let stripped = rmv_comments(&contents[..]).ok()?.1.join(" ");
+    let mut script = script(&stripped[..]).ok()?.1;
+    fs::remove_file(filepath).unwrap_or(());
+
+    let eip = end_insert_pt(&script);
+    script.init(eip);
+
+    let num_bavs = bavns.len();
+    const MAX_ITER : u32 = 1;
+    println!("starting max(2^{}, {}) iterations", num_bavs, MAX_ITER);
+    let mut urng = RandUniqPermGen::new_definite(num_bavs, MAX_ITER);
+    while let Some(truth_values) = urng.sample() {
+        let new_filename = get_iter_fileout_name(filepath, urng.get_count());
+        script.replace(eip, get_bav_assign(&bavns, truth_values));
+        fs::write(&new_filename, script.to_string()).unwrap_or(());
+
+        let mut to_push = (Path::new(&new_filename[..]).to_path_buf(), bavns.clone());
+        while let Err(PushError(reject)) = qout.push(to_push) {
+            to_push = reject;
+            backoff.snooze();
+        }
+
+    }
+    Some(())
+}
+
+fn report_bug(file : &Path, kind : SolveResult) {
+    println!("{:?} bug in {} !!!", kind, file.to_str().unwrap_or("defaultname"));
 }
 
 fn get_new_name(source_file : &PathBuf, prefix : &str) -> String {
@@ -178,28 +270,6 @@ pub fn strip_and_transform(source_file: &Path) ->
 
     let bavns = to_skel(&mut script);
     return Some((script, bavns));
-}
-
-fn iter(mut script : Script, bavns : Vec<String>, source_file : &Path) {
-    let eip = end_insert_pt(&script);
-    script.init(eip);
-
-    let num_bavs = bavns.len();
-    const MAX_ITER : u32 = 1;
-    println!("starting max(2^{}, {}) iterations", num_bavs, MAX_ITER);
-    let mut urng = RandUniqPermGen::new_definite(num_bavs, MAX_ITER);
-    while let Some(truth_values) = urng.sample() {
-        let filename = get_iter_fileout_name(source_file, urng.get_count());
-        script.replace(eip, get_bav_assign(&bavns, truth_values));
-        fs::write(&filename, script.to_string()).unwrap_or(());
-        match solve(&filename) {
-            SolveResult::Sat |
-            SolveResult::Unsat |
-            SolveResult::Unknown => fs::remove_file(filename).unwrap_or(()),
-            _ => (),
-        }
-    }
-    println!("Done with seed file");
 }
 
 fn get_iter_fileout_name(source_file: &Path, iter: u32) -> String {
