@@ -30,13 +30,11 @@ use crossbeam::queue::SegQueue;
 use std::path::PathBuf;
 use std::thread;
 use std::sync::Arc;
-use std::sync::atomic::AtomicU8;
-use std::sync::atomic::Ordering;
 use crossbeam::utils::Backoff;
 
 pub fn exec() {
     let q = SegQueue::new();
-    for entry in WalkDir::new("test/ooo.tag10.smt2")
+    for entry in WalkDir::new("known/8")
             .into_iter()
             .filter_map(Result::ok)
             .filter(|e| !e.file_type().is_dir()) {
@@ -78,7 +76,23 @@ fn mutator_worker(q : Arc<SegQueue<Result<PathBuf, PoisonPill>>>) {
 
         println!("fp {:?}", filepath);
         backoff.reset();
+        match strip_and_transform(&filepath) {
+            Some((script, bavns)) => {
+                let skel_name = get_new_name(&filepath, "skel");
+                fs::write(skel_name, script.to_string())
+                    .unwrap_or(());
+            },
+            None => continue,
+        }
     }
+}
+
+fn get_new_name(source_file : &PathBuf, prefix : &str) -> String {
+    let source_filename = match source_file.file_name().and_then(|n| n.to_str()) {
+        Some(name) => name,
+        None => "unknown",
+    };
+    prefix.to_owned() + "_" + source_filename
 }
 
 pub struct PoisonPill {}
@@ -147,7 +161,8 @@ impl RandUniqPermGen {
     }
 }
 
-pub fn strip_and_transform(source_file: &Path) -> Option<()> {
+pub fn strip_and_transform(source_file: &Path) ->
+        Option<(Script, Vec<String>)> {
     let contents: String =
         fs::read_to_string(source_file).ok()?;
     let stripped_contents = &rmv_comments(&contents[..]).ok()?
@@ -157,10 +172,14 @@ pub fn strip_and_transform(source_file: &Path) -> Option<()> {
     // TODO error handling here on prev 3 lines
 
     if script.is_unsupported_logic() {
-        return Some(());
+        return None;
     }
 
     let bavns = to_skel(&mut script);
+    return Some((script, bavns));
+}
+
+fn iter(mut script : Script, bavns : Vec<String>, source_file : &Path) {
     let eip = end_insert_pt(&script);
     script.init(eip);
 
@@ -177,7 +196,6 @@ pub fn strip_and_transform(source_file: &Path) -> Option<()> {
         }
     }
     println!("Done with seed file");
-    Some(())
 }
 
 fn get_iter_fileout_name(source_file: &Path, iter: u32) -> String {
@@ -245,13 +263,6 @@ mod tests {
             let pup = script(&up[..]).expect("reparse error").1;
             assert_eq!(p, pup);
         }
-    }
-
-    #[test]
-    fn smoke_test() {
-        let mut pb = PathBuf::new();
-        pb.push("samples/ex.smt2");
-        strip_and_test_file(&pb);
     }
 
     #[test]
