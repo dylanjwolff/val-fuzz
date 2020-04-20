@@ -2,7 +2,85 @@ use std::process;
 use std::str::from_utf8;
 
 
-pub fn solve(filename: &str) -> bool {
+pub enum SolveResult {
+    SoundnessBug,
+    ErrorBug,
+    Error,
+    ProcessError,
+    Sat,
+    Unsat,
+    Unknown,
+}
+
+const SF : &str = "segfault";
+const SF_L : &str = "segmentation fault";
+const AV : &str = "ASSERTION VIOLATION";
+const AF : &str = "Assertion Failure";
+const IE : &str = "Internal error detected";
+const IVM : &str = "invalid model";
+
+const BUG_ERRORS : [&str; 6] = [SF, SF_L, AV, AF, IE, IVM];
+
+fn is_bug_error(stdout : &str, stderr : &str) -> bool {
+    for bug_error in BUG_ERRORS.iter() {
+        if stdout.contains(bug_error) || stderr.contains(bug_error) {
+            return true;
+        }
+    }
+    return false;
+}
+
+fn is_unrecoverable(stdout: &str, stderr : &str) -> bool {
+    stderr.contains("(error ") || stdout.contains("(error ")
+}
+
+fn get_z3_result(stdout: &str, stderr : &str) -> SolveResult {
+        if stdout.contains("unsat") || stderr.contains("unsat\n") {
+            SolveResult::Unsat
+        } else if stdout.contains("sat") || stderr.contains("sat\n") {
+            SolveResult::Sat
+        } else { 
+            SolveResult::Unknown
+        }
+}
+
+fn solve_z3(z3path : &str, filename : &str) -> SolveResult {
+    let z3_res = process::Command::new("timeout")
+        .args(&["6s", z3path, "smt.string_solver=z3str3", "model_validate=true", filename ])
+        .output();
+
+    let z3mrs = z3_res.map(|out| {
+        let stderr = from_utf8(&out.stderr[..]).unwrap_or("");
+        let stdout = from_utf8(&out.stdout[..]).unwrap_or("");
+        let success = out.status.success();
+        (success, stderr.to_owned(), stdout.to_owned())
+    });
+
+    match z3mrs {
+        Ok((z3_succ, z3_out, z3_err)) => {
+            if is_bug_error(&z3_out, &z3_err) {
+                SolveResult::ErrorBug
+            } else if !z3_succ && is_unrecoverable(&z3_out, &z3_err) {
+                SolveResult::Error
+            } else {
+                get_z3_result(&z3_err, &z3_err)
+            }
+        },
+        Err(_) => SolveResult::ProcessError,
+    }
+}
+
+fn get_cvc4_result(stdout: &str, stderr : &str) -> SolveResult {
+        if stdout.contains("unsat") || stderr.contains("unsat\n") {
+            SolveResult::Unsat
+        } else if stdout.contains("sat") || stderr.contains("sat\n") {
+            SolveResult::Sat
+        } else { 
+            SolveResult::Unknown
+        }
+}
+
+fn solve_cvc4(cvc4path : &str, filename : &str) -> SolveResult {
     let cvc4_res = process::Command::new("timeout")
         .args(&[
             "6s",
@@ -13,12 +91,6 @@ pub fn solve(filename: &str) -> bool {
         ])
         .output();
 
-    
-    let z3_res = process::Command::new("timeout")
-        .args(&["6s", "z3", "smt.string_solver=z3str3", "model_validate=true", filename ])
-        .output();
-
-
     let cvc4mrs = cvc4_res.map(|out| {
         let stderr = from_utf8(&out.stderr[..]).unwrap_or("");
         let stdout = from_utf8(&out.stdout[..]).unwrap_or("");
@@ -26,65 +98,30 @@ pub fn solve(filename: &str) -> bool {
         (success, stderr.to_owned(), stdout.to_owned())
     });
 
-    let z3mrs = z3_res.map(|out| {
-        let stderr = from_utf8(&out.stderr[..]).unwrap_or("");
-        let stdout = from_utf8(&out.stdout[..]).unwrap_or("");
-        let success = out.status.success();
-        (success, stderr.to_owned(), stdout.to_owned())
-    });
-
-    let mut rmv_file = false;
-    match (cvc4mrs, z3mrs) {
-        (Ok((cvc4_succ, cvc4_out, cvc4_err)), Ok((z3_succ, z3_out, z3_err))) => {
-            // TODO This isn't correct for incremental formulas... nor is it a good way to parse
-            // these responses... leaving for now until we have firmly proved the concept
-            let z3_unsat = z3_out.contains("unsat") || z3_err.contains("unsat\n");
-            let z3_sat = !z3_unsat && (z3_out.contains("sat") || z3_err.contains("sat\n"));
-            let z3_unknown = !z3_unsat && !z3_sat && (z3_out.contains("unknown")
-                                                      || z3_err.contains("unknown\n"));
-            let cvc4_unsat = cvc4_out.contains("unsat") || cvc4_err.contains("unsat\n");
-            let cvc4_sat = !cvc4_unsat && (cvc4_out.contains("sat") || cvc4_err.contains("sat\n"));
-            let cvc4_unknown = !cvc4_unsat && !cvc4_sat && (cvc4_out.contains("unknown")
-                                                      || cvc4_err.contains("unknown\n"));
-
-            if z3_out.contains("ASSERTION VIOLATION") {
-               println!("file {} has assertion violation problem!!!", filename);
-            } else if z3_err.contains("invalid model") {
-               println!("file {} has invalid model problem!!!", filename);
-            } else if z3_out.contains("dumped core") || cvc4_out.contains("dumped core") {
-               println!("file {} cause segfault!!!", filename);
-            } else if !z3_succ && z3_err.len() > 0 && !z3_sat && !z3_unsat && !z3_unknown {
-               println!("z3 unsuccessful on file {} : {}", filename, z3_err);
-            } else if !cvc4_succ && cvc4_err.len() > 0 && !cvc4_sat && !cvc4_unsat && !cvc4_unknown {
-               println!("cvc4 unsuccessful on file {} : {}", filename, cvc4_err);
-            } else if z3_unknown || cvc4_unknown {
-               println!("unknown result for file {}", filename);
-               rmv_file = true;
-            } else if cvc4_sat && z3_unsat {
-               println!("file {} has soundness problem!!!", filename);
-            } else if cvc4_unsat && z3_sat && !z3_err.contains("unknown function/constant")
-                && !z3_err.contains("unknown constant")
-                && !z3_err.contains("unknown parameter") {
-               println!("file {} has soundness problem!!!", filename);
-            } else if cvc4_out.contains("timeout") || z3_out.contains("timeout") {
-                // TODO look for timeouts in stderr in robust manner (shouldn't happen, but good to
-                // be safe). Can't because some error messages have timeout in them that aren't
-                // timeouts
-               println!("timeout on file {}", filename);
+    match cvc4mrs {
+        Ok((cvc4_succ, cvc4_out, cvc4_err)) => {
+            if is_bug_error(&cvc4_out, &cvc4_err) {
+                SolveResult::ErrorBug
+            } else if !cvc4_succ && is_unrecoverable(&cvc4_out, &cvc4_err) {
+                SolveResult::Error
             } else {
-               rmv_file = true;
+                get_cvc4_result(&cvc4_err, &cvc4_err)
             }
-
-            if cvc4_succ && z3_succ {
-                println!("parse success for file :{}", filename);
-            }
-
-
         },
-        (Err(e), _) => println!("cvc4 process error on file {} : {}", filename, e),
-        (_, Err(e)) => println!("z3 process error on file {} : {}", filename, e),
-    };
-    return rmv_file;
+        Err(_) => SolveResult::ProcessError,
+    }
+}
+
+pub fn solve(filename: &str) -> SolveResult {
+    match (solve_z3("z3", filename), solve_cvc4("cvc4", filename)) {
+        (ErrorBug, _) | (_, ErrorBug) => SolveResult::ErrorBug,
+        (Sat, Unsat) | (Unsat, Sat) => SolveResult::SoundnessBug,
+        (ProcessError, _) | (_, ProcessError) => SolveResult::ProcessError,
+        (Error, _) | (_, Error) => SolveResult::Error,
+        (Sat, _) | (_, Sat) => SolveResult::Sat,
+        (Unsat, _) | (_, Unsat) => SolveResult::Unsat,
+        _ => SolveResult::Unknown,
+    }
 }
 
 #[cfg(test)]

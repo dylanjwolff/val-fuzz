@@ -13,6 +13,7 @@ pub mod parser;
 pub mod transforms;
 
 use solver::solve;
+use solver::SolveResult;
 use bit_vec::BitVec;
 use parser::{
     rmv_comments, script,
@@ -191,8 +192,11 @@ fn iter(mut script : Script, bavns : Vec<String>, source_file : &Path) {
         let filename = get_iter_fileout_name(source_file, urng.get_count());
         script.replace(eip, get_bav_assign(&bavns, truth_values));
         fs::write(&filename, script.to_string()).unwrap_or(());
-        if solve(&filename) {
-            fs::remove_file(filename).unwrap_or(());
+        match solve(&filename) {
+            SolveResult::Sat |
+            SolveResult::Unsat |
+            SolveResult::Unknown => fs::remove_file(filename).unwrap_or(()),
+            _ => (),
         }
     }
     println!("Done with seed file");
