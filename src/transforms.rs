@@ -7,6 +7,8 @@ use bit_vec::BitVec;
 use std::iter::once;
 use std::collections::BTreeMap;
 use std::rc::Rc;
+use crate::Timer;
+use std::time::Duration;
 
 pub struct VarNameGenerator {
     basename: String,
@@ -169,16 +171,18 @@ pub fn to_skel(script: &mut Script) -> Vec<String> {
 }
 
 pub fn rl(script: &mut Script, scoped_vars: &mut BTreeMap<String, Vec<SExp>>) {
+    let timer = Timer::new();
+    timer.start(Duration::from_secs(120));
     match script {
         Script::Commands(cmds) => {
             for cmd in cmds.iter_mut() {
-                rl_c(&mut *cmd.borrow_mut(), scoped_vars);
+                rl_c(&mut *cmd.borrow_mut(), scoped_vars, timer);
             }
         }
     }
 }
 
-fn rl_c(cmd: &mut Command, scoped_vars: &mut BTreeMap<String, Vec<SExp>>) {
+fn rl_c(cmd: &mut Command, scoped_vars: &mut BTreeMap<String, Vec<SExp>>, timer : Timer) {
     match cmd {
         Command::Assert(s) | Command::CheckSatAssuming(s) => {
             rl_s(&mut *s.borrow_mut(), scoped_vars)
@@ -187,7 +191,7 @@ fn rl_c(cmd: &mut Command, scoped_vars: &mut BTreeMap<String, Vec<SExp>>) {
     }
 }
 
-fn rl_s(sexp: &mut SExp, scoped_vars: &mut BTreeMap<String, Vec<SExp>>) {
+fn rl_s(sexp: &mut SExp, scoped_vars: &mut BTreeMap<String, Vec<SExp>>, timer : Timer) {
     match sexp {
         SExp::Let(v, rest) => {
             // This looks a bit strange, but if we don't explore these first, those expressions are

@@ -34,12 +34,40 @@ use std::path::PathBuf;
 use std::thread;
 use std::sync::Arc;
 use std::sync::Mutex;
+use std::sync::atomic::AtomicBool;
 use crossbeam::utils::Backoff;
+use std::sync::atomic::Ordering;
+use std::time::Duration;
 
 type InputPPQ = Arc<SegQueue<Result<PathBuf, PoisonPill>>>;
 type SkeletonQueue = Arc<SegQueue<(PathBuf, Vec<String>)>>;
 type BavAssingedQ = Arc<ArrayQueue<(PathBuf, Vec<String>)>>;
 type StageCompleteA = Arc<StageComplete>;
+
+struct Timer {
+    done : Arc<AtomicBool>,
+}
+
+impl Timer {
+    fn new() -> Self {
+        Timer {
+            done : Arc::new(AtomicBool::new(false)),
+        }
+    }
+
+    fn start(&self, time : Duration) {
+        let t_b = Arc::clone(&self.done);
+        thread::spawn(move || { thread::sleep(time); t_b.store(true, Ordering::Relaxed)});
+    }
+
+    fn is_done(&self) -> bool {
+        self.done.load(Ordering::Relaxed)
+    }
+
+    fn reset(&self) {
+        self.done.store(false, Ordering::Relaxed);
+    }
+}
 
 struct StageComplete {
     number_workers_finished : Mutex<u8>,
@@ -85,7 +113,7 @@ pub fn exec() {
     let aq2 = Arc::new(q2);
     let num_stage2_workers = 2;
     let stage2 = Arc::new(StageComplete::new(num_stage2_workers));
-        
+
     let baq = ArrayQueue::new(100);
     let a_baq = Arc::new(baq);
 
@@ -410,6 +438,16 @@ mod tests {
     }
 
     #[test]
+    fn timer_test() {
+        let timer = Timer::new();
+        timer.start(Duration::from_millis(200));
+        thread::sleep(Duration::from_millis(100));
+        assert!(!timer.is_done());
+        thread::sleep(Duration::from_millis(200));
+        assert!(timer.is_done());
+    }
+
+    #[test]
     fn ru_definite_reaches_maxiter() {
         let mut rng = RandUniqPermGen::new_definite(10, 1);
         assert!(rng.sample().is_some());
@@ -427,7 +465,7 @@ mod tests {
     #[test]
     fn ru_definite_correct_size() {
         let mut rng = RandUniqPermGen::new_definite(9, 1);
-        assert_eq!(rng.sample().expect("Should hold value").len(), 9);
+        assert_eq!(rng.sample().expect("should hold value").len(), 9);
     }
 
     #[test]
