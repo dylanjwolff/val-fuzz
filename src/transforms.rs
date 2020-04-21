@@ -170,28 +170,37 @@ pub fn to_skel(script: &mut Script) -> Vec<String> {
     bavns
 }
 
-pub fn rl(script: &mut Script, scoped_vars: &mut BTreeMap<String, Vec<SExp>>) {
+pub fn rl(script: &mut Script, scoped_vars: &mut BTreeMap<String, Vec<SExp>>) -> Result<(), ()> {
     let timer = Timer::new();
     timer.start(Duration::from_secs(120));
     match script {
         Script::Commands(cmds) => {
             for cmd in cmds.iter_mut() {
-                rl_c(&mut *cmd.borrow_mut(), scoped_vars, timer);
+                rl_c(&mut *cmd.borrow_mut(), scoped_vars, &timer)?;
             }
+            Ok(())
         }
     }
 }
 
-fn rl_c(cmd: &mut Command, scoped_vars: &mut BTreeMap<String, Vec<SExp>>, timer : Timer) {
+fn rl_c(cmd: &mut Command, scoped_vars: &mut BTreeMap<String, Vec<SExp>>, timer : &Timer) -> Result<(),()> {
+    if timer.is_done() {
+        return Err(());
+    }
+
     match cmd {
         Command::Assert(s) | Command::CheckSatAssuming(s) => {
-            rl_s(&mut *s.borrow_mut(), scoped_vars)
+            rl_s(&mut *s.borrow_mut(), scoped_vars, timer)
         }
-        _ => (),
+        _ => Ok(()),
     }
 }
 
-fn rl_s(sexp: &mut SExp, scoped_vars: &mut BTreeMap<String, Vec<SExp>>, timer : Timer) {
+fn rl_s(sexp: &mut SExp, scoped_vars: &mut BTreeMap<String, Vec<SExp>>, timer : &Timer) -> Result<(), ()> {
+    if timer.is_done() {
+        return Err(());
+    }
+
     match sexp {
         SExp::Let(v, rest) => {
             // This looks a bit strange, but if we don't explore these first, those expressions are
@@ -203,7 +212,7 @@ fn rl_s(sexp: &mut SExp, scoped_vars: &mut BTreeMap<String, Vec<SExp>>, timer : 
 
             let mut new_vars: Vec<(&SymbolRc, &SExpRc)> = vec![];
             for (var, val) in v {
-                rl_s(&mut *val.borrow_mut(), scoped_vars); // first make sure the val is "let-free"
+                rl_s(&mut *val.borrow_mut(), scoped_vars, timer)?; // first make sure the val is "let-free"
                 new_vars.push((var, val)); // make note of the mapping to add to the rest
             }
 
@@ -219,7 +228,7 @@ fn rl_s(sexp: &mut SExp, scoped_vars: &mut BTreeMap<String, Vec<SExp>>, timer : 
             }
 
             // Recurse on the rest of the SExp
-            rl_s(&mut *rest.borrow_mut(), scoped_vars);
+            rl_s(&mut *rest.borrow_mut(), scoped_vars, timer)?;
 
             // Pop our variables off of the stack
             for (var, _) in new_vars {
@@ -230,6 +239,7 @@ fn rl_s(sexp: &mut SExp, scoped_vars: &mut BTreeMap<String, Vec<SExp>>, timer : 
 
             let b = (**rest.borrow()).clone();
             *sexp = b; // the let expression isn't doing anything anymore, replace it with rest
+            Ok(())
         }
         SExp::Symbol(s) => {
             let new_s = scoped_vars
@@ -240,18 +250,20 @@ fn rl_s(sexp: &mut SExp, scoped_vars: &mut BTreeMap<String, Vec<SExp>>, timer : 
                 Some(e) => {
                     let b = e.clone();
                     *sexp = b;
+                    Ok(())
                 }
-                None => (),
+                None => Ok(()),
             }
         }
 
         SExp::Compound(v) | SExp::BExp(_, v) => {
             for e in v {
-                rl_s(&mut *e.borrow_mut(), scoped_vars)
+                rl_s(&mut *e.borrow_mut(), scoped_vars, timer)?
             }
+            Ok(())
         }
-        SExp::QForAll(_, s) => rl_s(&mut s.borrow_mut(), scoped_vars),
-        SExp::Constant(_) => (),
+        SExp::QForAll(_, s) => rl_s(&mut s.borrow_mut(), scoped_vars, timer),
+        SExp::Constant(_) => Ok(()),
     }
 }
 
@@ -485,7 +497,8 @@ mod tests {
             vec![(rccell!(v.clone()), rccell!(e))],
             rccell!(Box::new(SExp::Symbol(rccell!(v)))),
         );
-        rl_s(&mut sexp, &mut BTreeMap::new());
+        let timer = Timer::new();
+        rl_s(&mut sexp, &mut BTreeMap::new(), &timer);
         assert_eq!(sexp, expected);
     }
 }
