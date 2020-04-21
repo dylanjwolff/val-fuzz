@@ -1,0 +1,7 @@
+(define-sort FPN () (_ FloatingPoint 55 53))
+(declare-const BAV1 Bool)
+(declare-fun a () FPN)
+(declare-fun b () FPN)
+(assert (= (fp.sqrt roundTowardPositive a) b))
+(assert (= BAV1 (= (fp.sqrt roundTowardPositive a) b)))
+(check-sat)

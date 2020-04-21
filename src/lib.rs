@@ -77,6 +77,14 @@ pub fn exec() {
                 .spawn(|| bav_assign_worker(t_q2, t_baq))
     });
 
+    let solver_handles = (0..2).map(|_| {
+             let t_baq= Arc::clone(&a_baq);
+
+             thread::Builder::new()
+                .stack_size(STACK_SIZE)
+                .spawn(|| solver_worker(t_baq))
+    });
+
     for h in handles {
         h.unwrap().join().unwrap();
     }
@@ -84,6 +92,12 @@ pub fn exec() {
     for h in bav_handles {
         h.unwrap().join().unwrap();
     }
+
+    for h in solver_handles {
+        h.unwrap().join().unwrap();
+    }
+
+    println!("Queue lengths {} {} {}", aq.len(), aq2.len(), a_baq.len());
 }
 
 fn mutator_worker(qin : InputPPQ, qout : SkeletonQueue) {
@@ -127,7 +141,6 @@ fn bav_assign_worker(qin : SkeletonQueue, qout : BavAssingedQ) {
             Err(_) => {
                 backoff.snooze();
                 BO = BO -1;
-                println!("BO {}", BO);
                 if BO == 0 { break; }
                 continue;
             }
@@ -152,7 +165,6 @@ fn add_iterations_to_q(filepath : &Path, bavns : Vec<String>, qout : BavAssinged
     let contents = fs::read_to_string(filepath).ok()?;
     let stripped = rmv_comments(&contents[..]).ok()?.1.join(" ");
     let mut script = script(&stripped[..]).ok()?.1;
-    fs::remove_file(filepath).unwrap_or(());
 
     let eip = end_insert_pt(&script);
     script.init(eip);
@@ -189,6 +201,34 @@ fn get_new_name(source_file : &PathBuf, prefix : &str) -> String {
 }
 
 pub struct PoisonPill {}
+
+fn solver_worker(qin : BavAssingedQ) {
+    let backoff = Backoff::new();
+
+    //TODO hack
+    let mut BO = 1000000;
+    while true {
+        let (filepath, _bavns) = match qin.pop() {
+            Ok(item) => item,
+            Err(_) => {
+                backoff.snooze();
+                BO = BO -1;
+                if BO == 0 { break; }
+                continue;
+            }
+        };
+
+        println!("Checking file {:?}", filepath);
+        let outcome = solve(filepath.to_str().unwrap_or("defaultname"));
+        match outcome {
+            SolveResult::ErrorBug | SolveResult::SoundnessBug =>
+                report_bug(filepath.as_path(), outcome),
+            _ => fs::remove_file(filepath).unwrap_or(()),
+        }
+    }
+
+
+}
 
 #[allow(unused)]
 struct RandUniqPermGen {
