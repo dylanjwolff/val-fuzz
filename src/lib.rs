@@ -33,11 +33,37 @@ use crossbeam::queue::PushError;
 use std::path::PathBuf;
 use std::thread;
 use std::sync::Arc;
+use std::sync::Mutex;
 use crossbeam::utils::Backoff;
 
 type InputPPQ = Arc<SegQueue<Result<PathBuf, PoisonPill>>>;
 type SkeletonQueue = Arc<SegQueue<(PathBuf, Vec<String>)>>;
 type BavAssingedQ = Arc<ArrayQueue<(PathBuf, Vec<String>)>>;
+type StageCompleteA = Arc<StageComplete>;
+
+struct StageComplete {
+    number_workers_finished : Mutex<u8>,
+    total_workers : u8,
+}
+
+impl StageComplete {
+    fn new(num_workers : u8) -> Self {
+        StageComplete {
+            number_workers_finished : Mutex::new(0),
+            total_workers : num_workers,
+        }
+    }
+
+    fn finish(&self) {
+       let mut guard = self.number_workers_finished.lock().unwrap();
+       *guard = *guard + 1;
+    }
+
+    fn is_complete(&self) -> bool {
+       let guard = self.number_workers_finished.lock().unwrap();
+       *guard == self.total_workers
+    }
+}
 
 pub fn exec() {
     let q = SegQueue::new();
@@ -50,11 +76,16 @@ pub fn exec() {
     }
     q.push(Err(PoisonPill{}));
 
+    //stage 0
     let aq = Arc::new(q);
+    let num_stage1_workers = 2;
+    let stage1 = Arc::new(StageComplete::new(num_stage1_workers));
 
     let q2 = SegQueue::new();
     let aq2 = Arc::new(q2);
-
+    let num_stage2_workers = 2;
+    let stage2 = Arc::new(StageComplete::new(num_stage2_workers));
+        
     let baq = ArrayQueue::new(100);
     let a_baq = Arc::new(baq);
 
@@ -62,27 +93,31 @@ pub fn exec() {
     let handles = (0..2).map(|_| {
              let t_q = Arc::clone(&aq);
              let t_q2 = Arc::clone(&aq2);
+             let t_s1 = Arc::clone(&stage1);
 
              thread::Builder::new()
                 .stack_size(STACK_SIZE)
-                .spawn(|| mutator_worker(t_q, t_q2))
+                .spawn(|| mutator_worker(t_q, t_q2, t_s1))
     });
 
     let bav_handles = (0..2).map(|_| {
              let t_q2 = Arc::clone(&aq2);
              let t_baq= Arc::clone(&a_baq);
+             let t_s1 = Arc::clone(&stage1);
+             let t_s2 = Arc::clone(&stage2);
 
              thread::Builder::new()
                 .stack_size(STACK_SIZE)
-                .spawn(|| bav_assign_worker(t_q2, t_baq))
+                .spawn(|| bav_assign_worker(t_q2, t_s1, t_baq, t_s2))
     });
 
     let solver_handles = (0..2).map(|_| {
              let t_baq= Arc::clone(&a_baq);
+             let t_s2 = Arc::clone(&stage2);
 
              thread::Builder::new()
                 .stack_size(STACK_SIZE)
-                .spawn(|| solver_worker(t_baq))
+                .spawn(|| solver_worker(t_baq, t_s2))
     });
 
     for h in handles {
@@ -100,7 +135,7 @@ pub fn exec() {
     println!("Queue lengths {} {} {}", aq.len(), aq2.len(), a_baq.len());
 }
 
-fn mutator_worker(qin : InputPPQ, qout : SkeletonQueue) {
+fn mutator_worker(qin : InputPPQ, qout : SkeletonQueue, stage : StageCompleteA) {
     let backoff = Backoff::new();
 
     let mut stage_finished = false;
@@ -115,7 +150,6 @@ fn mutator_worker(qin : InputPPQ, qout : SkeletonQueue) {
             Err(_) => { backoff.snooze(); continue; },
         };
 
-        println!("fp {:?}", filepath);
         backoff.reset();
         match strip_and_transform(&filepath) {
             Some((script, bavns)) => {
@@ -128,20 +162,18 @@ fn mutator_worker(qin : InputPPQ, qout : SkeletonQueue) {
             None => continue,
         }
     }
+
+    stage.finish();
 }
 
-fn bav_assign_worker(qin : SkeletonQueue, qout : BavAssingedQ) {
+fn bav_assign_worker(qin : SkeletonQueue, prev_stage : StageCompleteA, qout : BavAssingedQ, stage : StageCompleteA) {
     let backoff = Backoff::new();
 
-    //TODO hack
-    let mut BO = 1000000;
-    while true {
+    while !prev_stage.is_complete() || qin.len() > 0 {
         let (filepath, bavns) = match qin.pop() {
             Ok(item) => item,
             Err(_) => {
                 backoff.snooze();
-                BO = BO -1;
-                if BO == 0 { break; }
                 continue;
             }
         };
@@ -158,6 +190,8 @@ fn bav_assign_worker(qin : SkeletonQueue, qout : BavAssingedQ) {
             _ => { add_iterations_to_q(filepath.as_path(), bavns, Arc::clone(&qout)); () },
         }
     }
+
+    stage.finish();
 }
 
 fn add_iterations_to_q(filepath : &Path, bavns : Vec<String>, qout : BavAssingedQ) -> Option<()> {
@@ -202,18 +236,14 @@ fn get_new_name(source_file : &PathBuf, prefix : &str) -> String {
 
 pub struct PoisonPill {}
 
-fn solver_worker(qin : BavAssingedQ) {
+fn solver_worker(qin : BavAssingedQ, prev_stage : StageCompleteA) {
     let backoff = Backoff::new();
 
-    //TODO hack
-    let mut BO = 1000000;
-    while true {
+    while !prev_stage.is_complete() || qin.len() > 0 {
         let (filepath, _bavns) = match qin.pop() {
             Ok(item) => item,
             Err(_) => {
                 backoff.snooze();
-                BO = BO -1;
-                if BO == 0 { break; }
                 continue;
             }
         };
