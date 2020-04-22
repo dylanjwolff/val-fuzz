@@ -38,6 +38,7 @@ use std::sync::atomic::AtomicBool;
 use crossbeam::utils::Backoff;
 use std::sync::atomic::Ordering;
 use std::time::Duration;
+use std::thread::JoinHandle;
 
 type InputPPQ = Arc<SegQueue<Result<PathBuf, PoisonPill>>>;
 type SkeletonQueue = Arc<SegQueue<(PathBuf, Vec<String>)>>;
@@ -95,11 +96,12 @@ impl StageComplete {
 
 pub fn exec() {
     let q = SegQueue::new();
-    for entry in WalkDir::new("known/8")
+    for entry in WalkDir::new("test")
             .into_iter()
             .filter_map(Result::ok)
             .filter(|e| !e.file_type().is_dir()) {
                 let filepath = entry.into_path();
+                println!("push {:?}", filepath);
                 q.push(Ok(filepath));
     }
     q.push(Err(PoisonPill{}));
@@ -126,7 +128,7 @@ pub fn exec() {
              thread::Builder::new()
                 .stack_size(STACK_SIZE)
                 .spawn(|| mutator_worker(t_q, t_q2, t_s1))
-    });
+    }).collect::<Vec<std::io::Result<JoinHandle<()>>>>();
 
     let bav_handles = (0..2).map(|_| {
              let t_q2 = Arc::clone(&aq2);
@@ -137,7 +139,7 @@ pub fn exec() {
              thread::Builder::new()
                 .stack_size(STACK_SIZE)
                 .spawn(|| bav_assign_worker(t_q2, t_s1, t_baq, t_s2))
-    });
+    }).collect::<Vec<std::io::Result<JoinHandle<()>>>>();
 
     let solver_handles = (0..2).map(|_| {
              let t_baq= Arc::clone(&a_baq);
@@ -146,7 +148,7 @@ pub fn exec() {
              thread::Builder::new()
                 .stack_size(STACK_SIZE)
                 .spawn(|| solver_worker(t_baq, t_s2))
-    });
+    }).collect::<Vec<std::io::Result<JoinHandle<()>>>>();
 
     for h in handles {
         h.unwrap().join().unwrap();
@@ -366,7 +368,7 @@ pub fn strip_and_transform(source_file: &Path) ->
         return None;
     }
 
-    let bavns = to_skel(&mut script);
+    let bavns = to_skel(&mut script).ok()?;
     return Some((script, bavns));
 }
 

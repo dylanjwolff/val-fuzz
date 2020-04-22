@@ -148,14 +148,14 @@ pub fn get_bav_assign(bavns: &Vec<String>, ta: BitVec) -> Command {
 }
 
 /// returns the Boolean Abstract Variables added as vector of their names
-pub fn to_skel(script: &mut Script) -> Vec<String> {
+pub fn to_skel(script: &mut Script) -> Result<Vec<String>, ()> {
     let mut vng = VarNameGenerator::new("GEN");
     rc(script, &mut vng);
 
     set_logic_all(script);
 
     let mut scopes = BTreeMap::new();
-    rl(script, &mut scopes);
+    rl(script, &mut scopes)?;
 
     vng.basename = "BAV".to_owned();
     let mut bavs = vec![];
@@ -167,12 +167,12 @@ pub fn to_skel(script: &mut Script) -> Vec<String> {
         .map(|(name, _, _)| name.clone())
         .collect::<Vec<String>>();
     add_ba(script, bavs);
-    bavns
+    Ok(bavns)
 }
 
 pub fn rl(script: &mut Script, scoped_vars: &mut BTreeMap<String, Vec<SExp>>) -> Result<(), ()> {
     let timer = Timer::new();
-    timer.start(Duration::from_secs(120));
+    timer.start(Duration::from_secs(10));
     match script {
         Script::Commands(cmds) => {
             for cmd in cmds.iter_mut() {
