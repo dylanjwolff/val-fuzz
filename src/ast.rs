@@ -1,5 +1,7 @@
 use std::cell::RefCell;
 use std::rc::Rc;
+use crate::Timer;
+use std::time::Duration;
 
 pub type ScriptRc = Rc<RefCell<Script>>;
 pub type CommandRc = Rc<RefCell<Command>>;
@@ -108,13 +110,22 @@ pub enum AstNode {
 }
 
 impl Script {
-    pub fn to_string(&self) -> String {
+    pub fn to_string_dfltto(&self) -> Option<String> {
+        println!("starting tostring");
+        self.to_string(Timer::new_started(Duration::from_secs(30)))
+    }
+
+    pub fn to_string(&self, timer : Timer) -> Option<String> {
+        if timer.is_done() {
+            return None;
+        }
+
         match self {
-            Script::Commands(cmds) => cmds
+            Script::Commands(cmds) => Some( cmds
                 .iter()
-                .map(|cmd| cmd.borrow().to_string())
-                .collect::<Vec<String>>()
-                .join("\n"),
+                .map(|cmd| cmd.borrow().to_string(timer.clone()))
+                .collect::<Option<Vec<String>>>()?
+                .join("\n") ),
         }
     }
 
@@ -150,18 +161,22 @@ impl Script {
 }
 
 impl Command {
-    pub fn to_string(&self) -> String {
-        match self {
+    pub fn to_string(&self, timer : Timer) -> Option<String> {
+        if timer.is_done() {
+            return None;
+        }
+
+        Some( match self {
             Command::Logic(l) => format!("(set-logic {})", l.borrow().to_string()),
             Command::CheckSat() => "(check-sat)".to_string(),
             Command::CheckSatAssuming(sexp) =>
-                format!("(check-sat-assuming {})", sexp.borrow().to_string()),
+                format!("(check-sat-assuming {})", sexp.borrow().to_string(timer.clone())?),
             Command::GetModel() => "(get-model)".to_string(),
             Command::DeclConst(v, s) => 
-                format!("(declare-const {} {})", v, s.borrow().to_string()),
+                format!("(declare-const {} {})", v, s.borrow().to_string(timer.clone())?),
             Command::Generic(s) => s.clone(),
-            Command::Assert(s) => format!("(assert {})", s.borrow().to_string()),
-        }
+            Command::Assert(s) => format!("(assert {})", s.borrow().to_string(timer.clone())?),
+        })
     }
 
     pub fn is_logic(&self) -> bool {
@@ -193,8 +208,12 @@ impl Constant {
 }
 
 impl Sort {
-    pub fn to_string(&self) -> String {
-        match self {
+    pub fn to_string(&self, timer : Timer) -> Option<String> {
+        if timer.is_done() {
+            return None;
+        }
+
+        Some (match self {
             Sort::UInt() => "Int".to_string(),
             Sort::Dec() => "Real".to_string(),
             Sort::Bool() => "Bool".to_string(),
@@ -205,13 +224,13 @@ impl Sort {
             Sort::Compound(v) => {
                 let rec_s = v
                     .iter()
-                    .map(|sort| Box::new(sort.borrow().to_string()))
+                    .map(|sort| Box::new(sort.borrow().to_string(timer.clone())))
                     .map(|bs| *bs)
-                    .collect::<Vec<String>>()
+                    .collect::<Option<Vec<String>>>()?
                     .join(" ");
                 format!("({})", rec_s)
             }
-        }
+        })
     }
 }
 
@@ -224,56 +243,60 @@ impl SExp {
         SExp::Symbol(rccell!(Symbol::Token("false".to_owned())))
     }
 
-    pub fn to_string(&self) -> String {
-        match self {
+    pub fn to_string(&self, timer : Timer) -> Option<String> {
+        if timer.is_done() {
+            return None;
+        }
+
+        Some ( match self {
             SExp::Constant(c) => c.borrow().to_string(),
             SExp::Symbol(s) => s.borrow().to_string(),
             SExp::Let(vbs, s) => {
                 let vbss = Box::new(
                     vbs.iter()
                         .map(|(v, s)| {
-                            Box::new(format!(
-                                "({} {})",
-                                v.borrow().to_string(),
-                                s.borrow().to_string()
-                            ))
+                                Some((v.borrow().to_string(),
+                                s.borrow().to_string(timer.clone())?))
                         })
+                        .collect::<Option<Vec<(String, String)>>>()?
+                        .iter()
+                        .map(|(vs, ss)| Box::new(format!("({} {}", vs, ss)))
                         .map(|bs| *bs)
                         .collect::<String>(),
                 );
-                format!("(let ({}) {})", vbss, s.borrow().to_string())
+                format!("(let ({}) {})", vbss, s.borrow().to_string(timer.clone())?)
             }
             SExp::Compound(v) => {
                 let rec_s = v
                     .iter()
-                    .map(|sexp| Box::new(sexp.borrow().to_string()))
+                    .map(|sexp| Box::new(sexp.borrow().to_string(timer.clone())))
                     .map(|bs| *bs)
-                    .collect::<Vec<String>>()
+                    .collect::<Option<Vec<String>>>()?
                     .join(" ");
                 format!("({})", rec_s)
             }
             SExp::BExp(o, v) => {
                 let rec_s = v
                     .iter()
-                    .map(|sexp| Box::new(sexp.borrow().to_string()))
+                    .map(|sexp| Box::new(sexp.borrow().to_string(timer.clone())))
                     .map(|bs| *bs)
-                    .collect::<Vec<String>>()
+                    .collect::<Option<Vec<String>>>()?
                     .join(" ");
                 format!("({} {})", o.borrow().to_string(), rec_s)
             },
             SExp::QForAll(v, s) => {
                 let vbss = v.iter()
-                    .map(|(va, vl)| format!(
+                    .map(|(va, vl)| Some( format!(
                             "({} {})",
                             va.borrow().to_string(),
-                            vl.borrow().to_string())
-                        )
-                    .collect::<Vec<String>>()
+                            vl.borrow().to_string(timer.clone())?)
+                        ))
+                    .collect::<Option<Vec<String>>>()?
                     .join("");
-                format!("(forall ({}) {})", vbss, s.borrow().to_string())
+                format!("(forall ({}) {})", vbss, s.borrow().to_string(timer.clone())?)
             }
 
-        }
+        } )
     }
 }
 

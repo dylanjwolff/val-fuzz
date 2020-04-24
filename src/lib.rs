@@ -45,14 +45,28 @@ type SkeletonQueue = Arc<SegQueue<(PathBuf, Vec<String>)>>;
 type BavAssingedQ = Arc<ArrayQueue<(PathBuf, Vec<String>)>>;
 type StageCompleteA = Arc<StageComplete>;
 
-struct Timer {
+pub struct Timer {
     done : Arc<AtomicBool>,
 }
 
 impl Timer {
+    fn new_started(time : Duration) -> Self {
+        let t = Timer {
+            done : Arc::new(AtomicBool::new(false)),
+        };
+        t.start(time);
+        t
+    }
+
     fn new() -> Self {
         Timer {
             done : Arc::new(AtomicBool::new(false)),
+        }
+    }
+
+    fn clone(&self) -> Self {
+        Timer {
+            done : Arc::clone(&self.done),
         }
     }
 
@@ -184,7 +198,12 @@ fn mutator_worker(qin : InputPPQ, qout : SkeletonQueue, stage : StageCompleteA) 
         match strip_and_transform(&filepath) {
             Some((script, bavns)) => {
                 let skel_name = get_new_name(&filepath, "skel");
-                fs::write(&skel_name[..], script.to_string())
+                let contents = match script.to_string_dfltto() {
+                    Some(contents) => contents,
+                    None => continue,
+                };
+
+                fs::write(&skel_name[..], contents)
                     .unwrap_or(());
                 let mut to_push =(Path::new(&skel_name[..]).to_path_buf(), bavns);
                 qout.push(to_push);
@@ -240,7 +259,11 @@ fn add_iterations_to_q(filepath : &Path, bavns : Vec<String>, qout : BavAssinged
     while let Some(truth_values) = urng.sample() {
         let new_filename = get_iter_fileout_name(filepath, urng.get_count());
         script.replace(eip, get_bav_assign(&bavns, truth_values));
-        fs::write(&new_filename, script.to_string()).unwrap_or(());
+        let contents = match script.to_string_dfltto() {
+            Some(contents) => contents,
+            None => continue,
+        };
+        fs::write(&new_filename, contents).unwrap_or(());
 
         let mut to_push = (Path::new(&new_filename[..]).to_path_buf(), bavns.clone());
         while let Err(PushError(reject)) = qout.push(to_push) {
@@ -363,12 +386,14 @@ pub fn strip_and_transform(source_file: &Path) ->
         .join(" ")[..];
     let mut script = script(&stripped_contents[..]).ok()?.1;
     // TODO error handling here on prev 3 lines
+    println!("Done parsing");
 
     if script.is_unsupported_logic() {
         return None;
     }
 
     let bavns = to_skel(&mut script).ok()?;
+    println!("Done skelling");
     return Some((script, bavns));
 }
 
@@ -433,7 +458,11 @@ mod tests {
 
             let p = script(contents_sans_comments).expect("parser error").1;
 
-            let up = p.to_string();
+            let up = match p.to_string_dfltto() {
+                Some(contents) => contents,
+                None => continue,
+            };
+
             let pup = script(&up[..]).expect("reparse error").1;
             assert_eq!(p, pup);
         }
@@ -479,13 +508,5 @@ mod tests {
         set.insert(rng.sample().expect("Should hold value"));
         set.insert(rng.sample().expect("Should hold value"));
         assert_eq!(set.len(), 4);
-    }
-
-    #[test]
-    fn quick_visual() {
-        let mut s = parse_file("samples/bug272.minimized.smtv1.smt2");
-        println!("Before \n {} \n\n", s.to_string());
-        to_skel(&mut s);
-        println!("Skeleton \n {}", s.to_string());
     }
 }

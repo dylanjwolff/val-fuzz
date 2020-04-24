@@ -151,15 +151,17 @@ pub fn get_bav_assign(bavns: &Vec<String>, ta: BitVec) -> Command {
 pub fn to_skel(script: &mut Script) -> Result<Vec<String>, ()> {
     let mut vng = VarNameGenerator::new("GEN");
     rc(script, &mut vng);
-
+    println!("rc done");
     set_logic_all(script);
 
     let mut scopes = BTreeMap::new();
     rl(script, &mut scopes)?;
+    println!("rl done");
 
     vng.basename = "BAV".to_owned();
     let mut bavs = vec![];
-    bav(script, &mut vng, &mut bavs);
+    bav(script, &mut vng, &mut bavs).ok_or(())?;
+    println!("bav done");
 
     init_vars(script, vng.vars_generated);
     let bavns = bavs
@@ -317,52 +319,64 @@ fn rc_se(sexp: &mut SExp, vng: &mut VarNameGenerator) {
 }
 
 pub fn bav(script: &mut Script, vng: &mut VarNameGenerator,
-           bava: &mut Vec<(String, SExp, VarBindings)>) {
+           bava: &mut Vec<(String, SExp, VarBindings)>) -> Option<()> {
+    let timer = Timer::new_started(Duration::from_secs(10));
     let mut qvars = vec![];
     match script {
         Script::Commands(cmds) => {
             for cmd in cmds.iter_mut() {
-                bav_c(&mut *cmd.borrow_mut(), vng, bava, &mut qvars);
+                bav_c(&mut *cmd.borrow_mut(), vng, bava, &mut qvars, timer.clone())?;
             }
         }
-    }
+    };
+    Some(())
 }
 
 type VarBindings = Vec<(SymbolRc, SortRc)>;
 
 fn bav_c(cmd: &mut Command, vng: &mut VarNameGenerator,
-         bava: &mut Vec<(String, SExp, VarBindings)>, qvars : &mut VarBindings) {
+         bava: &mut Vec<(String, SExp, VarBindings)>, qvars : &mut VarBindings, timer : Timer) -> Option<()> {
+    if timer.is_done() {
+        return None
+    }
     match cmd {
         Command::Assert(sexp) | Command::CheckSatAssuming(sexp) => {
-            bav_se(&mut *sexp.borrow_mut(), vng, bava, qvars)
+            bav_se(&mut *sexp.borrow_mut(), vng, bava, qvars, timer.clone())
         }
-        _ => (),
+        _ => Some(()),
     }
 }
 
 fn bav_se(sexp: &mut SExp, vng: &mut VarNameGenerator,
-          bavs: &mut Vec<(String, SExp, VarBindings)>, qvars : &mut VarBindings) {
+          bavs: &mut Vec<(String, SExp, VarBindings)>, qvars : &mut VarBindings, timer : Timer) -> Option<()> {
+    if timer.is_done() {
+        return None;
+    }
+
     match sexp {
         SExp::BExp(bop, sexps) => {
             let name = vng.get_name(Sort::Bool());
             let sec = SExp::BExp(bop.clone(), sexps.clone());
             bavs.push((name, sec, qvars.clone()));
             for sexp in sexps {
-                bav_se(&mut *sexp.borrow_mut(), vng, bavs, qvars);
+                bav_se(&mut *sexp.borrow_mut(), vng, bavs, qvars, timer.clone())?;
             }
+            Some(())
         }
         SExp::Compound(sexps) => {
             for sexp in sexps {
-                bav_se(&mut *sexp.borrow_mut(), vng, bavs, qvars);
+                bav_se(&mut *sexp.borrow_mut(), vng, bavs, qvars, timer.clone())?;
             }
+            Some(())
         }
         SExp::Let(_, _) => panic!("Let statments should be filtered out!"),
         SExp::QForAll(vbs, rest) => {
             qvars.extend(vbs.clone());
-            bav_se(&mut *rest.borrow_mut(), vng, bavs, qvars);
+            bav_se(&mut *rest.borrow_mut(), vng, bavs, qvars, timer.clone())?;
             qvars.truncate(qvars.len() - vbs.len());
+            Some(())
         },
-        _ => (),
+        _ => Some(()),
     }
 }
 
