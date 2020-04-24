@@ -174,7 +174,7 @@ pub fn to_skel(script: &mut Script) -> Result<Vec<String>, ()> {
 
 pub fn rl(script: &mut Script, scoped_vars: &mut BTreeMap<String, Vec<SExp>>) -> Result<(), ()> {
     let timer = Timer::new();
-    timer.start(Duration::from_secs(10));
+    timer.start(Duration::from_secs(30));
     match script {
         Script::Commands(cmds) => {
             for cmd in cmds.iter_mut() {
@@ -320,7 +320,7 @@ fn rc_se(sexp: &mut SExp, vng: &mut VarNameGenerator) {
 
 pub fn bav(script: &mut Script, vng: &mut VarNameGenerator,
            bava: &mut Vec<(String, SExp, VarBindings)>) -> Option<()> {
-    let timer = Timer::new_started(Duration::from_secs(10));
+    let timer = Timer::new_started(Duration::from_secs(30));
     let mut qvars = vec![];
     match script {
         Script::Commands(cmds) => {
