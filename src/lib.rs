@@ -110,7 +110,7 @@ impl StageComplete {
 
 pub fn exec() {
     let q = SegQueue::new();
-    for entry in WalkDir::new("test")
+    for entry in WalkDir::new("samples")
             .into_iter()
             .filter_map(Result::ok)
             .filter(|e| !e.file_type().is_dir()) {
@@ -133,7 +133,7 @@ pub fn exec() {
     let baq = ArrayQueue::new(100);
     let a_baq = Arc::new(baq);
 
-    const STACK_SIZE: usize = 20 * 1024 * 1024; // 20mb
+    const STACK_SIZE: usize = 100 * 1024 * 1024; // 100mb
     let handles = (0..2).map(|_| {
              let t_q = Arc::clone(&aq);
              let t_q2 = Arc::clone(&aq2);
