@@ -4,6 +4,8 @@ extern crate rand;
 extern crate rand_core;
 extern crate rand_xoshiro;
 extern crate walkdir;
+extern crate serde;
+extern crate serde_lexpr;
 
 #[macro_use]
 pub mod ast;
@@ -41,8 +43,8 @@ use std::time::Duration;
 use std::thread::JoinHandle;
 
 type InputPPQ = Arc<SegQueue<Result<PathBuf, PoisonPill>>>;
-type SkeletonQueue = Arc<SegQueue<(PathBuf, Vec<String>)>>;
-type BavAssingedQ = Arc<ArrayQueue<(PathBuf, Vec<String>)>>;
+type SkeletonQueue = Arc<SegQueue<PathBuf>>;
+type BavAssingedQ = Arc<ArrayQueue<PathBuf>>;
 type StageCompleteA = Arc<StageComplete>;
 
 pub struct Timer {
@@ -97,6 +99,10 @@ impl StageComplete {
         }
     }
 
+    fn finished() -> Self {
+        StageComplete::new(0)
+    }
+
     fn finish(&self) {
        let mut guard = self.number_workers_finished.lock().unwrap();
        *guard = *guard + 1;
@@ -106,6 +112,64 @@ impl StageComplete {
        let guard = self.number_workers_finished.lock().unwrap();
        *guard == self.total_workers
     }
+}
+
+pub fn from_skels() {
+    let stage1 = Arc::new(StageComplete::finished());
+
+    let q2 = SegQueue::new();
+    for entry in WalkDir::new(".")
+            .into_iter()
+            .filter_map(Result::ok)
+            .filter(|e| !e.file_type().is_dir())
+            .filter(|e| e.file_name()
+                            .to_str()
+                            .map(|s| s.starts_with("skel"))
+                            .unwrap_or(false)) {
+
+                let filepath = entry.into_path();
+                println!("push {:?}", filepath);
+                q2.push(filepath);
+    }
+
+    let aq2 = Arc::new(q2);
+    let num_stage2_workers = 2;
+    let stage2 = Arc::new(StageComplete::new(num_stage2_workers));
+
+    let baq = ArrayQueue::new(100);
+    let a_baq = Arc::new(baq);
+
+    const STACK_SIZE: usize = 100 * 1024 * 1024; // 100mb
+
+    let bav_handles = (0..2).map(|_| {
+             let t_q2 = Arc::clone(&aq2);
+             let t_baq= Arc::clone(&a_baq);
+             let t_s1 = Arc::clone(&stage1);
+             let t_s2 = Arc::clone(&stage2);
+
+             thread::Builder::new()
+                .stack_size(STACK_SIZE)
+                .spawn(|| bav_assign_worker(t_q2, t_s1, t_baq, t_s2))
+    }).collect::<Vec<std::io::Result<JoinHandle<()>>>>();
+
+    let solver_handles = (0..2).map(|_| {
+             let t_baq= Arc::clone(&a_baq);
+             let t_s2 = Arc::clone(&stage2);
+
+             thread::Builder::new()
+                .stack_size(STACK_SIZE)
+                .spawn(|| solver_worker(t_baq, t_s2))
+    }).collect::<Vec<std::io::Result<JoinHandle<()>>>>();
+
+    for h in bav_handles {
+        h.unwrap().join().unwrap();
+    }
+
+    for h in solver_handles {
+        h.unwrap().join().unwrap();
+    }
+
+    println!("Queue lengths {} {}", aq2.len(), a_baq.len());
 }
 
 pub fn exec() {
@@ -198,15 +262,13 @@ fn mutator_worker(qin : InputPPQ, qout : SkeletonQueue, stage : StageCompleteA) 
         match strip_and_transform(&filepath) {
             Some((script, bavns)) => {
                 let skel_name = get_new_name(&filepath, "skel");
-                let contents = match script.to_string_dfltto() {
-                    Some(contents) => contents,
-                    None => continue,
-                };
 
-                fs::write(&skel_name[..], contents)
-                    .unwrap_or(());
-                let mut to_push =(Path::new(&skel_name[..]).to_path_buf(), bavns);
-                qout.push(to_push);
+                let to_push = Path::new(&skel_name).to_path_buf();
+                match serialize_to_f(&to_push.as_path(), &script, &bavns) {
+                    Ok(_) => qout.push(to_push),
+                    Err(_) => continue,
+                }
+
             },
             None => continue,
         }
@@ -215,11 +277,12 @@ fn mutator_worker(qin : InputPPQ, qout : SkeletonQueue, stage : StageCompleteA) 
     stage.finish();
 }
 
+
 fn bav_assign_worker(qin : SkeletonQueue, prev_stage : StageCompleteA, qout : BavAssingedQ, stage : StageCompleteA) {
     let backoff = Backoff::new();
 
     while !prev_stage.is_complete() || qin.len() > 0 {
-        let (filepath, bavns) = match qin.pop() {
+        let filepath = match qin.pop() {
             Ok(item) => item,
             Err(_) => {
                 backoff.snooze();
@@ -227,27 +290,35 @@ fn bav_assign_worker(qin : SkeletonQueue, prev_stage : StageCompleteA, qout : Ba
             }
         };
 
+        let (script, bavns) = match deserialize_from_f(&filepath) {
+            Ok(deserial) => deserial,
+            Err(_) => continue,
+        };
 
-        match solve(filepath.to_str().unwrap()) {
+        let empty_skel_name = get_new_name(&filepath, "empty");
+        let mut empty_skel = PathBuf::new();
+        empty_skel.push(&empty_skel_name);
+        fs::write(&empty_skel_name[..], script.to_string_dfltto().unwrap())
+                .unwrap_or(());
+
+        match solve(&empty_skel_name) {
             SolveResult::Error | SolveResult::ProcessError => {
                 fs::remove_file(filepath).unwrap_or(());
+                fs::remove_file(empty_skel).unwrap_or(());
             },
             SolveResult::ErrorBug =>
-                report_bug(filepath.as_path(), SolveResult::ErrorBug),
+                report_bug(empty_skel.as_path(), SolveResult::ErrorBug),
             SolveResult::SoundnessBug =>
-                report_bug(filepath.as_path(), SolveResult::SoundnessBug),
-            _ => { add_iterations_to_q(filepath.as_path(), bavns, Arc::clone(&qout)); () },
+                report_bug(empty_skel.as_path(), SolveResult::SoundnessBug),
+            _ => { add_iterations_to_q(script, bavns, &filepath, Arc::clone(&qout)); () },
         }
     }
 
     stage.finish();
 }
 
-fn add_iterations_to_q(filepath : &Path, bavns : Vec<String>, qout : BavAssingedQ) -> Option<()> {
+fn add_iterations_to_q(mut script : Script, bavns : Vec<String>, filepath : &Path, qout : BavAssingedQ) -> Option<()> {
     let backoff = Backoff::new();
-    let contents = fs::read_to_string(filepath).ok()?;
-    let stripped = rmv_comments(&contents[..]).ok()?.1.join(" ");
-    let mut script = script(&stripped[..]).ok()?.1;
 
     let eip = end_insert_pt(&script);
     script.init(eip);
@@ -259,13 +330,14 @@ fn add_iterations_to_q(filepath : &Path, bavns : Vec<String>, qout : BavAssinged
     while let Some(truth_values) = urng.sample() {
         let new_filename = get_iter_fileout_name(filepath, urng.get_count());
         script.replace(eip, get_bav_assign(&bavns, truth_values));
-        let contents = match script.to_string_dfltto() {
-            Some(contents) => contents,
-            None => continue,
-        };
-        fs::write(&new_filename, contents).unwrap_or(());
 
-        let mut to_push = (Path::new(&new_filename[..]).to_path_buf(), bavns.clone());
+        let mut to_push = Path::new(&new_filename[..]).to_path_buf();
+
+        match serialize_to_f(&to_push, &script, &bavns) {
+            Ok(_) => (),
+            Err(_) => continue,
+        }
+
         while let Err(PushError(reject)) = qout.push(to_push) {
             to_push = reject;
             backoff.snooze();
@@ -287,19 +359,44 @@ fn get_new_name(source_file : &PathBuf, prefix : &str) -> String {
     prefix.to_owned() + "_" + source_filename
 }
 
+fn serialize_to_f(filepath : &Path, script : &Script, bavns : &Vec<String>) -> Result<(),()> {
+        let contents = serde_lexpr::to_string(&(&script, &bavns))
+            .map_err(|_| ())?;
+        fs::write(filepath, contents)
+            .map_err(|_| ())?;
+        Ok(())
+}
+
+fn deserialize_from_f(filepath : &Path) -> Result<(Script, Vec<String>), ()> {
+        let contents = fs::read_to_string(&filepath)
+            .map_err(|_| ())?;
+        serde_lexpr::from_str(&contents)
+            .map_err(|_| ())
+}
+
 pub struct PoisonPill {}
 
 fn solver_worker(qin : BavAssingedQ, prev_stage : StageCompleteA) {
     let backoff = Backoff::new();
 
     while !prev_stage.is_complete() || qin.len() > 0 {
-        let (filepath, _bavns) = match qin.pop() {
+        let filepath = match qin.pop() {
             Ok(item) => item,
             Err(_) => {
                 backoff.snooze();
                 continue;
             }
         };
+
+        let (script, _) = match deserialize_from_f(&filepath) {
+            Ok(deserial) => deserial,
+            Err(_) => continue,
+        };
+
+        let final_name = get_new_name(&filepath, "final");
+        let filepath = Path::new(&final_name).to_path_buf();
+        fs::write(&filepath, script.to_string_dfltto().unwrap())
+                .unwrap_or(());
 
         println!("Checking file {:?}", filepath);
         let outcome = solve(filepath.to_str().unwrap_or("defaultname"));

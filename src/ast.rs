@@ -2,6 +2,8 @@ use std::cell::RefCell;
 use std::rc::Rc;
 use crate::Timer;
 use std::time::Duration;
+#[macro_use]
+use serde::{Serialize, Deserialize};
 
 pub type ScriptRc = Rc<RefCell<Script>>;
 pub type CommandRc = Rc<RefCell<Command>>;
@@ -19,12 +21,12 @@ macro_rules! rccell {
     }};
 }
 
-#[derive(Debug, Eq, PartialEq, Clone)]
+#[derive(Serialize, Deserialize, Debug, Eq, PartialEq, Clone)]
 pub enum Script {
     Commands(Vec<CommandRc>),
 }
 
-#[derive(Debug, Eq, PartialEq, Clone)]
+#[derive(Serialize, Deserialize, Debug, Eq, PartialEq, Clone)]
 pub enum Command {
     Logic(LogicRc),
     CheckSat(),
@@ -35,7 +37,7 @@ pub enum Command {
     Generic(String),
 }
 
-#[derive(Debug, Eq, PartialEq, Clone)]
+#[derive(Serialize, Deserialize, Debug, Eq, PartialEq, Clone)]
 pub enum Sort {
     UInt(),
     Dec(),
@@ -47,7 +49,7 @@ pub enum Sort {
     Compound(Vec<SortRc>),
 }
 
-#[derive(Debug, Eq, PartialEq, Clone)]
+#[derive(Serialize, Deserialize, Debug, Eq, PartialEq, Clone)]
 pub enum SExp {
     Compound(Vec<SExpRc>),
     Let(Vec<(SymbolRc, SExpRc)>, SExpBoxRc),
@@ -57,14 +59,14 @@ pub enum SExp {
     Symbol(SymbolRc),
 }
 
-#[derive(Debug, Eq, PartialEq, Clone)]
+#[derive(Serialize, Deserialize, Debug, Eq, PartialEq, Clone)]
 pub enum Symbol {
     Var(String), // Currently, it is hard to detect all variables, so some Tokens may also be
     // variables too
     Token(String),
 }
 
-#[derive(Debug, Eq, PartialEq, Clone)]
+#[derive(Serialize, Deserialize, Debug, Eq, PartialEq, Clone)]
 pub enum BoolOp {
     Equals(),
     And(),
@@ -78,7 +80,7 @@ pub enum BoolOp {
     Lte(),
 }
 
-#[derive(Debug, Eq, PartialEq, Clone)]
+#[derive(Serialize, Deserialize, Debug, Eq, PartialEq, Clone)]
 pub enum Constant {
     UInt(String),
     Dec(String),
@@ -89,13 +91,13 @@ pub enum Constant {
 }
 
 #[allow(non_camel_case_types)]
-#[derive(Debug, Eq, PartialEq, Clone)]
+#[derive(Serialize, Deserialize, Debug, Eq, PartialEq, Clone)]
 pub enum Logic {
     QF_SLIA(),
     Other(String),
 }
 
-#[derive(Debug, Eq, PartialEq)]
+#[derive(Serialize, Deserialize, Debug, Eq, PartialEq, Clone)]
 pub enum AstNode {
     Script(ScriptRc),
     Command(CommandRc),
