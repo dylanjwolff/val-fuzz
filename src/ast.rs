@@ -113,7 +113,6 @@ pub enum AstNode {
 
 impl Script {
     pub fn to_string_dfltto(&self) -> Option<String> {
-        println!("starting tostring");
         self.to_string(Timer::new_started(Duration::from_secs(30)))
     }
 

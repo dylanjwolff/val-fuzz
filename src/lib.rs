@@ -360,18 +360,25 @@ fn get_new_name(source_file : &PathBuf, prefix : &str) -> String {
 }
 
 fn serialize_to_f(filepath : &Path, script : &Script, bavns : &Vec<String>) -> Result<(),()> {
-        let contents = serde_lexpr::to_string(&(&script, &bavns))
+        match { let contents = serde_lexpr::to_string(&(&script, &bavns))
             .map_err(|_| ())?;
         fs::write(filepath, contents)
-            .map_err(|_| ())?;
-        Ok(())
+            .map_err(|_| ())?; 
+        Ok(()) } {
+            Ok(r) => Ok(r),
+            Err(()) => Err(println!("serial error file {:?}",filepath)),
+        }
 }
 
 fn deserialize_from_f(filepath : &Path) -> Result<(Script, Vec<String>), ()> {
-        let contents = fs::read_to_string(&filepath)
+        match { let contents = fs::read_to_string(&filepath)
             .map_err(|_| ())?;
         serde_lexpr::from_str(&contents)
             .map_err(|_| ())
+        } {
+            Ok(r) => Ok(r),
+            Err(e) => Err(println!("serial error file {:?}",filepath)),
+        }
 }
 
 pub struct PoisonPill {}
@@ -403,8 +410,9 @@ fn solver_worker(qin : BavAssingedQ, prev_stage : StageCompleteA) {
         match outcome {
             SolveResult::ErrorBug | SolveResult::SoundnessBug =>
                 report_bug(filepath.as_path(), outcome),
-            _ => fs::remove_file(filepath).unwrap_or(()),
+            _ => fs::remove_file(&filepath).unwrap_or(()),
         }
+        println!("Done hecking file {:?}", &filepath);
     }
 
 
