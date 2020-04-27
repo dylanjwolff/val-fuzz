@@ -43,8 +43,8 @@ use std::time::Duration;
 use std::thread::JoinHandle;
 
 type InputPPQ = Arc<SegQueue<Result<PathBuf, PoisonPill>>>;
-type SkeletonQueue = Arc<SegQueue<PathBuf>>;
-type BavAssingedQ = Arc<ArrayQueue<PathBuf>>;
+type SkeletonQueue = Arc<SegQueue<(PathBuf, PathBuf)>>;
+type BavAssingedQ = Arc<ArrayQueue<(PathBuf, PathBuf)>>;
 type StageCompleteA = Arc<StageComplete>;
 
 pub struct Timer {
@@ -124,12 +124,12 @@ pub fn from_skels() {
             .filter(|e| !e.file_type().is_dir())
             .filter(|e| e.file_name()
                             .to_str()
-                            .map(|s| s.starts_with("skel"))
+                            .map(|s| s.starts_with("skel") || s.starts_with("bavns"))
                             .unwrap_or(false)) {
 
                 let filepath = entry.into_path();
                 println!("push {:?}", filepath);
-                q2.push(filepath);
+                q2.push((filepath.clone(), filepath));
     }
 
     let aq2 = Arc::new(q2);
@@ -139,7 +139,7 @@ pub fn from_skels() {
     let baq = ArrayQueue::new(100);
     let a_baq = Arc::new(baq);
 
-    const STACK_SIZE: usize = 100 * 1024 * 1024; // 100mb
+    const STACK_SIZE: usize = 500 * 1024 * 1024; // 100mb
 
     let bav_handles = (0..2).map(|_| {
              let t_q2 = Arc::clone(&aq2);
@@ -197,7 +197,7 @@ pub fn exec() {
     let baq = ArrayQueue::new(100);
     let a_baq = Arc::new(baq);
 
-    const STACK_SIZE: usize = 100 * 1024 * 1024; // 100mb
+    const STACK_SIZE: usize = 500 * 1024 * 1024; // 100mb
     let handles = (0..2).map(|_| {
              let t_q = Arc::clone(&aq);
              let t_q2 = Arc::clone(&aq2);
@@ -219,7 +219,7 @@ pub fn exec() {
                 .spawn(|| bav_assign_worker(t_q2, t_s1, t_baq, t_s2))
     }).collect::<Vec<std::io::Result<JoinHandle<()>>>>();
 
-    let solver_handles = (0..2).map(|_| {
+    let solver_handles = (0..8).map(|_| {
              let t_baq= Arc::clone(&a_baq);
              let t_s2 = Arc::clone(&stage2);
 
@@ -245,7 +245,6 @@ pub fn exec() {
 
 fn mutator_worker(qin : InputPPQ, qout : SkeletonQueue, stage : StageCompleteA) {
     let backoff = Backoff::new();
-
     let mut stage_finished = false;
     while !stage_finished {
         let filepath = match qin.pop() {
@@ -258,20 +257,21 @@ fn mutator_worker(qin : InputPPQ, qout : SkeletonQueue, stage : StageCompleteA) 
             Err(_) => { backoff.snooze(); continue; },
         };
 
+        println!("Begin file {:?}", filepath);
         backoff.reset();
         match strip_and_transform(&filepath) {
             Some((script, bavns)) => {
                 let skel_name = get_new_name(&filepath, "skel");
 
-                let to_push = Path::new(&skel_name).to_path_buf();
-                match serialize_to_f(&to_push.as_path(), &script, &bavns) {
-                    Ok(_) => qout.push(to_push),
+                let skel_file = Path::new(&skel_name).to_path_buf();
+                match serialize_to_f(&skel_file.as_path(), &script, &bavns) {
+                    Ok(to_push) => qout.push(to_push),
                     Err(_) => continue,
                 }
-
             },
             None => continue,
         }
+        println!("End file {:?}", filepath);
     }
 
     stage.finish();
@@ -282,7 +282,7 @@ fn bav_assign_worker(qin : SkeletonQueue, prev_stage : StageCompleteA, qout : Ba
     let backoff = Backoff::new();
 
     while !prev_stage.is_complete() || qin.len() > 0 {
-        let filepath = match qin.pop() {
+        let filepaths = match qin.pop() {
             Ok(item) => item,
             Err(_) => {
                 backoff.snooze();
@@ -290,27 +290,27 @@ fn bav_assign_worker(qin : SkeletonQueue, prev_stage : StageCompleteA, qout : Ba
             }
         };
 
-        let (script, bavns) = match deserialize_from_f(&filepath) {
+        let (script, bavns) = match deserialize_from_f(&filepaths) {
             Ok(deserial) => deserial,
-            Err(_) => continue,
+            Err(e) => {println!("baw deserial err: {}", e); continue},
         };
 
-        let empty_skel_name = get_new_name(&filepath, "empty");
-        let mut empty_skel = PathBuf::new();
-        empty_skel.push(&empty_skel_name);
-        fs::write(&empty_skel_name[..], script.to_string_dfltto().unwrap())
-                .unwrap_or(());
+        // TODO below
+        let empty_skel_name =  &filepaths.0
+                                .file_name()
+                                .and_then(|s| s.to_str())
+                                .unwrap();
 
-        match solve(&empty_skel_name) {
+        match solve(empty_skel_name) {
             SolveResult::Error | SolveResult::ProcessError => {
-                fs::remove_file(filepath).unwrap_or(());
-                fs::remove_file(empty_skel).unwrap_or(());
+                fs::remove_file(filepaths.0).unwrap_or(());
+                fs::remove_file(filepaths.1).unwrap_or(());
             },
             SolveResult::ErrorBug =>
-                report_bug(empty_skel.as_path(), SolveResult::ErrorBug),
+                report_bug(filepaths.0.as_path(), SolveResult::ErrorBug),
             SolveResult::SoundnessBug =>
-                report_bug(empty_skel.as_path(), SolveResult::SoundnessBug),
-            _ => { add_iterations_to_q(script, bavns, &filepath, Arc::clone(&qout)); () },
+                report_bug(filepaths.0.as_path(), SolveResult::SoundnessBug),
+            _ => { add_iterations_to_q(script, bavns, &filepaths.0, Arc::clone(&qout)); () },
         }
     }
 
@@ -333,10 +333,10 @@ fn add_iterations_to_q(mut script : Script, bavns : Vec<String>, filepath : &Pat
 
         let mut to_push = Path::new(&new_filename[..]).to_path_buf();
 
-        match serialize_to_f(&to_push, &script, &bavns) {
-            Ok(_) => (),
+        let mut to_push = match serialize_to_f(&to_push, &script, &bavns) {
+            Ok(tp) => tp,
             Err(_) => continue,
-        }
+        };
 
         while let Err(PushError(reject)) = qout.push(to_push) {
             to_push = reject;
@@ -351,7 +351,7 @@ fn report_bug(file : &Path, kind : SolveResult) {
     println!("{:?} bug in {} !!!", kind, file.to_str().unwrap_or("defaultname"));
 }
 
-fn get_new_name(source_file : &PathBuf, prefix : &str) -> String {
+fn get_new_name(source_file : &Path, prefix : &str) -> String {
     let source_filename = match source_file.file_name().and_then(|n| n.to_str()) {
         Some(name) => name,
         None => "unknown",
@@ -359,26 +359,44 @@ fn get_new_name(source_file : &PathBuf, prefix : &str) -> String {
     prefix.to_owned() + "_" + source_filename
 }
 
-fn serialize_to_f(filepath : &Path, script : &Script, bavns : &Vec<String>) -> Result<(),()> {
-        match { let contents = serde_lexpr::to_string(&(&script, &bavns))
-            .map_err(|_| ())?;
-        fs::write(filepath, contents)
-            .map_err(|_| ())?; 
-        Ok(()) } {
-            Ok(r) => Ok(r),
-            Err(()) => Err(println!("serial error file {:?}",filepath)),
-        }
+fn serialize_to_f(based_off_of : &Path, script : &Script, bavns : &Vec<String>)
+    -> Result<(PathBuf, PathBuf),()> {
+    let bavns_name = get_new_name(based_off_of, "bavns");
+    let script_name = get_new_name(based_off_of, "script");
+    let bavns_file = Path::new(&bavns_name);
+    let script_file = Path::new(&script_name);
+
+    match {
+        let bavns_serial = serde_lexpr::to_string(&bavns).map_err(|_| ())?;
+        let script_serial = script.to_string_dfltto().ok_or(())?;
+
+        fs::write(bavns_file, bavns_serial).map_err(|_| ())?;
+        fs::write(script_file, script_serial).map_err(|_| ())?;
+        Ok((script_file.to_path_buf(), bavns_file.to_path_buf()))
+    } {
+        Ok(r) => Ok(r),
+        Err(()) => Err(println!("serial error file {:?}", based_off_of)),
+    }
 }
 
-fn deserialize_from_f(filepath : &Path) -> Result<(Script, Vec<String>), ()> {
-        match { let contents = fs::read_to_string(&filepath)
-            .map_err(|_| ())?;
-        serde_lexpr::from_str(&contents)
-            .map_err(|_| ())
-        } {
-            Ok(r) => Ok(r),
-            Err(e) => Err(println!("serial error file {:?}",filepath)),
-        }
+fn deserialize_from_f((script_file, bavns_file) : &(PathBuf, PathBuf)) -> Result<(Script, Vec<String>), String> {
+    let script_contents = fs::read_to_string(&script_file)
+        .map_err(|e| e.to_string() + " from IO")?;
+    let presult = script(&script_contents)
+        .map_err(|e| e.to_string() + " from parsing")?;
+
+    if presult.0 != "" {
+        Err("Incomplete Parse!".to_owned())
+    } else {
+        let script = presult.1;
+
+        let bavns_contents = fs::read_to_string(&bavns_file)
+            .map_err(|e| e.to_string() + " from bavn IO")?;
+        let bavns = serde_lexpr::from_str(&bavns_contents)
+            .map_err(|e| e.to_string() + " from serde")?;
+
+        Ok((script, bavns))
+    }
 }
 
 pub struct PoisonPill {}
@@ -387,7 +405,7 @@ fn solver_worker(qin : BavAssingedQ, prev_stage : StageCompleteA) {
     let backoff = Backoff::new();
 
     while !prev_stage.is_complete() || qin.len() > 0 {
-        let filepath = match qin.pop() {
+        let filepaths = match qin.pop() {
             Ok(item) => item,
             Err(_) => {
                 backoff.snooze();
@@ -395,27 +413,20 @@ fn solver_worker(qin : BavAssingedQ, prev_stage : StageCompleteA) {
             }
         };
 
-        let (script, _) = match deserialize_from_f(&filepath) {
+        let (script, _) = match deserialize_from_f(&filepaths) {
             Ok(deserial) => deserial,
-            Err(_) => continue,
+            Err(e) => { println!("solver deserial err: {}", e); continue},
         };
 
-        let final_name = get_new_name(&filepath, "final");
-        let filepath = Path::new(&final_name).to_path_buf();
-        fs::write(&filepath, script.to_string_dfltto().unwrap())
-                .unwrap_or(());
-
-        println!("Checking file {:?}", filepath);
-        let outcome = solve(filepath.to_str().unwrap_or("defaultname"));
+        println!("Checking file {:?}", filepaths.0);
+        let outcome = solve(filepaths.0.to_str().unwrap_or("defaultname"));
         match outcome {
             SolveResult::ErrorBug | SolveResult::SoundnessBug =>
-                report_bug(filepath.as_path(), outcome),
-            _ => fs::remove_file(&filepath).unwrap_or(()),
+                report_bug(filepaths.0.as_path(), outcome),
+            _ => fs::remove_file(&filepaths.0).unwrap_or(()),
         }
-        println!("Done hecking file {:?}", &filepath);
+        println!("Done hecking file {:?}", &filepaths.0);
     }
-
-
 }
 
 #[allow(unused)]
