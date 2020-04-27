@@ -124,12 +124,20 @@ pub fn from_skels() {
             .filter(|e| !e.file_type().is_dir())
             .filter(|e| e.file_name()
                             .to_str()
-                            .map(|s| s.starts_with("skel") || s.starts_with("bavns"))
+                            .map(|s| s.starts_with("bavns_skel"))
                             .unwrap_or(false)) {
 
-                let filepath = entry.into_path();
-                println!("push {:?}", filepath);
-                q2.push((filepath.clone(), filepath));
+                let metad_path = entry.into_path();
+                let script_path = match script_f_from_metadata_f(&metad_path) {
+                    Ok(r) => r,
+                    Err(e) => { 
+                        println!("can't find script for {:?} error: {}", metad_path, e);
+                        continue 
+                    },
+                };
+
+                println!("push {:?}", metad_path);
+                q2.push((script_path, metad_path));
     }
 
     let aq2 = Arc::new(q2);
@@ -367,7 +375,7 @@ fn serialize_to_f(based_off_of : &Path, script : &Script, bavns : &Vec<String>)
     let script_file = Path::new(&script_name);
 
     match {
-        let bavns_serial = serde_lexpr::to_string(&bavns).map_err(|_| ())?;
+        let bavns_serial = serde_lexpr::to_string(&(&bavns, &script_name)).map_err(|_| ())?;
         let script_serial = script.to_string_dfltto().ok_or(())?;
 
         fs::write(bavns_file, bavns_serial).map_err(|_| ())?;
@@ -392,11 +400,39 @@ fn deserialize_from_f((script_file, bavns_file) : &(PathBuf, PathBuf)) -> Result
 
         let bavns_contents = fs::read_to_string(&bavns_file)
             .map_err(|e| e.to_string() + " from bavn IO")?;
-        let bavns = serde_lexpr::from_str(&bavns_contents)
+        let (bavns, _) : (Vec<String>, PathBuf) = serde_lexpr::from_str(&bavns_contents)
             .map_err(|e| e.to_string() + " from serde")?;
 
         Ok((script, bavns))
     }
+}
+
+fn deserialize_from_metadata_f(bavns_file : &PathBuf) -> Result<(Script, Vec<String>), String> {
+    let bavns_contents = fs::read_to_string(&bavns_file)
+            .map_err(|e| e.to_string() + " from bavn IO")?;
+    let (bavns, script_file) : (Vec<String>, PathBuf) = serde_lexpr::from_str(&bavns_contents)
+            .map_err(|e| e.to_string() + " from serde")?;
+
+    let script_contents = fs::read_to_string(&script_file)
+        .map_err(|e| e.to_string() + " from IO")?;
+    let presult = script(&script_contents)
+        .map_err(|e| e.to_string() + " from parsing")?;
+
+    if presult.0 != "" {
+        Err("Incomplete Parse!".to_owned())
+    } else {
+        let script = presult.1;
+        Ok((script, bavns))
+    }
+}
+
+fn script_f_from_metadata_f(bavns_file : &PathBuf) -> Result<PathBuf, String> {
+    let bavns_contents = fs::read_to_string(&bavns_file)
+            .map_err(|e| e.to_string() + " from bavn IO")?;
+    let (_, script_file) : (Vec<String>, PathBuf) = serde_lexpr::from_str(&bavns_contents)
+            .map_err(|e| e.to_string() + " from serde")?;
+
+    Ok(script_file)
 }
 
 pub struct PoisonPill {}
