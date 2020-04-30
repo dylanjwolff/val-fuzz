@@ -1,5 +1,7 @@
 extern crate itertools;
+#[allow(unused)]
 extern crate nom;
+extern crate pfmt;
 extern crate rand;
 extern crate rand_core;
 extern crate rand_xoshiro;
@@ -14,14 +16,32 @@ pub mod parser;
 pub mod solver;
 pub mod transforms;
 
-#[allow(unused)]
 use ast::Script;
 use bit_vec::BitVec;
 use crossbeam::queue::ArrayQueue;
 use crossbeam::queue::PushError;
 use crossbeam::queue::SegQueue;
 use crossbeam::utils::Backoff;
+use nom::branch::alt;
+use nom::bytes::complete::take_until;
+use nom::bytes::complete::take_while;
+use nom::bytes::complete::take_while1;
+use nom::character::complete::char;
+use nom::character::complete::digit1;
+use nom::character::complete::hex_digit1;
+use nom::character::complete::line_ending;
+use nom::character::complete::multispace0;
+use nom::character::complete::not_line_ending;
+use nom::combinator::not;
+use nom::combinator::peek;
+use nom::multi::many0;
+use nom::multi::many1;
+use nom::number::complete::recognize_float;
+use nom::sequence::delimited;
+use nom::sequence::preceded;
+use nom::{bytes::complete::tag, combinator::map, sequence::tuple, IResult};
 use parser::{rmv_comments, script};
+use pfmt::{Fmt, FormatTable};
 use rand::Rng;
 use rand_xoshiro::rand_core::SeedableRng;
 use solver::solve;
@@ -605,6 +625,34 @@ fn get_iter_fileout_name(source_file: &Path, iter: u32) -> String {
     (iter).to_string() + "_" + source_filename
 }
 
+fn dynamic_format<'a, 'b>(
+    (s, mut vs): (&'a str, Vec<&'a str>),
+) -> IResult<(&'a str, Vec<&'a str>), Vec<&'a str>> {
+    let replace = |(s, mut vs): (&'a str, Vec<&'a str>)| {
+        tag("{}")(s)
+            .map_err(|e| match e {
+                nom::Err::Incomplete(n) => nom::Err::Incomplete(n),
+                nom::Err::Error((i, ek)) => nom::Err::Error(((i, vs.clone()), ek)),
+                nom::Err::Failure((i, ek)) => nom::Err::Failure(((i, vs.clone()), ek)),
+            })
+            .map(|(i, _o)| {
+                let v = vs.pop().unwrap_or("");
+                ((i, vs), v)
+            })
+    };
+
+    let keep = |(s, vs): (&'a str, Vec<&'a str>)| {
+        take_until("{}")(s)
+            .map_err(|e| match e {
+                nom::Err::Incomplete(n) => nom::Err::Incomplete(n),
+                nom::Err::Error((i, ek)) => nom::Err::Error(((i, vs.clone()), ek)),
+                nom::Err::Failure((i, ek)) => nom::Err::Failure(((i, vs.clone()), ek)),
+            })
+            .map(|(i, o)| ((i, vs), o))
+    };
+    many0(alt((replace, keep)))((s, vs))
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -613,6 +661,12 @@ mod tests {
     use std::thread;
 
     const STACK_SIZE: usize = 20 * 1024 * 1024;
+
+    #[test]
+    fn pfmt() {
+        let bv = BitVec::from_elem(2, true).iter().collect::<Vec<bool>>();
+        println!("{:?}", dynamic_format(("{}asdf{}", vec!["stitute", "sub"])))
+    }
 
     #[test]
     fn parse_unparse_test() {
