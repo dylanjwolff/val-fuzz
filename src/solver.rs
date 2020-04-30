@@ -72,7 +72,6 @@ fn solve_z3(z3path: &str, filename: &str) -> SolveResult {
 
     match z3mrs {
         Ok((z3_succ, z3_out, z3_err)) => {
-            println!("s: {} o: {} e: {}", z3_succ, z3_out, z3_err);
             if is_timeout(&z3_out, &z3_err) {
                 SolveResult::Timeout
             } else if is_bug_error(&z3_out, &z3_err) {
@@ -144,6 +143,7 @@ pub fn solve(filename: &str) -> SolveResult {
         (SolveResult::Error, _) | (_, SolveResult::Error) => SolveResult::Error,
         (SolveResult::Sat, _) | (_, SolveResult::Sat) => SolveResult::Sat,
         (SolveResult::Unsat, _) | (_, SolveResult::Unsat) => SolveResult::Unsat,
+        (SolveResult::Timeout, _) | (_, SolveResult::Timeout) => SolveResult::Timeout,
         _ => SolveResult::Unknown,
     }
 }
