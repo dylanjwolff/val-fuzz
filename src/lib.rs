@@ -1,7 +1,6 @@
 extern crate itertools;
 #[allow(unused)]
 extern crate nom;
-extern crate pfmt;
 extern crate rand;
 extern crate rand_core;
 extern crate rand_xoshiro;
@@ -41,7 +40,6 @@ use nom::sequence::delimited;
 use nom::sequence::preceded;
 use nom::{bytes::complete::tag, combinator::map, sequence::tuple, IResult};
 use parser::{rmv_comments, script};
-use pfmt::{Fmt, FormatTable};
 use rand::Rng;
 use rand_xoshiro::rand_core::SeedableRng;
 use solver::solve;
@@ -625,7 +623,7 @@ fn get_iter_fileout_name(source_file: &Path, iter: u32) -> String {
     (iter).to_string() + "_" + source_filename
 }
 
-fn dynamic_format<'a, 'b>(
+fn dynamic_format_parser<'a, 'b>(
     (s, mut vs): (&'a str, Vec<&'a str>),
 ) -> IResult<(&'a str, Vec<&'a str>), Vec<&'a str>> {
     let replace = |(s, mut vs): (&'a str, Vec<&'a str>)| {
@@ -653,6 +651,18 @@ fn dynamic_format<'a, 'b>(
     many0(alt((replace, keep)))((s, vs))
 }
 
+type DFormatParseError<'a> = nom::Err<((&'a str, std::vec::Vec<&'a str>), nom::error::ErrorKind)>;
+fn dyn_fmt<'a>(s: &'a str, mut vs: Vec<&'a str>) -> Result<String, DFormatParseError<'a>> {
+    vs.reverse();
+    let (rem, ss) = dynamic_format_parser((s, vs))?;
+    let cap = ss.iter().map(|s| s.len()).sum();
+    let mut v = Vec::with_capacity(cap);
+    for s in ss {
+        v.extend_from_slice(s.as_bytes());
+    }
+    unsafe { Ok(String::from_utf8_unchecked(v)) }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -663,9 +673,11 @@ mod tests {
     const STACK_SIZE: usize = 20 * 1024 * 1024;
 
     #[test]
-    fn pfmt() {
-        let bv = BitVec::from_elem(2, true).iter().collect::<Vec<bool>>();
-        println!("{:?}", dynamic_format(("{}asdf{}", vec!["stitute", "sub"])))
+    fn dfmt() {
+        assert_eq!(
+            dyn_fmt("{} asdf {}", vec!["sub", "stitute"]).unwrap(),
+            "sub asdf stitute"
+        );
     }
 
     #[test]
