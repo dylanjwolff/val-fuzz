@@ -1,13 +1,11 @@
-use crate::ast::{
-    AstNode, BoolOp, Command, Constant, SExp, Script, Logic, Sort, Symbol,
-};
-use crate::ast::{CommandRc, SExpRc, SymbolRc, SortRc};
-use crate::parser::{script};
-use bit_vec::BitVec;
-use std::iter::once;
-use std::collections::BTreeMap;
-use std::rc::Rc;
+use crate::ast::{AstNode, BoolOp, Command, Constant, Logic, SExp, Script, Sort, Symbol};
+use crate::ast::{CommandRc, SExpRc, SortRc, SymbolRc};
+use crate::parser::script;
 use crate::Timer;
+use bit_vec::BitVec;
+use std::collections::BTreeMap;
+use std::iter::once;
+use std::rc::Rc;
 use std::time::Duration;
 
 pub struct VarNameGenerator {
@@ -33,13 +31,12 @@ impl VarNameGenerator {
     }
 }
 
-fn set_logic_all(script : &mut Script) {
+fn set_logic_all(script: &mut Script) {
     let Script::Commands(cmds) = script;
-    let maybe_log_pos = cmds.iter()
+    let maybe_log_pos = cmds
+        .iter()
         .find(|cmd| cmd.borrow().is_logic())
-        .map(|cmd|
-             cmd.replace(Command::Logic(rccell!(Logic::Other("ALL".to_owned()))))
-         );
+        .map(|cmd| cmd.replace(Command::Logic(rccell!(Logic::Other("ALL".to_owned())))));
 }
 
 fn init_vars(script: &mut Script, vars: Vec<(String, Sort)>) {
@@ -93,14 +90,15 @@ fn add_ba(script: &mut Script, bavs: Vec<(String, SExp, VarBindings)>) {
         )
     });
 
-//    cmds.insert(cs_pos, rccell!(assert_many(&mut baveq_iter)));
+    //    cmds.insert(cs_pos, rccell!(assert_many(&mut baveq_iter)));
     let mut end = cmds.split_off(cs_pos);
     cmds.append(&mut many_assert(&mut baveq_iter));
     cmds.append(&mut end);
 }
 
 fn many_assert(iter: &mut dyn Iterator<Item = SExp>) -> Vec<CommandRc> {
-    iter.map(|bexp| rccell!(Command::Assert(rccell!(bexp)))).collect()
+    iter.map(|bexp| rccell!(Command::Assert(rccell!(bexp))))
+        .collect()
 }
 
 fn assert_many(iter: &mut dyn Iterator<Item = SExp>) -> Command {
@@ -147,6 +145,20 @@ pub fn get_bav_assign(bavns: &Vec<String>, ta: BitVec) -> Command {
     assert_many(&mut baveq)
 }
 
+pub fn get_bav_assign_fmt_str(bavns: &Vec<String>) -> Command {
+    let mut baveq = bavns.into_iter().map(|vname| {
+        SExp::BExp(
+            rccell!(BoolOp::Equals()),
+            vec![
+                rccell!(SExp::Symbol(rccell!(Symbol::Var(vname.clone())))),
+                rccell!(SExp::Symbol(rccell!(Symbol::Token("{}".to_owned())))),
+            ],
+        )
+    });
+
+    assert_many(&mut baveq)
+}
+
 /// returns the Boolean Abstract Variables added as vector of their names
 pub fn to_skel(script: &mut Script) -> Result<Vec<String>, ()> {
     let mut vng = VarNameGenerator::new("GEN");
@@ -185,7 +197,11 @@ pub fn rl(script: &mut Script, scoped_vars: &mut BTreeMap<String, Vec<SExp>>) ->
     }
 }
 
-fn rl_c(cmd: &mut Command, scoped_vars: &mut BTreeMap<String, Vec<SExp>>, timer : &Timer) -> Result<(),()> {
+fn rl_c(
+    cmd: &mut Command,
+    scoped_vars: &mut BTreeMap<String, Vec<SExp>>,
+    timer: &Timer,
+) -> Result<(), ()> {
     if timer.is_done() {
         return Err(());
     }
@@ -198,7 +214,11 @@ fn rl_c(cmd: &mut Command, scoped_vars: &mut BTreeMap<String, Vec<SExp>>, timer 
     }
 }
 
-fn rl_s(sexp: &mut SExp, scoped_vars: &mut BTreeMap<String, Vec<SExp>>, timer : &Timer) -> Result<(), ()> {
+fn rl_s(
+    sexp: &mut SExp,
+    scoped_vars: &mut BTreeMap<String, Vec<SExp>>,
+    timer: &Timer,
+) -> Result<(), ()> {
     if timer.is_done() {
         return Err(());
     }
@@ -296,8 +316,8 @@ fn rc_se(sexp: &mut SExp, vng: &mut VarNameGenerator) {
                 Constant::Dec(_) => Sort::Dec(),
                 Constant::Str(_) => Sort::Str(),
                 Constant::Bool(_) => Sort::Bool(),
-                Constant::Bin(bit_s)  => Sort::BitVec(bit_s.len() as u32),
-                Constant::Hex(hit_s) => Sort::BitVec((hit_s.len() as u32)*4),
+                Constant::Bin(bit_s) => Sort::BitVec(bit_s.len() as u32),
+                Constant::Hex(hit_s) => Sort::BitVec((hit_s.len() as u32) * 4),
             };
             let name = vng.get_name(sort);
             *sexp = SExp::Symbol(rccell!(Symbol::Var(name)));
@@ -306,20 +326,23 @@ fn rc_se(sexp: &mut SExp, vng: &mut VarNameGenerator) {
             for sexp in sexps {
                 rc_se(&mut *sexp.borrow_mut(), vng)
             }
-        },
+        }
         SExp::Let(vbs, rest) => {
             for (_, sexp) in vbs {
                 rc_se(&mut *sexp.borrow_mut(), vng)
             }
             rc_se(&mut *rest.borrow_mut(), vng);
-        },
+        }
         SExp::QForAll(_, rest) => rc_se(&mut *rest.borrow_mut(), vng),
         _ => (),
     }
 }
 
-pub fn bav(script: &mut Script, vng: &mut VarNameGenerator,
-           bava: &mut Vec<(String, SExp, VarBindings)>) -> Option<()> {
+pub fn bav(
+    script: &mut Script,
+    vng: &mut VarNameGenerator,
+    bava: &mut Vec<(String, SExp, VarBindings)>,
+) -> Option<()> {
     let timer = Timer::new_started(Duration::from_secs(30));
     let mut qvars = vec![];
     match script {
@@ -334,10 +357,15 @@ pub fn bav(script: &mut Script, vng: &mut VarNameGenerator,
 
 type VarBindings = Vec<(SymbolRc, SortRc)>;
 
-fn bav_c(cmd: &mut Command, vng: &mut VarNameGenerator,
-         bava: &mut Vec<(String, SExp, VarBindings)>, qvars : &mut VarBindings, timer : Timer) -> Option<()> {
+fn bav_c(
+    cmd: &mut Command,
+    vng: &mut VarNameGenerator,
+    bava: &mut Vec<(String, SExp, VarBindings)>,
+    qvars: &mut VarBindings,
+    timer: Timer,
+) -> Option<()> {
     if timer.is_done() {
-        return None
+        return None;
     }
     match cmd {
         Command::Assert(sexp) | Command::CheckSatAssuming(sexp) => {
@@ -347,8 +375,13 @@ fn bav_c(cmd: &mut Command, vng: &mut VarNameGenerator,
     }
 }
 
-fn bav_se(sexp: &mut SExp, vng: &mut VarNameGenerator,
-          bavs: &mut Vec<(String, SExp, VarBindings)>, qvars : &mut VarBindings, timer : Timer) -> Option<()> {
+fn bav_se(
+    sexp: &mut SExp,
+    vng: &mut VarNameGenerator,
+    bavs: &mut Vec<(String, SExp, VarBindings)>,
+    qvars: &mut VarBindings,
+    timer: Timer,
+) -> Option<()> {
     if timer.is_done() {
         return None;
     }
@@ -375,7 +408,7 @@ fn bav_se(sexp: &mut SExp, vng: &mut VarNameGenerator,
             bav_se(&mut *rest.borrow_mut(), vng, bavs, qvars, timer.clone())?;
             qvars.truncate(qvars.len() - vbs.len());
             Some(())
-        },
+        }
         _ => Some(()),
     }
 }
@@ -426,7 +459,7 @@ fn get_children(node: &AstNode) -> Vec<AstNode> {
                 astns.push(AstNode::Close());
                 astns.push(AstNode::SExp(rccell!(*(s.borrow()).clone())));
                 astns.into_iter().rev().collect()
-            },
+            }
             SExp::QForAll(vs, s) => {
                 let mut astns = vs.iter().fold(vec![AstNode::Open()], |mut asts, (vr, vl)| {
                     asts.push(AstNode::Open());
@@ -472,10 +505,18 @@ pub trait Visitor {
     fn exit(&mut self, node: &AstNode);
 }
 
-
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn bav_fmt_str() {
+        println!(
+            "{:?}",
+            get_bav_assign_fmt_str(&vec!["BAV1".to_owned(), "BAV2".to_owned()])
+                .to_string(Timer::new())
+        );
+    }
 
     #[test]
     fn bav_qual() {
@@ -490,14 +531,14 @@ mod tests {
         let Script::Commands(mut cmds) = p;
 
         let assertion_cmd = cmds.last().unwrap();
-        match & *assertion_cmd.borrow() {
+        match &*assertion_cmd.borrow() {
             Command::Assert(s) => match &*s.borrow() {
                 SExp::BExp(v, rest) => match &*rest[1].borrow() {
                     SExp::QForAll(v, rest) => assert!(v.len() > 0),
                     _ => panic!("inner should be qual"),
-                }
+                },
                 _ => panic!("Assert should be BExp"),
-            }
+            },
             _ => panic!("No assert!"),
         };
     }

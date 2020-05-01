@@ -33,11 +33,14 @@ use nom::character::complete::multispace0;
 use nom::character::complete::not_line_ending;
 use nom::combinator::not;
 use nom::combinator::peek;
+use nom::eof;
 use nom::multi::many0;
 use nom::multi::many1;
+use nom::named;
 use nom::number::complete::recognize_float;
 use nom::sequence::delimited;
 use nom::sequence::preceded;
+use nom::sequence::terminated;
 use nom::{bytes::complete::tag, combinator::map, sequence::tuple, IResult};
 use parser::{rmv_comments, script};
 use rand::Rng;
@@ -55,7 +58,7 @@ use std::sync::Mutex;
 use std::thread;
 use std::thread::JoinHandle;
 use std::time::Duration;
-use transforms::{end_insert_pt, get_bav_assign, to_skel};
+use transforms::{end_insert_pt, get_bav_assign, get_bav_assign_fmt_str, to_skel};
 use walkdir::WalkDir;
 
 type InputPPQ = Arc<SegQueue<Result<PathBuf, PoisonPill>>>;
@@ -382,6 +385,7 @@ fn add_iterations_to_q(
 
     let eip = end_insert_pt(&script);
     script.init(eip);
+    script.replace(eip, get_bav_assign_fmt_str(&bavns));
 
     let num_bavs = bavns.len();
     const MAX_ITER: u32 = 1;
@@ -622,7 +626,8 @@ fn get_iter_fileout_name(source_file: &Path, iter: u32) -> String {
     };
     (iter).to_string() + "_" + source_filename
 }
-
+use nom::error::ErrorKind;
+use nom::error_position;
 fn dynamic_format_parser<'a, 'b>(
     (s, mut vs): (&'a str, Vec<&'a str>),
 ) -> IResult<(&'a str, Vec<&'a str>), Vec<&'a str>> {
@@ -648,19 +653,37 @@ fn dynamic_format_parser<'a, 'b>(
             })
             .map(|(i, o)| ((i, vs), o))
     };
-    many0(alt((replace, keep)))((s, vs))
+
+    many1(alt((replace, keep)))((s, vs)).map(|(i, mut o)| {
+        o.push(i.0); // if there are no more {}, push the rest of the str
+        (("", i.1), o)
+    })
 }
 
+fn eof_str<'a>(s: &'a str) -> IResult<&'a str, &'a str> {
+    if s.len() == 0 {
+        Ok(("", ""))
+    } else {
+        Err(nom::Err::Error(error_position!(s, ErrorKind::Eof)))
+    }
+}
 type DFormatParseError<'a> = nom::Err<((&'a str, std::vec::Vec<&'a str>), nom::error::ErrorKind)>;
 fn dyn_fmt<'a>(s: &'a str, mut vs: Vec<&'a str>) -> Result<String, DFormatParseError<'a>> {
     vs.reverse();
     let (rem, ss) = dynamic_format_parser((s, vs))?;
+    println!("rem {:?}", rem);
     let cap = ss.iter().map(|s| s.len()).sum();
     let mut v = Vec::with_capacity(cap);
     for s in ss {
         v.extend_from_slice(s.as_bytes());
     }
     unsafe { Ok(String::from_utf8_unchecked(v)) }
+}
+
+fn to_strs(bv: &BitVec) -> Vec<&'static str> {
+    bv.iter()
+        .map(|b| if b { "true" } else { "false" })
+        .collect::<Vec<&str>>()
 }
 
 #[cfg(test)]
@@ -673,10 +696,23 @@ mod tests {
     const STACK_SIZE: usize = 20 * 1024 * 1024;
 
     #[test]
+    fn bv_replace() {
+        let fmt_str = get_bav_assign_fmt_str(&vec!["BAV1".to_owned()])
+            .to_string(Timer::new())
+            .unwrap();
+        println!("{}", fmt_str);
+        let bv = BitVec::from_elem(1, true);
+        assert_eq!(
+            dyn_fmt(&fmt_str, to_strs(&bv)).unwrap(),
+            "(assert (= BAV1 true))"
+        );
+    }
+
+    #[test]
     fn dfmt() {
         assert_eq!(
-            dyn_fmt("{} asdf {}", vec!["sub", "stitute"]).unwrap(),
-            "sub asdf stitute"
+            dyn_fmt("{} asdf {}!", vec!["sub", "stitute"]).unwrap(),
+            "sub asdf stitute!"
         );
     }
 
