@@ -366,7 +366,7 @@ fn bav_assign_worker(
                 report_bug(filepaths.0.as_path(), SolveResult::SoundnessBug)
             }
             SolveResult::Sat | SolveResult::Unsat | SolveResult::Unknown => {
-                add_iterations_to_q(script, bavns, &filepaths.0, Arc::clone(&qout));
+                add_iterations_to_q(script, bavns, &filepaths.0, &filepaths.1, Arc::clone(&qout));
                 ()
             }
         }
@@ -379,6 +379,7 @@ fn add_iterations_to_q(
     mut script: Script,
     bavns: Vec<String>,
     filepath: &Path,
+    bavn_fp: &Path,
     qout: BavAssingedQ,
 ) -> Option<()> {
     let backoff = Backoff::new();
@@ -386,6 +387,7 @@ fn add_iterations_to_q(
     let eip = end_insert_pt(&script);
     script.init(eip);
     script.replace(eip, get_bav_assign_fmt_str(&bavns));
+    let script_str = script.to_string_dfltto()?;
 
     let num_bavs = bavns.len();
     const MAX_ITER: u32 = 1;
@@ -393,15 +395,11 @@ fn add_iterations_to_q(
     let mut urng = RandUniqPermGen::new_definite(num_bavs, MAX_ITER);
     while let Some(truth_values) = urng.sample() {
         let new_filename = get_iter_fileout_name(filepath, urng.get_count());
-        script.replace(eip, get_bav_assign(&bavns, truth_values));
+        let new_file = Path::new(&new_filename[..]).to_path_buf();
 
-        let mut to_push = Path::new(&new_filename[..]).to_path_buf();
-
-        let mut to_push = match serialize_to_f(&to_push, &script, &bavns) {
-            Ok(tp) => tp,
-            Err(_) => continue,
-        };
-
+        let str_with_model = dyn_fmt(&script_str, to_strs(&truth_values)).ok()?;
+        fs::write(&new_file, str_with_model).ok()?;
+        let mut to_push = (new_file.to_path_buf(), bavn_fp.to_path_buf());
         while let Err(PushError(reject)) = qout.push(to_push) {
             to_push = reject;
             backoff.snooze();
@@ -531,8 +529,8 @@ fn solver_worker(qin: BavAssingedQ, prev_stage: StageCompleteA) {
                 fs::remove_file(&filepaths.1).unwrap_or(());
             }
             _ => {
-                fs::remove_file(&filepaths.0).unwrap_or(());
-                fs::remove_file(&filepaths.1).unwrap_or(());
+                // fs::remove_file(&filepaths.0).unwrap_or(());
+                // fs::remove_file(&filepaths.1).unwrap_or(());
             }
         }
         println!("Done hecking file {:?}", &filepaths.0);
