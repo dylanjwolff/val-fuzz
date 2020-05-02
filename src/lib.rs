@@ -343,7 +343,7 @@ fn bav_assign_worker(
         let (script, bavns) = match deserialize_from_f(&filepaths) {
             Ok(deserial) => deserial,
             Err(e) => {
-                println!("baw deserial err: {}", e);
+                println!("baw deserial err in {:?}: {}", filepaths, e);
                 continue;
             }
         };
@@ -390,7 +390,7 @@ fn add_iterations_to_q(
     let script_str = script.to_string_dfltto()?;
 
     let num_bavs = bavns.len();
-    const MAX_ITER: u32 = 1;
+    const MAX_ITER: u32 = 1000;
     println!("starting max(2^{}, {}) iterations", num_bavs, MAX_ITER);
     let mut urng = RandUniqPermGen::new_definite(num_bavs, MAX_ITER);
     while let Some(truth_values) = urng.sample() {
@@ -512,7 +512,7 @@ fn solver_worker(qin: BavAssingedQ, prev_stage: StageCompleteA) {
         let (script, _) = match deserialize_from_f(&filepaths) {
             Ok(deserial) => deserial,
             Err(e) => {
-                println!("solver deserial err: {}", e);
+                println!("solver deserial err from {:?}: {}", filepaths, e);
                 continue;
             }
         };
@@ -526,11 +526,10 @@ fn solver_worker(qin: BavAssingedQ, prev_stage: StageCompleteA) {
             SolveResult::Timeout => {
                 println!("Timeout on file {:?}", filepaths.0);
                 fs::remove_file(&filepaths.0).unwrap_or(());
-                fs::remove_file(&filepaths.1).unwrap_or(());
+                // no need to remove metadata file, as there is only one per seed right now
             }
             _ => {
                 fs::remove_file(&filepaths.0).unwrap_or(());
-                fs::remove_file(&filepaths.1).unwrap_or(());
             }
         }
         println!("Done hecking file {:?}", &filepaths.0);
@@ -554,7 +553,7 @@ impl RandUniqPermGen {
     fn new_definite(numbits: usize, maxiter: u32) -> Self {
         let buf = BitVec::from_elem(numbits, false).to_bytes();
         let seen = BTreeSet::new();
-        let rng = Xoshiro256Plus::seed_from_u64(99990);
+        let rng = Xoshiro256Plus::seed_from_u64(9281);
 
         let true_max = if (maxiter as f64).log2() < (numbits as f64) {
             maxiter
@@ -669,7 +668,6 @@ type DFormatParseError<'a> = nom::Err<((&'a str, std::vec::Vec<&'a str>), nom::e
 fn dyn_fmt<'a>(s: &'a str, mut vs: Vec<&'a str>) -> Result<String, DFormatParseError<'a>> {
     vs.reverse();
     let (rem, ss) = dynamic_format_parser((s, vs))?;
-    println!("rem {:?}", rem);
     let cap = ss.iter().map(|s| s.len()).sum();
     let mut v = Vec::with_capacity(cap);
     for s in ss {
