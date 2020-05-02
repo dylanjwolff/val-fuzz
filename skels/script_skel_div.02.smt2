@@ -1,0 +1,8 @@
+(set-logic ALL)
+(declare-const GEN1 Int)
+(declare-const BAV2 Bool)
+(set-info :smt-lib-version 2.0)
+(declare-fun n () Int)
+(assert (distinct (div n n) GEN1))
+(assert (= BAV2 (distinct (div n n) GEN1)))
+(check-sat)

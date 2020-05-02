@@ -1,0 +1,5 @@
+(set-logic ALL)
+(declare-fun a () (_ BitVec 8))
+(declare-fun b () (_ BitVec 8))
+(assert (bvult (bvmul a b) (bvudiv a b)))
+(check-sat)

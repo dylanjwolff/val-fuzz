@@ -1,0 +1,7 @@
+(set-logic ALL)
+(declare-const BAV1 Bool)
+(declare-fun a () (Array Int Int))
+(declare-fun b () (Array Int Int))
+(assert (= a b))
+(assert (= BAV1 (= a b)))
+(check-sat)

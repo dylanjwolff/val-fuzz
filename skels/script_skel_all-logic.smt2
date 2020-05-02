@@ -1,0 +1,7 @@
+(set-logic ALL)
+(declare-const GEN1 Real)
+(declare-const BAV2 Bool)
+(declare-fun x () Real)
+(assert (< (* x x) GEN1))
+(assert (= BAV2 (< (* x x) GEN1)))
+(check-sat)

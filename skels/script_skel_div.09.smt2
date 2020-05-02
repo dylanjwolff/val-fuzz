@@ -1,0 +1,8 @@
+(set-logic ALL)
+(declare-const GEN1 Int)
+(declare-const BAV2 Bool)
+(set-info :status unknown)
+(declare-fun n () Real)
+(assert (= (/ n n) GEN1))
+(assert (= BAV2 (= (/ n n) GEN1)))
+(check-sat)

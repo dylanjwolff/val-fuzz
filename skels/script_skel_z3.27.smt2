@@ -1,0 +1,8 @@
+(set-option :auto-config true)
+(set-option :produce-models true)
+(simplify (bvor #x6 #x3))
+(simplify (bvand #x6 #x3))
+(simplify (bvnot #x6))
+(simplify (bvnand #x6 #x3))
+(simplify (bvnor #x6 #x3))
+(simplify (bvxnor #x6 #x3))

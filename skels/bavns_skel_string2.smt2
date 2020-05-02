@@ -1,0 +1,1 @@
+#(("BAV6") "script_skel_string2.smt2")

@@ -1,0 +1,6 @@
+(set-option :produce-models true)
+(set-logic ALL)
+(declare-sort us_image 0)
+(declare-sort || 0)
+(check-sat)
+(get-model)

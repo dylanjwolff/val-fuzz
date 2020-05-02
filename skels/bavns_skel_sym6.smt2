@@ -1,0 +1,1 @@
+#(("BAV4" "BAV5" "BAV6" "BAV7" "BAV8" "BAV9") "script_skel_sym6.smt2")

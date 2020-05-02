@@ -1,0 +1,7 @@
+(set-logic ALL)
+(declare-const BAV1 Bool)
+(declare-fun x () (Set Real))
+(declare-fun y () (Set Real))
+(assert (not (= x y)))
+(assert (= BAV1 (= x y)))
+(check-sat)

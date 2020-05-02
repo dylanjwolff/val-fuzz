@@ -1,0 +1,8 @@
+(set-logic ALL)
+(declare-const GEN1 Int)
+(declare-const GEN2 Int)
+(declare-const GEN3 Int)
+(declare-const BAV4 Bool)
+(assert (= (div GEN1 (- GEN2)) (- GEN3)))
+(assert (= BAV4 (= (div GEN1 (- GEN2)) (- GEN3))))
+(check-sat)

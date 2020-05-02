@@ -1,0 +1,7 @@
+(set-logic ALL)
+(declare-const BAV1 Bool)
+(declare-fun a () (_ BitVec 4))
+(declare-fun b () (_ BitVec 4))
+(assert (forall ((x (_ BitVec 4))) (not (= (bvurem x a) b))))
+(assert (= BAV1 (forall ((x (_ BitVec 4))) (= (bvurem x a) b))))
+(check-sat)

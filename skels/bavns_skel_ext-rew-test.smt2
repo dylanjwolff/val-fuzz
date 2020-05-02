@@ -1,0 +1,1 @@
+#(() "script_skel_ext-rew-test.smt2")

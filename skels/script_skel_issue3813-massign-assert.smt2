@@ -1,0 +1,8 @@
+(set-logic ALL)
+(declare-const GEN1 Int)
+(declare-const BAV2 Bool)
+(declare-fun a () (Array Int Bool))
+(declare-fun b () (Array Int Bool))
+(assert (= a (store b GEN1 true)))
+(assert (= BAV2 (= a (store b GEN1 true))))
+(check-sat)

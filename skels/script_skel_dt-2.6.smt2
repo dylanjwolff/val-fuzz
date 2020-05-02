@@ -1,0 +1,11 @@
+(set-logic ALL)
+(declare-const BAV1 Bool)
+(declare-datatypes ((IntList 0)) (
+((empty) (insert ( head Int ) ( tail IntList ) ))
+))
+(declare-fun x () IntList)
+(declare-fun y () IntList)
+(declare-fun z () IntList)
+(assert (distinct x y z))
+(assert (= BAV1 (distinct x y z)))
+(check-sat)

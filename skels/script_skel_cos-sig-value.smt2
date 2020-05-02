@@ -1,0 +1,8 @@
+(set-logic ALL)
+(declare-const GEN1 Real)
+(declare-const GEN2 Real)
+(declare-const BAV3 Bool)
+(declare-fun x () Real)
+(assert (not (= (cos GEN1) GEN2)))
+(assert (= BAV3 (= (cos GEN1) GEN2)))
+(check-sat)

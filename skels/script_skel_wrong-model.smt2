@@ -1,0 +1,8 @@
+(set-logic ALL)
+(declare-const BAV1 Bool)
+(declare-const r RoundingMode)
+(declare-const x (_ FloatingPoint 5 11))
+(declare-const y (_ FloatingPoint 5 11))
+(assert (not (= (fp.isSubnormal x) false)))
+(assert (= BAV1 (= (fp.isSubnormal x) false)))
+(check-sat)

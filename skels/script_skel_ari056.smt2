@@ -1,0 +1,6 @@
+(set-logic ALL)
+(declare-const GEN1 Int)
+(declare-const BAV2 Bool)
+(assert (forall ((X Int)) (= X GEN1)))
+(assert (= BAV2 (forall ((X Int)) (= X GEN1))))
+(check-sat)

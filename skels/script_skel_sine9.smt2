@@ -1,0 +1,8 @@
+(set-info :source |Written by D. B. Staple for Stack Overflow question 37711933.|)
+(declare-const GEN1 Real)
+(declare-const BAV2 Bool)
+(set-info :status unknown)
+(declare-fun x () Real)
+(assert (< (sin x) GEN1))
+(assert (= BAV2 (< (sin x) GEN1)))
+(check-sat)

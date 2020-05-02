@@ -1,0 +1,8 @@
+(set-logic ALL)
+(declare-const GEN1 Int)
+(declare-const GEN2 Int)
+(declare-const BAV3 Bool)
+(define-funs-rec ((is-even ((x Int)) Int) (is-odd ((y Int)) Int)) ((ite (= x 0) 1 (ite (= (is-odd (- x 1)) 0) 1 0)) (ite (= y 0) 0 (ite (= (is-even (- y 1)) 0) 1 0))))
+(assert (= (is-even GEN1) GEN2))
+(assert (= BAV3 (= (is-even GEN1) GEN2)))
+(check-sat)

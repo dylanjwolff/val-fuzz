@@ -1,0 +1,1 @@
+#(("BAV6" "BAV7" "BAV8") "script_skel_bvmul-pow2-only.smt2")

@@ -1,0 +1,1 @@
+#(("BAV9" "BAV10" "BAV11" "BAV12") "script_skel_sin1-sat.smt2")

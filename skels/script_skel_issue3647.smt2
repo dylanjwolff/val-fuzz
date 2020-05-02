@@ -1,0 +1,7 @@
+(set-logic ALL)
+(declare-const GEN1 Real)
+(declare-const GEN2 Real)
+(declare-const BAV3 Bool)
+(assert (distinct (sin GEN1) GEN2))
+(assert (= BAV3 (distinct (sin GEN1) GEN2)))
+(check-sat)

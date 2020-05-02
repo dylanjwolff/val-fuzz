@@ -1,0 +1,7 @@
+(set-logic ALL)
+(push 1)
+(assert false)
+(check-sat)
+(pop 1)
+(assert false)
+(check-sat)

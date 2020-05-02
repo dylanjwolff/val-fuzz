@@ -1,0 +1,8 @@
+(set-logic ALL)
+(declare-const GEN1 Int)
+(declare-const BAV2 Bool)
+(declare-datatype MyList (par (T) ((nelem) (cons (hd T) (tl (MyList T))))))
+(declare-fun a () (MyList Int))
+(assert (> (hd a) GEN1))
+(assert (= BAV2 (> (hd a) GEN1)))
+(check-sat)

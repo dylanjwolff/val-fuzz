@@ -1,0 +1,5 @@
+(set-logic ALL)
+(declare-fun a () Int)
+(declare-fun b () Int)
+(declare-fun c () Int)
+(get-qe-disjunct (exists ((x Int)) (and (<= a x) (or (<= x b) (<= x c)))))

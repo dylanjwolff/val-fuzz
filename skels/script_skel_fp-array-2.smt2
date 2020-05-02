@@ -1,0 +1,7 @@
+(set-info :source |Handcrafted by Christoph M. Wintersteiger (cwinter@microsoft.com).|)
+(declare-const GEN1 Int)
+(declare-const GEN2 Int)
+(declare-fun A () (Array Int (_ FloatingPoint 11 53)))
+(assert (fp.eq (select A GEN1) (select A GEN2)))
+(check-sat)
+(exit)

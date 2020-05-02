@@ -1,0 +1,8 @@
+(set-logic ALL)
+(declare-const GEN1 Int)
+(declare-const BAV2 Bool)
+(declare-fun x () String)
+(assert (= (str.len x) GEN1))
+(assert (= BAV2 (= (str.len x) GEN1)))
+(check-sat)
+(get-value (x))

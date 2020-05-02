@@ -1,0 +1,8 @@
+(set-logic ALL)
+(declare-const GEN1 Int)
+(declare-const GEN2 Int)
+(declare-const GEN3 Int)
+(declare-const BAV4 Bool)
+(assert (forall ((U Int)(V Int)) (not (= (* GEN1 U) (+ GEN2 (* (- GEN3) V))))))
+(assert (= BAV4 (forall ((U Int)(V Int)) (= (* GEN1 U) (+ GEN2 (* (- GEN3) V))))))
+(check-sat)

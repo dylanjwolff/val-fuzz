@@ -1,0 +1,12 @@
+(set-option :produce-models true)
+(set-logic ALL)
+(set-info :smt-lib-version 2.5)
+(declare-datatypes () (
+    (StringRotation (StringRotation$C_StringRotation (StringRotation$C_StringRotation$sr String)))
+    (StringRotation2 (StringRotation2$C_StringRotation2 (StringRotation2$C_StringRotation2$sr1 StringRotation) (StringRotation2$C_StringRotation2$sr2 StringRotation)))
+) )
+(define-fun f1005$isValid_string((x$$1008 String)) Bool true)
+(define-fun f1035$isValid_StringRotation((x$$1038 StringRotation)) Bool (and (f1005$isValid_string (StringRotation$C_StringRotation$sr x$$1038)) (or (or (or (= (StringRotation$C_StringRotation$sr x$$1038) "0 deg") (= (StringRotation$C_StringRotation$sr x$$1038) "90 deg")) (= (StringRotation$C_StringRotation$sr x$$1038) "180 deg")) (= (StringRotation$C_StringRotation$sr x$$1038) "270 deg"))))
+(define-fun f1121$isValid_StringRotation2((x$$1124 StringRotation2)) Bool (and (f1035$isValid_StringRotation (StringRotation2$C_StringRotation2$sr1 x$$1124)) (f1035$isValid_StringRotation (StringRotation2$C_StringRotation2$sr2 x$$1124))))
+(declare-fun $OutSR$1356$3$1$() StringRotation2)
+(assert (f1121$isValid_StringRotation2 $OutSR$1356$3$1$))

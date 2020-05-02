@@ -1,0 +1,5 @@
+(declare-const x Real)
+(declare-const GEN1 Int)
+(assert (is_int x))
+(assert (not (is_int (+ x GEN1))))
+(check-sat)

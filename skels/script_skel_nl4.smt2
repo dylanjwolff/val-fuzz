@@ -1,0 +1,6 @@
+(declare-const x1 Real)
+(declare-const GEN1 Real)
+(declare-const BAV2 Bool)
+(assert (< (* x1 x1) GEN1))
+(assert (= BAV2 (< (* x1 x1) GEN1)))
+(check-sat)

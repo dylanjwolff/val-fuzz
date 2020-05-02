@@ -1,0 +1,7 @@
+(set-logic ALL)
+(declare-const BAV1 Bool)
+(declare-fun a () (_ BitVec 32))
+(declare-fun b () (_ BitVec 32))
+(assert (not (= (bvmul a b) (bvmul (bvneg a) (bvneg b)))))
+(assert (= BAV1 (= (bvmul a b) (bvmul (bvneg a) (bvneg b)))))
+(check-sat)

@@ -1,0 +1,1 @@
+#(("BAV2") "script_skel_pow2-bool.smt2")

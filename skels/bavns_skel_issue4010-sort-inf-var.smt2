@@ -1,0 +1,1 @@
+#(() "script_skel_issue4010-sort-inf-var.smt2")

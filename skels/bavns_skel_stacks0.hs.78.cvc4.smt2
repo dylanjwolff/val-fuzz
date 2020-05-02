@@ -1,0 +1,1 @@
+#(() "script_skel_stacks0.hs.78.cvc4.smt2")

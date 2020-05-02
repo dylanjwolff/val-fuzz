@@ -1,0 +1,8 @@
+(set-option :auto-config true)
+(declare-const BAV1 Bool)
+(set-option :produce-models true)
+(declare-const x (_ BitVec 64))
+(declare-const y (_ BitVec 64))
+(assert (not (= (bvand (bvnot x) (bvnot y)) (bvnot (bvor x y)))))
+(assert (= BAV1 (= (bvand (bvnot x) (bvnot y)) (bvnot (bvor x y)))))
+(check-sat)

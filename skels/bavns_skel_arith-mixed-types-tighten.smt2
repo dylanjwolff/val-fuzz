@@ -1,0 +1,1 @@
+#(("BAV20" "BAV21" "BAV22" "BAV23" "BAV24" "BAV25" "BAV26" "BAV27" "BAV28" "BAV29") "script_skel_arith-mixed-types-tighten.smt2")

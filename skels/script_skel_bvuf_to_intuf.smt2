@@ -1,0 +1,8 @@
+(set-logic ALL)
+(declare-const BAV1 Bool)
+(declare-fun a () (_ BitVec 4))
+(declare-fun b () (_ BitVec 4))
+(declare-fun f ((_ BitVec 4)) (_ BitVec 4) )
+(assert (distinct (bvadd a b) (f a)))
+(assert (= BAV1 (distinct (bvadd a b) (f a))))
+(check-sat)

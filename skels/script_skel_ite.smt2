@@ -1,0 +1,8 @@
+(set-logic ALL)
+(declare-const BAV1 Bool)
+(declare-sort U 0)
+(declare-fun x () U)
+(declare-fun y () U)
+(assert (not (= x (ite true x y))))
+(assert (= BAV1 (= x (ite true x y))))
+(check-sat)
