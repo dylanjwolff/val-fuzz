@@ -14,6 +14,7 @@ def in_bin(commit):
 
 def z3(commit):
     def build(commit):
+        os.system("cd .solvers/z3; git checkout master; git pull;")
         if os.system("cd .solvers/z3; git checkout " + commit) != 0: raise "not a commit"
         os.system("cd .solvers/z3; rm -rf .solvers/z3/build")
         os.system("cd .solvers/z3; python scripts/mk_make.py; ./configure -d; cd build; make -j 4")
@@ -25,6 +26,7 @@ def z3(commit):
 
 def cvc4(commit):
     def build(commit):
+        os.system("cd .solvers/cvc4; git checkout master; git pull;")
         if os.system("cd .solvers/cvc4; git checkout " + commit) != 0: raise "not a commit"
         os.system("cd .solvers/cvc4; rm -rf .solvers/cvc4/build")
         os.system("cd .solvers/cvc4; ./contrib/get-antlr-3.4; ./configure.sh --assertions; cd build; make -j 4")
