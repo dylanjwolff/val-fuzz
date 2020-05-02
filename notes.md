@@ -1,11 +1,14 @@
-* Split into three parts:
-1) can we execute skeleton without truth values under both (without error?)?
-2) take known non-error files and try to solve for constants
-3) solve the original with the new constants
-* What to do with non-fatal errors?
-* TODO
-1) Sequence terminated early
-2) Comment directives?
-3) BitVec index vs Int
-4) z3 doesnt understand incremental, cvc4 needs it sometimes
+@IDEAS
 
+1. Feed model back in as constants
+2. Record SAT UNSAT Timeout Error Bug results for small iterations ~100 
+    Are we getting tons of UNSAT or tons of SAT?
+        -> if formulae are consistently either, then maybe they are trivial
+3. Use abstract domains as additional model restrictions
+4. Measure code coverage
+5. Lazily make constants holes only when BAM is UNSAT for the current constants
+6. For UNSAT, find minimal unsatisfiable set of BAM, forbid them from future iterations
+
+2nd May:
+    Do (2) and maybe start on (1)?
+    Alternatively, can do more manual testing...

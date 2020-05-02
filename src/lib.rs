@@ -529,8 +529,8 @@ fn solver_worker(qin: BavAssingedQ, prev_stage: StageCompleteA) {
                 fs::remove_file(&filepaths.1).unwrap_or(());
             }
             _ => {
-                // fs::remove_file(&filepaths.0).unwrap_or(());
-                // fs::remove_file(&filepaths.1).unwrap_or(());
+                fs::remove_file(&filepaths.0).unwrap_or(());
+                fs::remove_file(&filepaths.1).unwrap_or(());
             }
         }
         println!("Done hecking file {:?}", &filepaths.0);
