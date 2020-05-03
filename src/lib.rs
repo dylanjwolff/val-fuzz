@@ -686,7 +686,7 @@ fn to_strs(bv: &BitVec) -> Vec<&'static str> {
 mod tests {
     use super::*;
     use std::fs;
-    use std::path::PathBuf;
+    
     use std::thread;
 
     const STACK_SIZE: usize = 20 * 1024 * 1024;

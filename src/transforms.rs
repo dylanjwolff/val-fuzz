@@ -529,13 +529,13 @@ mod tests {
         bav(&mut p, &mut vng, &mut bavs);
         add_ba(&mut p, bavs);
 
-        let Script::Commands(mut cmds) = p;
+        let Script::Commands(cmds) = p;
 
         let assertion_cmd = cmds.last().unwrap();
         match &*assertion_cmd.borrow() {
             Command::Assert(s) => match &*s.borrow() {
-                SExp::BExp(v, rest) => match &*rest[1].borrow() {
-                    SExp::QForAll(v, rest) => assert!(v.len() > 0),
+                SExp::BExp(_v, rest) => match &*rest[1].borrow() {
+                    SExp::QForAll(v, _rest) => assert!(v.len() > 0),
                     _ => panic!("inner should be qual"),
                 },
                 _ => panic!("Assert should be BExp"),
