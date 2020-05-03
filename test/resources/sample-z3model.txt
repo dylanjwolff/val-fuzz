@@ -1,0 +1,23 @@
+sat
+(model 
+  (define-fun b () Int
+    0)
+  (define-fun a () Int
+    1)
+  (define-fun e () Real
+    1.0)
+  (define-fun GEN1 () Real
+    (- 1.0))
+  (define-fun BAV5 () Bool
+    true)
+  (define-fun BAV4 () Bool
+    true)
+  (define-fun BAV3 () Bool
+    true)
+  (define-fun c () Int
+    0)
+  (define-fun GEN2 () Real
+    0.0)
+  (define-fun d () Real
+    0.0)
+)
