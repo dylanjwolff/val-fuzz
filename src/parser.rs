@@ -1,3 +1,7 @@
+use super::ast::{
+    BoolOp, Command, Constant, Logic, SExp, SExpBoxRc, SExpRc, Script, Sort, SortRc, Symbol,
+    SymbolRc,
+};
 use nom::branch::alt;
 use nom::bytes::complete::take_while;
 use nom::bytes::complete::take_while1;
@@ -15,7 +19,6 @@ use nom::number::complete::recognize_float;
 use nom::sequence::delimited;
 use nom::sequence::preceded;
 use nom::{bytes::complete::tag, combinator::map, sequence::tuple, IResult};
-use super::ast::{Script, SortRc, Command, Constant, Symbol, BoolOp, SExp, SymbolRc, Sort, Logic, SExpBoxRc, SExpRc};
 
 fn integer(s: &str) -> IResult<&str, &str> {
     // let inner = |(sn, _peek): (&str, ())| {
@@ -115,7 +118,7 @@ fn var_binding(s: &str) -> IResult<&str, (SymbolRc, SortRc)> {
     let ws_sort = delimited(multispace0, sort, multispace0);
     map(
         delimited(char('('), tuple((mapped_ws_symbol, ws_sort)), char(')')),
-        |(sy, se)| (rccell!(sy), rccell!(se))
+        |(sy, se)| (rccell!(sy), rccell!(se)),
     )(s)
 }
 
@@ -152,7 +155,9 @@ fn sexp(s: &str) -> IResult<&str, SExp> {
     alt((
         ws_bexp,
         map(ws_let_sexp, |(tbs, sexp)| SExp::Let(tbs, sexp)),
-        map(ws_quant, |(tbs, sexp)| SExp::QForAll(tbs, rccell!(Box::new(sexp)))),
+        map(ws_quant, |(tbs, sexp)| {
+            SExp::QForAll(tbs, rccell!(Box::new(sexp)))
+        }),
         map(ws_rec_sexp, |es| {
             SExp::Compound(es.into_iter().map(|e| rccell!(e)).collect())
         }),
@@ -260,7 +265,7 @@ fn command(s: &str) -> IResult<&str, Command> {
     ))(s)
 }
 
-pub fn quantifier(s : &str) -> IResult<&str, (Vec<(SymbolRc, SortRc)>, SExp)> {
+pub fn quantifier(s: &str) -> IResult<&str, (Vec<(SymbolRc, SortRc)>, SExp)> {
     let ws_var_binding = delimited(multispace0, var_binding, multispace0);
     let var_bindings = delimited(char('('), many1(ws_var_binding), char(')'));
     let ws_var_bindings = delimited(multispace0, var_bindings, multispace0);
@@ -280,7 +285,6 @@ pub fn rmv_comments(s: &str) -> IResult<&str, Vec<&str>> {
     let comment = delimited(char(';'), not_line_ending, line_ending);
     many1(alt((not_comment, map(comment, |_| ""))))(s)
 }
-
 
 #[cfg(test)]
 mod tests {
@@ -306,7 +310,7 @@ mod tests {
     fn equant() {
         let r =
             script("(assert (forall ((ah Real)) (= ah 4)))(assert (exists ((ah Real)) (= ah 4)))")
-            .unwrap();
+                .unwrap();
         let Script::Commands(cmds) = r.1;
         println!("CEXSIT {:?}", cmds.last());
         println!("not p {:?}", r.0);
