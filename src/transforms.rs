@@ -1,6 +1,6 @@
 use crate::ast::{AstNode, BoolOp, Command, Constant, Logic, SExp, Script, Sort, Symbol};
 use crate::ast::{CommandRc, SExpRc, SortRc, SymbolRc};
-use crate::parser::script;
+
 use crate::Timer;
 use bit_vec::BitVec;
 use std::collections::BTreeMap;
@@ -33,7 +33,7 @@ impl VarNameGenerator {
 
 fn set_logic_all(script: &mut Script) {
     let Script::Commands(cmds) = script;
-    let maybe_log_pos = cmds
+    let _maybe_log_pos = cmds
         .iter()
         .find(|cmd| cmd.borrow().is_logic())
         .map(|cmd| cmd.replace(Command::Logic(rccell!(Logic::Other("ALL".to_owned())))));
@@ -508,6 +508,7 @@ pub trait Visitor {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::parser::script;
 
     #[test]
     fn bav_fmt_str() {

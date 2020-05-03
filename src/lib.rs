@@ -23,25 +23,25 @@ use crossbeam::queue::SegQueue;
 use crossbeam::utils::Backoff;
 use nom::branch::alt;
 use nom::bytes::complete::take_until;
-use nom::bytes::complete::take_while;
-use nom::bytes::complete::take_while1;
-use nom::character::complete::char;
-use nom::character::complete::digit1;
-use nom::character::complete::hex_digit1;
-use nom::character::complete::line_ending;
-use nom::character::complete::multispace0;
-use nom::character::complete::not_line_ending;
-use nom::combinator::not;
-use nom::combinator::peek;
-use nom::eof;
-use nom::multi::many0;
+
+
+
+
+
+
+
+
+
+
+
+
 use nom::multi::many1;
-use nom::named;
-use nom::number::complete::recognize_float;
-use nom::sequence::delimited;
-use nom::sequence::preceded;
-use nom::sequence::terminated;
-use nom::{bytes::complete::tag, combinator::map, sequence::tuple, IResult};
+
+
+
+
+
+use nom::{bytes::complete::tag, IResult};
 use parser::{rmv_comments, script};
 use rand::Rng;
 use rand_xoshiro::rand_core::SeedableRng;
@@ -58,7 +58,7 @@ use std::sync::Mutex;
 use std::thread;
 use std::thread::JoinHandle;
 use std::time::Duration;
-use transforms::{end_insert_pt, get_bav_assign, get_bav_assign_fmt_str, to_skel};
+use transforms::{end_insert_pt, get_bav_assign_fmt_str, to_skel};
 use walkdir::WalkDir;
 
 type InputPPQ = Arc<SegQueue<Result<PathBuf, PoisonPill>>>;
@@ -509,7 +509,7 @@ fn solver_worker(qin: BavAssingedQ, prev_stage: StageCompleteA) {
             }
         };
 
-        let (script, _) = match deserialize_from_f(&filepaths) {
+        let (_script, _) = match deserialize_from_f(&filepaths) {
             Ok(deserial) => deserial,
             Err(e) => {
                 println!("solver deserial err from {:?}: {}", filepaths, e);
@@ -626,7 +626,7 @@ fn get_iter_fileout_name(source_file: &Path, iter: u32) -> String {
 use nom::error::ErrorKind;
 use nom::error_position;
 fn dynamic_format_parser<'a, 'b>(
-    (s, mut vs): (&'a str, Vec<&'a str>),
+    (s, vs): (&'a str, Vec<&'a str>),
 ) -> IResult<(&'a str, Vec<&'a str>), Vec<&'a str>> {
     let replace = |(s, mut vs): (&'a str, Vec<&'a str>)| {
         tag("{}")(s)
@@ -667,7 +667,7 @@ fn eof_str<'a>(s: &'a str) -> IResult<&'a str, &'a str> {
 type DFormatParseError<'a> = nom::Err<((&'a str, std::vec::Vec<&'a str>), nom::error::ErrorKind)>;
 fn dyn_fmt<'a>(s: &'a str, mut vs: Vec<&'a str>) -> Result<String, DFormatParseError<'a>> {
     vs.reverse();
-    let (rem, ss) = dynamic_format_parser((s, vs))?;
+    let (_rem, ss) = dynamic_format_parser((s, vs))?;
     let cap = ss.iter().map(|s| s.len()).sum();
     let mut v = Vec::with_capacity(cap);
     for s in ss {

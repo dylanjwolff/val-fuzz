@@ -96,7 +96,7 @@ fn get_cvc4_result(stdout: &str, stderr: &str) -> SolveResult {
     }
 }
 
-fn solve_cvc4(cvc4path: &str, filename: &str) -> SolveResult {
+fn solve_cvc4(_cvc4path: &str, filename: &str) -> SolveResult {
     let cvc4_res = process::Command::new("timeout")
         .args(&[
             "-v",
