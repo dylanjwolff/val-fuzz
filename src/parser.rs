@@ -20,6 +20,36 @@ use nom::sequence::delimited;
 use nom::sequence::preceded;
 use nom::{bytes::complete::tag, combinator::map, sequence::tuple, IResult};
 
+macro_rules! ws {
+    ($x:expr) => {
+        delimited(multispace0, $x, multispace0)
+    };
+}
+
+macro_rules! brack {
+    ($x:expr) => {
+        delimited(char('('), $x, char(')'))
+    };
+}
+
+macro_rules! brack_ws {
+    ($x:expr) => {
+        delimited(char('('), ws!($x), char(')'))
+    };
+}
+
+macro_rules! ws_brack {
+    ($x:expr) => {
+        ws!(delimited(char('('), $x, char(')')))
+    };
+}
+
+macro_rules! ws_brack_ws {
+    ($x:expr) => {
+        ws!(delimited(char('('), ws!($x), char(')')))
+    };
+}
+
 fn integer(s: &str) -> IResult<&str, &str> {
     // let inner = |(sn, _peek): (&str, ())| {
     //    sn.parse::<u64>().unwrap()
@@ -80,11 +110,7 @@ fn bool_int_ops(s: &str) -> IResult<&str, BoolOp> {
         map(char('>'), |_| BoolOp::Gt()),
     ));
 
-    delimited(
-        multispace0,
-        alt((naked_bop_tags, naked_bop_chars)),
-        multispace0,
-    )(s)
+    ws!(alt((naked_bop_tags, naked_bop_chars)))(s)
 }
 
 fn bool_core_ops(s: &str) -> IResult<&str, BoolOp> {
@@ -97,7 +123,7 @@ fn bool_core_ops(s: &str) -> IResult<&str, BoolOp> {
     ));
     let naked_eq = map(char('='), |_| BoolOp::Equals());
 
-    delimited(multispace0, alt((naked_bool_tags, naked_eq)), multispace0)(s)
+    ws!(alt((naked_bool_tags, naked_eq)))(s)
 }
 
 fn bool_sexp(s: &str) -> IResult<&str, SExp> {
@@ -109,31 +135,23 @@ fn bool_sexp(s: &str) -> IResult<&str, SExp> {
     });
 
     let naked_b = alt((inner_int, inner_core));
-    delimited(char('('), naked_b, char(')'))(s)
+    brack!(naked_b)(s)
 }
 
 fn var_binding(s: &str) -> IResult<&str, (SymbolRc, SortRc)> {
-    let ws_symbol = delimited(multispace0, symbol, multispace0);
-    let mapped_ws_symbol = map(ws_symbol, |s| Symbol::Var(s.to_owned()));
-    let ws_sort = delimited(multispace0, sort, multispace0);
+    let mapped_symbol = map(symbol, |s| Symbol::Var(s.to_owned()));
     map(
-        delimited(char('('), tuple((mapped_ws_symbol, ws_sort)), char(')')),
+        brack!(tuple((ws!(mapped_symbol), ws!(sort)))),
         |(sy, se)| (rccell!(sy), rccell!(se)),
     )(s)
 }
 
 fn let_sexp(s: &str) -> IResult<&str, (Vec<(SymbolRc, SExpRc)>, SExpBoxRc)> {
-    let ws_symbol = delimited(multispace0, symbol, multispace0);
-    let mapped_ws_symbol = map(ws_symbol, |s| Symbol::Var(s.to_owned()));
-    let ws_sexp = delimited(multispace0, sexp, multispace0);
-    let var_binding = delimited(char('('), tuple((mapped_ws_symbol, ws_sexp)), char(')'));
-    let ws_var_b = delimited(multispace0, var_binding, multispace0);
-    let var_bs = delimited(char('('), many1(ws_var_b), char(')'));
-    let ws_var_bs = delimited(multispace0, var_bs, multispace0);
-    let inner = preceded(tag("let"), tuple((ws_var_bs, sexp)));
-    let ws_inner = delimited(multispace0, inner, multispace0);
-    let wrapped = delimited(char('('), ws_inner, char(')'));
-    let mapped = map(wrapped, |(a, b)| {
+    let mapped_symbol = map(symbol, |s| Symbol::Var(s.to_owned()));
+    let var_binding = brack!(tuple((ws!(mapped_symbol), ws!(sexp))));
+    let var_bs = brack!(many1(ws!(var_binding)));
+    let inner = preceded(tag("let"), tuple((ws!(var_bs), ws!(sexp))));
+    let mapped = map(brack_ws!(inner), |(a, b)| {
         (
             a.into_iter()
                 .map(|(x, y)| (rccell!(x), rccell!(y)))
@@ -145,83 +163,63 @@ fn let_sexp(s: &str) -> IResult<&str, (Vec<(SymbolRc, SExpRc)>, SExpBoxRc)> {
 }
 
 fn sexp(s: &str) -> IResult<&str, SExp> {
-    let rec_sexp = delimited(char('('), many1(sexp), char(')'));
-    let ws_rec_sexp = delimited(multispace0, rec_sexp, multispace0);
-    let ws_constant = delimited(multispace0, constant, multispace0);
-    let ws_symbol = delimited(multispace0, symbol, multispace0);
-    let ws_quant = delimited(multispace0, quantifier, multispace0);
-    let ws_bexp = delimited(multispace0, bool_sexp, multispace0);
-    let ws_let_sexp = delimited(multispace0, let_sexp, multispace0);
-    alt((
-        ws_bexp,
-        map(ws_let_sexp, |(tbs, sexp)| SExp::Let(tbs, sexp)),
-        map(ws_quant, |(tbs, sexp)| {
+    let rec_sexp = brack!(many1(sexp));
+    ws!(alt((
+        bool_sexp,
+        map(let_sexp, |(tbs, sexp)| SExp::Let(tbs, sexp)),
+        map(quantifier, |(tbs, sexp)| {
             SExp::QForAll(tbs, rccell!(Box::new(sexp)))
         }),
-        map(ws_rec_sexp, |es| {
+        map(rec_sexp, |es| {
             SExp::Compound(es.into_iter().map(|e| rccell!(e)).collect())
         }),
-        map(ws_constant, |c| SExp::Constant(rccell!(c))),
-        map(ws_symbol, |s| {
+        map(constant, |c| SExp::Constant(rccell!(c))),
+        map(symbol, |s| {
             SExp::Symbol(rccell!(Symbol::Token(s.to_owned())))
         }),
-    ))(s)
+    )))(s)
 }
 
 fn sort(s: &str) -> IResult<&str, Sort> {
-    let ws_int = delimited(multispace0, tag("Int"), multispace0);
-    let ws_dec = delimited(multispace0, tag("Real"), multispace0);
-    let ws_userdef = delimited(multispace0, symbol, multispace0);
-    let rec_sort = delimited(char('('), many1(sort), char(')'));
-    let ws_rec_sort = delimited(multispace0, rec_sort, multispace0);
-    alt((
-        map(ws_int, |_| Sort::UInt()),
-        map(ws_dec, |_| Sort::Dec()),
-        map(ws_userdef, |s| Sort::UserDef(s.to_owned())),
-        map(ws_rec_sort, |ss| {
+    ws!(alt((
+        map(tag("Int"), |_| Sort::UInt()),
+        map(tag("Real"), |_| Sort::Dec()),
+        map(symbol, |s| Sort::UserDef(s.to_owned())),
+        map(brack!(many1(sort)), |ss| {
             Sort::Compound(ss.into_iter().map(|s| rccell!(s)).collect())
         }),
-    ))(s)
+    )))(s)
 }
 
 fn naked_decl_const(s: &str) -> IResult<&str, (&str, Sort)> {
-    let ws_decl = delimited(multispace0, tag("declare-const"), multispace0);
-    let ws_symbol = delimited(multispace0, symbol, multispace0);
-    let ws_sort = delimited(multispace0, sort, multispace0);
-    preceded(ws_decl, tuple((ws_symbol, ws_sort)))(s)
+    let ws_decl = ws!(tag("declare-const"));
+    preceded(ws_decl, tuple((ws!(symbol), ws!(sort))))(s)
 }
 
 fn naked_assert(s: &str) -> IResult<&str, SExp> {
-    let ws_atag = delimited(multispace0, tag("assert"), multispace0);
-    let ws_sexp = delimited(multispace0, sexp, multispace0);
-    preceded(ws_atag, ws_sexp)(s)
+    preceded(ws!(tag("assert")), ws!(sexp))(s)
 }
 
 fn naked_csa(s: &str) -> IResult<&str, SExp> {
-    let ws_csatag = delimited(multispace0, tag("check-sat-assuming"), multispace0);
-    let ws_sexp = delimited(multispace0, sexp, multispace0);
+    let ws_csatag = ws!(tag("check-sat-assuming"));
+    let ws_sexp = ws!(sexp);
     preceded(ws_csatag, ws_sexp)(s)
 }
 
 fn naked_logic(s: &str) -> IResult<&str, Logic> {
-    let ws_ltag = delimited(multispace0, tag("set-logic"), multispace0);
+    let ws_ltag = ws!(tag("set-logic"));
     let qslia = map(tag("QF_SLIA"), |_| Logic::QF_SLIA());
     let other = map(symbol, |s| Logic::Other(s.to_owned()));
-    let ws_l = delimited(multispace0, alt((qslia, other)), multispace0);
+    let ws_l = ws!(alt((qslia, other)));
     preceded(ws_ltag, ws_l)(s)
 }
 
 fn set_info_status(s: &str) -> IResult<&str, (&str, &str)> {
-    let ws_val = delimited(multispace0, alt((tag("sat"), tag("unsat"))), multispace0);
-    let ws_status = delimited(multispace0, tag(":status"), multispace0);
+    let ws_val = ws!(alt((tag("sat"), tag("unsat"))));
+    let ws_status = ws!(tag(":status"));
     let naked_si = preceded(tag("set-info"), tuple((ws_status, ws_val)));
 
-    let wrapped = delimited(
-        char('('),
-        delimited(multispace0, naked_si, multispace0),
-        char(')'),
-    );
-    delimited(multispace0, wrapped, multispace0)(s)
+    ws_brack_ws!(naked_si)(s)
 }
 
 fn naked_command(s: &str) -> IResult<&str, Command> {
@@ -239,26 +237,21 @@ fn naked_command(s: &str) -> IResult<&str, Command> {
 
 fn unknown_balanced(s: &str) -> IResult<&str, Vec<&str>> {
     alt((
-        map(
-            tuple((char('('), many0(unknown_balanced), char(')'))),
-            |(_, v, _)| {
-                let mut vflat = v.concat();
-                vflat.insert(0, "(");
-                vflat.push(")");
-                vflat
-            },
-        ),
+        map(brack!(many0(unknown_balanced)), |v| {
+            let mut vflat = v.concat();
+            vflat.insert(0, "(");
+            vflat.push(")");
+            vflat
+        }),
         // Trim whitespace here
         map(take_while1(|c| !(c == '(') && !(c == ')')), |s| vec![s]),
     ))(s)
 }
 
 fn command(s: &str) -> IResult<&str, Command> {
-    let ws_ncommand = delimited(multispace0, naked_command, multispace0);
-    let delim_command = delimited(char('('), ws_ncommand, char(')'));
     alt((
         preceded(set_info_status, command), // just drop for now
-        delimited(multispace0, delim_command, multispace0),
+        ws_brack_ws!(naked_command),
         map(unknown_balanced, |v| {
             Command::Generic(v.into_iter().map(|g| g.to_owned()).collect::<String>())
         }),
@@ -266,18 +259,15 @@ fn command(s: &str) -> IResult<&str, Command> {
 }
 
 pub fn quantifier(s: &str) -> IResult<&str, (Vec<(SymbolRc, SortRc)>, SExp)> {
-    let ws_var_binding = delimited(multispace0, var_binding, multispace0);
-    let var_bindings = delimited(char('('), many1(ws_var_binding), char(')'));
-    let ws_var_bindings = delimited(multispace0, var_bindings, multispace0);
+    let ws_var_bindings = ws!(brack!(many1(ws!(var_binding))));
     let naked_quant = preceded(tag("forall"), tuple((ws_var_bindings, sexp)));
-    delimited(char('('), naked_quant, char(')'))(s)
+    brack!(naked_quant)(s)
 }
 
 pub fn script(s: &str) -> IResult<&str, Script> {
-    map(
-        many0(delimited(multispace0, command, multispace0)),
-        |cmds| Script::Commands(cmds.into_iter().map(|cmd| rccell!(cmd)).collect()),
-    )(s)
+    map(many0(ws!(command)), |cmds| {
+        Script::Commands(cmds.into_iter().map(|cmd| rccell!(cmd)).collect())
+    })(s)
 }
 
 pub fn rmv_comments(s: &str) -> IResult<&str, Vec<&str>> {
