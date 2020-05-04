@@ -42,9 +42,9 @@ try:
             if sys.argv[3] == "tip":
                 commit = tip("z3")
             else:
-                commit = sys.argv[2]
+                commit = sys.argv[3]
             z3(commit)
-            os.system("cd .solvers/z3; cd build; make install")
+            os.system("cp bin/z3-" + commit + " /usr/local/bin/z3")
         elif sys.argv[2] == "tip":
             z3(tip("z3"))
         else:
@@ -55,9 +55,9 @@ try:
             if sys.argv[3] == "tip":
                 commit = tip("cvc4")
             else:
-                commit = sys.argv[2]
+                commit = sys.argv[3]
             cvc4(commit)
-            os.system("cd .solvers/cvc4; cd build; make install")
+            os.system("cp bin/cvc4-" + commit + " /usr/local/bin/cvc4")
         elif sys.argv[2] == "tip":
             cvc4(tip("cvc4"))
         else:
@@ -69,7 +69,7 @@ try:
     elif sys.argv[1] == "install":
         z3(tip("z3"))
         cvc4(tip("cvc4"))
-        os.system("cd .solvers/z3; cd build; make install")
-        os.system("cd .solvers/cvc4; cd build; make install")
+        os.system("cp bin/z3-" + commit + " /usr/local/bin/z3")
+        os.system("cp bin/cvc4-" + commit + " /usr/local/bin/cvc4")
 except:
     sys.exit(1)
