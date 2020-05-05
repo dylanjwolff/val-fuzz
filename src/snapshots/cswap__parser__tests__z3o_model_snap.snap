@@ -1,0 +1,177 @@
+---
+source: src/parser.rs
+expression: z3o(response)
+---
+Ok(
+    (
+        "",
+        [
+            Sat,
+            Model(
+                [
+                    (
+                        Token(
+                            "b",
+                        ),
+                        [],
+                        UInt,
+                        Constant(
+                            RefCell {
+                                value: UInt(
+                                    "0",
+                                ),
+                            },
+                        ),
+                    ),
+                    (
+                        Token(
+                            "a",
+                        ),
+                        [],
+                        UInt,
+                        Constant(
+                            RefCell {
+                                value: UInt(
+                                    "1",
+                                ),
+                            },
+                        ),
+                    ),
+                    (
+                        Token(
+                            "e",
+                        ),
+                        [],
+                        Dec,
+                        Constant(
+                            RefCell {
+                                value: Dec(
+                                    "1.0",
+                                ),
+                            },
+                        ),
+                    ),
+                    (
+                        Token(
+                            "GEN1",
+                        ),
+                        [],
+                        Dec,
+                        Compound(
+                            [
+                                RefCell {
+                                    value: Symbol(
+                                        RefCell {
+                                            value: Token(
+                                                "-",
+                                            ),
+                                        },
+                                    ),
+                                },
+                                RefCell {
+                                    value: Constant(
+                                        RefCell {
+                                            value: Dec(
+                                                "1.0",
+                                            ),
+                                        },
+                                    ),
+                                },
+                            ],
+                        ),
+                    ),
+                    (
+                        Token(
+                            "BAV5",
+                        ),
+                        [],
+                        UserDef(
+                            "Bool",
+                        ),
+                        Symbol(
+                            RefCell {
+                                value: Token(
+                                    "true",
+                                ),
+                            },
+                        ),
+                    ),
+                    (
+                        Token(
+                            "BAV4",
+                        ),
+                        [],
+                        UserDef(
+                            "Bool",
+                        ),
+                        Symbol(
+                            RefCell {
+                                value: Token(
+                                    "true",
+                                ),
+                            },
+                        ),
+                    ),
+                    (
+                        Token(
+                            "BAV3",
+                        ),
+                        [],
+                        UserDef(
+                            "Bool",
+                        ),
+                        Symbol(
+                            RefCell {
+                                value: Token(
+                                    "true",
+                                ),
+                            },
+                        ),
+                    ),
+                    (
+                        Token(
+                            "c",
+                        ),
+                        [],
+                        UInt,
+                        Constant(
+                            RefCell {
+                                value: UInt(
+                                    "0",
+                                ),
+                            },
+                        ),
+                    ),
+                    (
+                        Token(
+                            "GEN2",
+                        ),
+                        [],
+                        Dec,
+                        Constant(
+                            RefCell {
+                                value: Dec(
+                                    "0.0",
+                                ),
+                            },
+                        ),
+                    ),
+                    (
+                        Token(
+                            "d",
+                        ),
+                        [],
+                        Dec,
+                        Constant(
+                            RefCell {
+                                value: Dec(
+                                    "0.0",
+                                ),
+                            },
+                        ),
+                    ),
+                ],
+            ),
+        ],
+    ),
+)

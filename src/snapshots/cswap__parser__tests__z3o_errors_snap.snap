@@ -1,0 +1,26 @@
+---
+source: src/parser.rs
+expression: z3o(response)
+---
+Ok(
+    (
+        "",
+        [
+            Unsupported,
+            Comment,
+            Error(
+                "line 5 column 52: unknown constant emptyset",
+            ),
+            Error(
+                "line 6 column 60: unknown function/constant member",
+            ),
+            Error(
+                "line 7 column 71: unknown function/constant singleton",
+            ),
+            Error(
+                "line 168 column 52: unknown function/constant smt_set_mem",
+            ),
+            Sat,
+        ],
+    ),
+)

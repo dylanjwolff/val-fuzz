@@ -290,21 +290,37 @@ pub fn define_func(s: &str) -> IResult<&str, (Symbol, Vec<(SymbolRc, SortRc)>, S
 }
 
 pub fn model(s: &str) -> IResult<&str, Vec<(Symbol, Vec<(SymbolRc, SortRc)>, Sort, SExp)>> {
-    brack!(preceded(ws!(tag("model")), ws!(many0(define_func))))(s)
+    brack!(preceded(ws!(tag("model")), many0(ws!(define_func))))(s)
 }
 
 pub fn z3_oerror(s: &str) -> IResult<&str, &str> {
     brack!(preceded(ws!(tag("error")), ws!(string)))(s)
 }
+type FuncDefine = (Symbol, Vec<(SymbolRc, SortRc)>, Sort, SExp);
 
-pub fn z3o(s: &str) -> IResult<&str, &str> {
-    alt((
-        z3_oerror,
-        tag("sat"),
-        tag("unsat"),
-        tag("unknown"),
-        tag("unsupported"),
-    ))(s)
+#[derive(Debug, Eq, PartialEq, Clone)]
+pub enum ResultLine<'a> {
+    Sat,
+    Unsat,
+    Unknown,
+    Unsupported,
+    Comment,
+    Error(&'a str),
+    Model(Vec<FuncDefine>),
+}
+
+pub fn z3o(s: &str) -> IResult<&str, Vec<ResultLine>> {
+    many0(ws!(alt((
+        map(tag("sat"), |_| ResultLine::Sat),
+        map(tag("unsat"), |_| ResultLine::Unsat),
+        map(tag("unknown"), |_| ResultLine::Unknown),
+        map(tag("unsupported"), |_| ResultLine::Unsupported),
+        map(delimited(char(';'), not_line_ending, line_ending), |_| {
+            ResultLine::Comment
+        }),
+        map(z3_oerror, |e| ResultLine::Error(e)),
+        map(model, |m| ResultLine::Model(m)),
+    ))))(s)
 }
 
 #[cfg(test)]
@@ -312,6 +328,46 @@ mod tests {
     use super::*;
     use insta::assert_debug_snapshot;
     use std::fs;
+
+    #[test]
+    fn z3o_model_snap() {
+        let response = "sat
+                        (model 
+                          (define-fun b () Int
+                            0)
+                          (define-fun a () Int
+                            1)
+                          (define-fun e () Real
+                            1.0)
+                          (define-fun GEN1 () Real
+                            (- 1.0))
+                          (define-fun BAV5 () Bool
+                            true)
+                          (define-fun BAV4 () Bool
+                            true)
+                          (define-fun BAV3 () Bool
+                            true)
+                          (define-fun c () Int
+                            0)
+                          (define-fun GEN2 () Real
+                            0.0)
+                          (define-fun d () Real
+                            0.0)
+                        )";
+        assert_debug_snapshot!(z3o(response));
+    }
+
+    #[test]
+    fn z3o_errors_snap() {
+        let response = "unsupported
+                        ; ignoring unsupported logic QF_ALL_SUPPORTED line: 2 position: 1
+                        (error \"line 5 column 52: unknown constant emptyset\")
+                        (error \"line 6 column 60: unknown function/constant member\")
+                        (error \"line 7 column 71: unknown function/constant singleton\")
+                        (error \"line 168 column 52: unknown function/constant smt_set_mem\")
+                        sat";
+        assert_debug_snapshot!(z3o(response));
+    }
 
     #[test]
     fn z3oerr_snap() {
@@ -322,7 +378,7 @@ mod tests {
 
     #[test]
     fn model_snap() {
-        assert_debug_snapshot!(model("(model (define-fun f () int 7))"));
+        assert_debug_snapshot!(model("(model (define-fun f () Int 7))"));
     }
 
     #[test]
