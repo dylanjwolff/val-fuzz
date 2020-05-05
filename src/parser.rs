@@ -276,10 +276,64 @@ pub fn rmv_comments(s: &str) -> IResult<&str, Vec<&str>> {
     many1(alt((not_comment, map(comment, |_| ""))))(s)
 }
 
+pub fn define_func(s: &str) -> IResult<&str, (Symbol, Vec<(SymbolRc, SortRc)>, Sort, SExp)> {
+    let mapped_symbol = map(symbol, |s| Symbol::Token(s.to_owned()));
+    brack!(preceded(
+        ws!(tag("define-fun")),
+        tuple((
+            ws!(mapped_symbol),
+            brack!(many0(ws!(var_binding))),
+            ws!(sort),
+            ws!(sexp)
+        ))
+    ))(s)
+}
+
+pub fn model(s: &str) -> IResult<&str, Vec<(Symbol, Vec<(SymbolRc, SortRc)>, Sort, SExp)>> {
+    brack!(preceded(ws!(tag("model")), ws!(many0(define_func))))(s)
+}
+
+pub fn z3_oerror(s: &str) -> IResult<&str, &str> {
+    brack!(preceded(ws!(tag("error")), ws!(string)))(s)
+}
+
+pub fn z3o(s: &str) -> IResult<&str, &str> {
+    alt((
+        z3_oerror,
+        tag("sat"),
+        tag("unsat"),
+        tag("unknown"),
+        tag("unsupported"),
+    ))(s)
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
+    use insta::assert_debug_snapshot;
     use std::fs;
+
+    #[test]
+    fn z3oerr_snap() {
+        assert_debug_snapshot!(z3_oerror(
+            "(error \"line 6 column 52: unknown constant emptyset\")"
+        ));
+    }
+
+    #[test]
+    fn model_snap() {
+        assert_debug_snapshot!(model("(model (define-fun f () int 7))"));
+    }
+
+    #[test]
+    fn func_snap() {
+        assert_debug_snapshot!(define_func("(define-fun foo ((a Real) (b String)) Int 7)"));
+    }
+
+    #[test]
+    fn func_noargs_snap() {
+        assert_debug_snapshot!(define_func("(define-fun foo () Int 7)"));
+    }
 
     fn parse_file(f: &str) -> Script {
         let contents = &fs::read_to_string(f).expect("error reading file")[..];
@@ -292,17 +346,13 @@ mod tests {
     }
 
     #[test]
-    fn quant() {
-        quantifier("(forall ((ah Real)) (= ah 4))").unwrap();
+    fn quant_snap() {
+        assert_debug_snapshot!(quantifier("(forall ((ah Real)) (= ah 4))"));
     }
 
     #[test]
     fn equant() {
-        let r =
-            script("(assert (forall ((ah Real)) (= ah 4)))(assert (exists ((ah Real)) (= ah 4)))")
-                .unwrap();
-        let Script::Commands(cmds) = r.1;
-        println!("CEXSIT {:?}", cmds.last());
-        println!("not p {:?}", r.0);
+        let r = script("(assert (exists ((ah Real)) (= ah 4)))").unwrap();
+        assert_debug_snapshot!(r);
     }
 }
