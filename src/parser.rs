@@ -19,6 +19,7 @@ use nom::multi::many1;
 use nom::number::complete::recognize_float;
 use nom::sequence::delimited;
 use nom::sequence::preceded;
+use nom::sequence::terminated;
 use nom::{bytes::complete::tag, combinator::map, sequence::tuple, IResult};
 
 macro_rules! ws {
@@ -307,7 +308,9 @@ pub enum ResultLine<'a> {
     Unsupported,
     Comment,
     Timeout,
+    Generic(&'a str),
     SegF,
+    AssertionViolation,
     Error(&'a str),
     Model(Vec<FuncDefine>),
 }
@@ -336,7 +339,15 @@ pub fn z3o(s: &str) -> IResult<&str, Vec<ResultLine>> {
         map(model, |m| ResultLine::Model(m)),
         map(timeout, |_| ResultLine::Timeout),
         map(segf, |_| ResultLine::SegF),
+        map(av, |_| ResultLine::AssertionViolation),
+        map(generic, |s| ResultLine::Generic(s)),
     ))))(s)
+    .map(|(i, mut o)| {
+        if i != "" {
+            o.push(ResultLine::Generic(i));
+        }
+        (i, o)
+    })
 }
 
 fn iv_model_err(s: &str) -> IResult<&str, &str> {
@@ -353,11 +364,42 @@ fn iv_model_err(s: &str) -> IResult<&str, &str> {
     ))(s)
 }
 
+fn av(s: &str) -> IResult<&str, &str> {
+    delimited(
+        ws!(tag("ASSERTION VIOLATION")),
+        take_until("(G)DB"),
+        tag("(G)DB"),
+    )(s)
+}
+
+fn generic(s: &str) -> IResult<&str, &str> {
+    terminated(not_line_ending, line_ending)(s)
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
     use insta::assert_debug_snapshot;
     use std::fs;
+
+    #[test]
+    fn generic_snap() {
+        assert_debug_snapshot!(generic("line \n break"));
+    }
+
+    #[test]
+    fn generic_w_eof_snap() {
+        assert_debug_snapshot!(z3o("no linebreak before end"));
+    }
+
+    #[test]
+    fn av_snap() {
+        assert_debug_snapshot!(av("ASSERTION VIOLATION
+                File: ../src/qe/qsat.cpp
+                Line: 631
+                validate_defs(\"check_sat\")
+                (C)ontinue, (A)bort, (S)top, (T)hrow exception, Invoke (G)DB"));
+    }
 
     #[test]
     fn iv_snap() {
@@ -414,6 +456,30 @@ mod tests {
                         (error \"line 168 column 52: unknown function/constant smt_set_mem\")
                         sat";
         assert_debug_snapshot!(z3o(response));
+    }
+
+    #[test]
+    fn cvc4_modle_snap() {
+        let response = "(model
+(define-fun f ((BOUND_VARIABLE_397 Int)) (Set Int) (ite (= BOUND_VARIABLE_397 (- 1)) (singleton 0) (as emptyset (Set Int))))
+(define-fun x () Int (- 1))
+(define-fun y () Int 0)
+(define-fun S () (Set Int) (as emptyset (Set Int)))
+(define-fun T () (Set Int) (singleton 0))
+)";
+        assert_debug_snapshot!(model(response));
+    }
+
+    #[test]
+    fn cvc4o_err_snap() {
+        let response =
+            "(error \"Parse Error: ../samples/z3.44.produced.smt2:3.3: Unexpected token: 'sat'.
+
+              sat
+              ^
+            \")";
+
+        assert_debug_snapshot!(z3_oerror(response));
     }
 
     #[test]
