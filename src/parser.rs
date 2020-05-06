@@ -3,6 +3,7 @@ use super::ast::{
     SymbolRc,
 };
 use nom::branch::alt;
+use nom::bytes::complete::take_until;
 use nom::bytes::complete::take_while;
 use nom::bytes::complete::take_while1;
 use nom::character::complete::char;
@@ -305,8 +306,21 @@ pub enum ResultLine<'a> {
     Unknown,
     Unsupported,
     Comment,
+    Timeout,
+    SegF,
     Error(&'a str),
     Model(Vec<FuncDefine>),
+}
+
+fn timeout(s: &str) -> IResult<&str, &str> {
+    preceded(
+        ws!(tag("timeout: sending signal TERM to command")),
+        ws!(symbol),
+    )(s)
+}
+
+fn segf(s: &str) -> IResult<&str, &str> {
+    tag("timeout: the monitored command dumped core")(s)
 }
 
 pub fn z3o(s: &str) -> IResult<&str, Vec<ResultLine>> {
@@ -320,7 +334,23 @@ pub fn z3o(s: &str) -> IResult<&str, Vec<ResultLine>> {
         }),
         map(z3_oerror, |e| ResultLine::Error(e)),
         map(model, |m| ResultLine::Model(m)),
+        map(timeout, |_| ResultLine::Timeout),
+        map(segf, |_| ResultLine::SegF),
     ))))(s)
+}
+
+fn iv_model_err(s: &str) -> IResult<&str, &str> {
+    brack!(preceded(
+        ws!(tag("error")),
+        delimited(
+            char('"'),
+            preceded(
+                take_until("invalid model was generated"),
+                tag("invalid model was generated")
+            ),
+            char('"')
+        )
+    ))(s)
 }
 
 #[cfg(test)]
@@ -328,6 +358,23 @@ mod tests {
     use super::*;
     use insta::assert_debug_snapshot;
     use std::fs;
+
+    #[test]
+    fn iv_snap() {
+        assert_debug_snapshot!(iv_model_err(
+            "(error \"line 5 column 10: an invalid model was generated\")"
+        ));
+    }
+
+    #[test]
+    fn segf_snap() {
+        assert_debug_snapshot!(segf("timeout: the monitored command dumped core"));
+    }
+
+    #[test]
+    fn timeout_snap() {
+        assert_debug_snapshot!(timeout("timeout: sending signal TERM to command ‘z3’"));
+    }
 
     #[test]
     fn z3o_model_snap() {
