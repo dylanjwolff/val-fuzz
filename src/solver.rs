@@ -1,3 +1,4 @@
+use crate::ast::*;
 use crate::parser::*;
 use std::process;
 use std::str::from_utf8;
@@ -24,24 +25,29 @@ const AF: &str = "Assertion Failure";
 const IE: &str = "Internal error detected";
 const IVM: &str = "invalid model";
 const BUG_ERRORS: [&str; 7] = [SF, SF_L, SF_DC, AV, AF, IE, IVM];
-const MNA_Z3 : &str = "model is not available";
-const MNA_CVC4 : &str = "Cannot get model unless";
-const NON_FATAL_ERRORS: [&str; 2] = [MNA_Z3, MNA_Z3];
+const MNA_Z3: &str = "model is not available";
+const MNA_CVC4: &str = "Cannot get model unless";
+const NON_FATAL_ERRORS: [&str; 2] = [MNA_CVC4, MNA_Z3];
 
-
-struct R<'a> {
-    stdout: &'a str,
-    stderr: &'a str,
+#[allow(dead_code)]
+struct RSolve<'a> {
+    stdout: String,
+    stderr: String,
     lines: Vec<ResultLine<'a>>,
 }
 
-impl<'a> R<'a> {
-    fn new(stdout : &'a str, stderr : &'a str) -> Self {
-        R {
-            stdout : stdout,
-            stderr : stderr,
+#[allow(dead_code)]
+impl<'a> RSolve<'a> {
+    fn new(stdout: String, stderr: String) -> Self {
+        RSolve {
+            stdout: stdout,
+            stderr: stderr,
             // Following should never panic, as parser should never throw an error
-            lines : { let v = z3o(stdout).unwrap().1; v.extend(z3o(stderr).unwrap().1); v},
+            lines: {
+                let mut v = z3o(stdout).unwrap().1;
+                v.extend(z3o(stderr).unwrap().1);
+                v
+            },
         }
     }
 
@@ -55,63 +61,63 @@ impl<'a> R<'a> {
     }
 
     fn has_unrecoverable_error(&self) -> bool {
-        self.lines.iter()
-            .filter_map(|l| match l { 
+        self.lines
+            .iter()
+            .filter_map(|l| match l {
                 ResultLine::Error(s) => Some(s),
-                _ => None 
+                _ => None,
             })
             // any error line that has no non-fatal errors is a fatal error
-            .any(|s| NON_FATAL_ERRORS.iter()
-                      .all(|e| !s.contains(e)))
+            .any(|s| NON_FATAL_ERRORS.iter().all(|e| !s.contains(e)))
     }
 
     fn was_timeout(&self) -> bool {
-        self.lines.iter()
-            .any(|l| match l { 
-                ResultLine::Timeout => true,
-                _ => false 
+        self.lines.iter().any(|l| match l {
+            ResultLine::Timeout => true,
+            _ => false,
+        })
+    }
+
+    fn differential(a: Self, b: Self) -> bool {
+        let is_out_result = |l: &&ResultLine| match l {
+            ResultLine::Sat | ResultLine::Unsat | ResultLine::Unknown => true,
+            _ => false,
+        };
+        a.lines
+            .iter()
+            .filter(|l| is_out_result(l))
+            .zip(b.lines.iter().filter(|l| is_out_result(l)))
+            .any(|r| match r {
+                (ResultLine::Sat, ResultLine::Unsat) | (ResultLine::Unsat, ResultLine::Sat) => true,
+                _ => false,
             })
     }
 
-    fn differential(a : Self, b : Self) -> {}
-    fn has_sat(&self) -> bool {}
-    fn extract_const_var_vals(&self, Vec<&str>) {}
-}
-
-// impl hassat hasunsat hasunknown issat is... getmodel
-// string contains for most things except model
-// vars of interest from model
-// line by line comparison of sats and unsats
-// maybe split formula into subformula
-
-fn is_bug_error(stdout: &str, stderr: &str) -> bool {
-    for bug_error in BUG_ERRORS.iter() {
-        if stdout.contains(bug_error) || stderr.contains(bug_error) {
-            return true;
-        }
+    fn has_sat(&self) -> bool {
+        self.lines.iter().any(|l| match l {
+            ResultLine::Sat => true,
+            _ => false,
+        })
     }
-    return false;
-}
 
-fn is_timeout(stdout: &str, stderr: &str) -> bool {
-    stdout.contains(TO) || stderr.contains(TO)
-}
-
-fn is_unrecoverable(stdout: &str, stderr: &str) -> bool {
-    stderr.contains("(error ") || stdout.contains("(error ")
-}
-
-fn get_z3_result(stdout: &str, stderr: &str) -> SolveResult {
-    if stdout.contains("unsat") || stderr.contains("unsat\n") {
-        SolveResult::Unsat
-    } else if stdout.contains("sat") || stderr.contains("sat\n") {
-        SolveResult::Sat
-    } else {
-        SolveResult::Unknown
+    fn extract_const_var_vals(&self, varnames: Vec<&str>) -> Vec<(&Symbol, &SExp)> {
+        self.lines
+            .iter()
+            .filter_map(|l| match l {
+                ResultLine::Model(m) => Some(
+                    m.iter()
+                        .filter(|(name, _, _, _)| varnames.contains(&&name.to_string()[..]))
+                        .map(|(name, _, _, val)| (name, val))
+                        .collect::<Vec<(&Symbol, &SExp)>>(),
+                ),
+                _ => None,
+            })
+            .flatten()
+            .collect::<Vec<(&Symbol, &SExp)>>()
     }
 }
 
-fn solve_z3(z3path: &str, filename: &str) -> SolveResult {
+fn solve_z3(z3path: &str, filename: &str) -> RSolve {
     let z3_res = process::Command::new("timeout")
         .args(&[
             "-v",
@@ -131,17 +137,7 @@ fn solve_z3(z3path: &str, filename: &str) -> SolveResult {
     });
 
     match z3mrs {
-        Ok((z3_succ, z3_out, z3_err)) => {
-            if is_bug_error(&z3_out, &z3_err) {
-                SolveResult::ErrorBug
-            } else if is_timeout(&z3_out, &z3_err) {
-                SolveResult::Timeout
-            } else if !z3_succ && is_unrecoverable(&z3_out, &z3_err) {
-                SolveResult::Error
-            } else {
-                get_z3_result(&z3_err, &z3_err)
-            }
-        }
+        Ok((z3_succ, z3_out, z3_err)) => RSolve::new(z3_out, z3_err),
         Err(_) => SolveResult::ProcessError,
     }
 }
@@ -211,12 +207,109 @@ pub fn solve(filename: &str) -> SolveResult {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use insta::assert_debug_snapshot;
     use walkdir::WalkDir;
 
-    const STACK_SIZE: usize = 20 * 1024 * 1024;
+    #[test]
+    fn get_var_vals_snap() {
+        let rstr = "sat
+                        (model 
+                          (define-fun b () Int
+                            0)
+                          (define-fun a () Int
+                            1)
+                          (define-fun e () Real
+                            1.0)
+                          (define-fun GEN1 () Real
+                            (- 1.0))
+                          (define-fun BAV5 () Bool
+                            true)
+                          (define-fun BAV4 () Bool
+                            true)
+                          (define-fun BAV3 () Bool
+                            true)
+                          (define-fun c () Int
+                            0)
+                          (define-fun GEN2 () Real
+                            0.0)
+                          (define-fun d () Real
+                            0.0)
+                        )";
+        let r = RSolve::new(rstr, "");
+        assert_debug_snapshot!(r.extract_const_var_vals(vec!["GEN1", "GEN2", "BAV3"]));
+    }
 
     #[test]
-    fn z3_new() {}
+    fn z3_new() {
+        let rstring = "sat (model (define-fun b () Int 0) (define-fun a () Int 1))";
+        let r = RSolve::new("", rstring);
+        assert!(r.has_sat());
+        assert!(!r.has_unrecoverable_error());
+        assert!(!r.has_bug_error());
+    }
+
+    #[test]
+    fn diff_self() {
+        let rstring = "sat (model (define-fun b () Int 0) (define-fun a () Int 1))";
+        let r1 = RSolve::new("", rstring);
+        let r2 = RSolve::new(rstring, "");
+        assert!(!RSolve::differential(r1, r2))
+    }
+
+    #[test]
+    fn diff_difft() {
+        let rstring = "sat (model (define-fun b () Int 0) (define-fun a () Int 1))";
+        let r1 = RSolve::new("", rstring);
+        let r2 = RSolve::new("unsat", "");
+        assert!(RSolve::differential(r1, r2))
+    }
+
+    #[test]
+    fn diff_difft_multiple() {
+        let r1str = "unsupported
+            samples/z3.11.smt2:6.14: No set-logic command was given before this point.
+            samples/z3.11.smt2:6.14: CVC4 will make all theories available.
+            samples/z3.11.smt2:6.14: Consider setting a stricter logic for (likely) better performance.
+            samples/z3.11.smt2:6.14: To suppress this warning in the future use (set-logic ALL).
+            sat
+            (model
+            (define-fun a () Real 0.0)
+            )
+            unsat";
+        let r2str = "sat
+            (model 
+              (define-fun a () Real
+                38.0)
+              (define-fun /0 ((x!0 Real) (x!1 Real)) Real
+                10.0)
+            )
+            unsat";
+        let r1 = RSolve::new(r1str, "");
+        let r2 = RSolve::new(r2str, "");
+        assert!(!RSolve::differential(r1, r2));
+    }
+
+    #[test]
+    fn nonfatal_error() {
+        let rstr = "unsupported
+                unsupported
+                unsupported
+                testfile.smt2:8.12: No set-logic command was given before this point.
+                testfile.smt2:8.12: CVC4 will make all theories available.
+                testfile.smt2:8.12: Consider setting a stricter logic for (likely) better performance.
+                testfile.smt2:8.12: To suppress this warning in the future use (set-logic ALL).
+                unsat
+                (error \"Cannot get model unless immediately preceded by SAT/NOT_ENTAILED or UNKNOWN response.\")";
+        let r = RSolve::new(rstr, "");
+        assert!(!r.has_unrecoverable_error());
+    }
+
+    #[test]
+    fn fatal_error() {
+        let rstr = "unsat \n (error \"something went wrong\")";
+        let r = RSolve::new(rstr, "");
+        assert!(r.has_unrecoverable_error());
+    }
 
     #[ignore]
     #[test]
