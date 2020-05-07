@@ -461,12 +461,12 @@ mod tests {
     #[test]
     fn cvc4_modle_snap() {
         let response = "(model
-(define-fun f ((BOUND_VARIABLE_397 Int)) (Set Int) (ite (= BOUND_VARIABLE_397 (- 1)) (singleton 0) (as emptyset (Set Int))))
-(define-fun x () Int (- 1))
-(define-fun y () Int 0)
-(define-fun S () (Set Int) (as emptyset (Set Int)))
-(define-fun T () (Set Int) (singleton 0))
-)";
+            (define-fun f ((BOUND_VARIABLE_397 Int)) (Set Int) (ite (= BOUND_VARIABLE_397 (- 1)) (singleton 0) (as emptyset (Set Int))))
+            (define-fun x () Int (- 1))
+            (define-fun y () Int 0)
+            (define-fun S () (Set Int) (as emptyset (Set Int)))
+            (define-fun T () (Set Int) (singleton 0))
+            )";
         assert_debug_snapshot!(model(response));
     }
 

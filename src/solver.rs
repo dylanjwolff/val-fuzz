@@ -1,3 +1,4 @@
+use crate::parser::*;
 use std::process;
 use std::str::from_utf8;
 
@@ -23,6 +24,65 @@ const AF: &str = "Assertion Failure";
 const IE: &str = "Internal error detected";
 const IVM: &str = "invalid model";
 const BUG_ERRORS: [&str; 7] = [SF, SF_L, SF_DC, AV, AF, IE, IVM];
+const MNA_Z3 : &str = "model is not available";
+const MNA_CVC4 : &str = "Cannot get model unless";
+const NON_FATAL_ERRORS: [&str; 2] = [MNA_Z3, MNA_Z3];
+
+
+struct R<'a> {
+    stdout: &'a str,
+    stderr: &'a str,
+    lines: Vec<ResultLine<'a>>,
+}
+
+impl<'a> R<'a> {
+    fn new(stdout : &'a str, stderr : &'a str) -> Self {
+        R {
+            stdout : stdout,
+            stderr : stderr,
+            // Following should never panic, as parser should never throw an error
+            lines : { let v = z3o(stdout).unwrap().1; v.extend(z3o(stderr).unwrap().1); v},
+        }
+    }
+
+    fn has_bug_error(&self) -> bool {
+        for bug_error in BUG_ERRORS.iter() {
+            if self.stdout.contains(bug_error) || self.stderr.contains(bug_error) {
+                return true;
+            }
+        }
+        return false;
+    }
+
+    fn has_unrecoverable_error(&self) -> bool {
+        self.lines.iter()
+            .filter_map(|l| match l { 
+                ResultLine::Error(s) => Some(s),
+                _ => None 
+            })
+            // any error line that has no non-fatal errors is a fatal error
+            .any(|s| NON_FATAL_ERRORS.iter()
+                      .all(|e| !s.contains(e)))
+    }
+
+    fn was_timeout(&self) -> bool {
+        self.lines.iter()
+            .any(|l| match l { 
+                ResultLine::Timeout => true,
+                _ => false 
+            })
+    }
+
+    fn differential(a : Self, b : Self) -> {}
+    fn has_sat(&self) -> bool {}
+    fn extract_const_var_vals(&self, Vec<&str>) {}
+}
+
+// impl hassat hasunsat hasunknown issat is... getmodel
+// string contains for most things except model
+// vars of interest from model
+// line by line comparison of sats and unsats
+// maybe split formula into subformula
 
 fn is_bug_error(stdout: &str, stderr: &str) -> bool {
     for bug_error in BUG_ERRORS.iter() {
@@ -72,10 +132,10 @@ fn solve_z3(z3path: &str, filename: &str) -> SolveResult {
 
     match z3mrs {
         Ok((z3_succ, z3_out, z3_err)) => {
-            if is_timeout(&z3_out, &z3_err) {
-                SolveResult::Timeout
-            } else if is_bug_error(&z3_out, &z3_err) {
+            if is_bug_error(&z3_out, &z3_err) {
                 SolveResult::ErrorBug
+            } else if is_timeout(&z3_out, &z3_err) {
+                SolveResult::Timeout
             } else if !z3_succ && is_unrecoverable(&z3_out, &z3_err) {
                 SolveResult::Error
             } else {
@@ -154,6 +214,9 @@ mod tests {
     use walkdir::WalkDir;
 
     const STACK_SIZE: usize = 20 * 1024 * 1024;
+
+    #[test]
+    fn z3_new() {}
 
     #[ignore]
     #[test]
