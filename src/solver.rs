@@ -30,22 +30,43 @@ const MNA_CVC4: &str = "Cannot get model unless";
 const NON_FATAL_ERRORS: [&str; 2] = [MNA_CVC4, MNA_Z3];
 
 #[allow(dead_code)]
-struct RSolve<'a> {
+struct RSolve {
     stdout: String,
     stderr: String,
-    lines: Vec<ResultLine<'a>>,
+    lines: Vec<ResultLine>,
 }
 
 #[allow(dead_code)]
-impl<'a> RSolve<'a> {
-    fn new(stdout: String, stderr: String) -> Self {
+impl RSolve {
+    fn process_error() -> Self {
         RSolve {
-            stdout: stdout,
-            stderr: stderr,
+            stdout: "".to_owned(),
+            stderr: "".to_owned(),
+            lines: vec![ResultLine::Error("Process Error".to_owned())],
+        }
+    }
+
+    fn move_new(stdout: String, stderr: String) -> Self {
+        RSolve {
             // Following should never panic, as parser should never throw an error
             lines: {
-                let mut v = z3o(stdout).unwrap().1;
-                v.extend(z3o(stderr).unwrap().1);
+                let mut v = z3o(&stdout).unwrap().1;
+                v.extend(z3o(&stderr).unwrap().1);
+                v
+            },
+            stdout: stdout,
+            stderr: stderr,
+        }
+    }
+
+    fn new(stdout: &str, stderr: &str) -> Self {
+        RSolve {
+            stdout: stdout.to_owned(),
+            stderr: stderr.to_owned(),
+            // Following should never panic, as parser should never throw an error
+            lines: {
+                let mut v = z3o(&stdout).unwrap().1;
+                v.extend(z3o(&stderr).unwrap().1);
                 v
             },
         }
@@ -137,71 +158,13 @@ fn solve_z3(z3path: &str, filename: &str) -> RSolve {
     });
 
     match z3mrs {
-        Ok((z3_succ, z3_out, z3_err)) => RSolve::new(z3_out, z3_err),
-        Err(_) => SolveResult::ProcessError,
-    }
-}
-
-fn get_cvc4_result(stdout: &str, stderr: &str) -> SolveResult {
-    if stdout.contains("unsat") || stderr.contains("unsat\n") {
-        SolveResult::Unsat
-    } else if stdout.contains("sat") || stderr.contains("sat\n") {
-        SolveResult::Sat
-    } else {
-        SolveResult::Unknown
-    }
-}
-
-fn solve_cvc4(_cvc4path: &str, filename: &str) -> SolveResult {
-    let cvc4_res = process::Command::new("timeout")
-        .args(&[
-            "-v",
-            "6s",
-            "cvc4",
-            "--incremental",
-            "--produce-model",
-            filename,
-        ])
-        .output();
-
-    let cvc4mrs = cvc4_res.map(|out| {
-        let stderr = from_utf8(&out.stderr[..]).unwrap_or("");
-        let stdout = from_utf8(&out.stdout[..]).unwrap_or("");
-        let success = out.status.success();
-        (success, stderr.to_owned(), stdout.to_owned())
-    });
-
-    match cvc4mrs {
-        Ok((cvc4_succ, cvc4_out, cvc4_err)) => {
-            if is_timeout(&cvc4_out, &cvc4_err) {
-                SolveResult::Timeout
-            } else if is_bug_error(&cvc4_out, &cvc4_err) {
-                SolveResult::ErrorBug
-            } else if !cvc4_succ && is_unrecoverable(&cvc4_out, &cvc4_err) {
-                SolveResult::Error
-            } else {
-                get_cvc4_result(&cvc4_err, &cvc4_err)
-            }
-        }
-        Err(_) => SolveResult::ProcessError,
+        Ok((z3_succ, z3_out, z3_err)) => RSolve::move_new(z3_out, z3_err),
+        Err(_) => RSolve::process_error(),
     }
 }
 
 pub fn solve(filename: &str) -> SolveResult {
-    match (solve_z3("z3", filename), solve_cvc4("cvc4", filename)) {
-        (SolveResult::ErrorBug, _) | (_, SolveResult::ErrorBug) => SolveResult::ErrorBug,
-        (SolveResult::Sat, SolveResult::Unsat) | (SolveResult::Unsat, SolveResult::Sat) => {
-            SolveResult::SoundnessBug
-        }
-        (SolveResult::ProcessError, _) | (_, SolveResult::ProcessError) => {
-            SolveResult::ProcessError
-        }
-        (SolveResult::Error, _) | (_, SolveResult::Error) => SolveResult::Error,
-        (SolveResult::Sat, _) | (_, SolveResult::Sat) => SolveResult::Sat,
-        (SolveResult::Unsat, _) | (_, SolveResult::Unsat) => SolveResult::Unsat,
-        (SolveResult::Timeout, _) | (_, SolveResult::Timeout) => SolveResult::Timeout,
-        _ => SolveResult::Unknown,
-    }
+    SolveResult::Unsat
 }
 
 #[cfg(test)]

@@ -301,17 +301,17 @@ pub fn z3_oerror(s: &str) -> IResult<&str, &str> {
 type FuncDefine = (Symbol, Vec<(SymbolRc, SortRc)>, Sort, SExp);
 
 #[derive(Debug, Eq, PartialEq, Clone)]
-pub enum ResultLine<'a> {
+pub enum ResultLine {
     Sat,
     Unsat,
     Unknown,
     Unsupported,
     Comment,
     Timeout,
-    Generic(&'a str),
+    Generic(String),
     SegF,
     AssertionViolation,
-    Error(&'a str),
+    Error(String),
     Model(Vec<FuncDefine>),
 }
 
@@ -335,16 +335,16 @@ pub fn z3o(s: &str) -> IResult<&str, Vec<ResultLine>> {
         map(delimited(char(';'), not_line_ending, line_ending), |_| {
             ResultLine::Comment
         }),
-        map(z3_oerror, |e| ResultLine::Error(e)),
+        map(z3_oerror, |e| ResultLine::Error(e.to_owned())),
         map(model, |m| ResultLine::Model(m)),
         map(timeout, |_| ResultLine::Timeout),
         map(segf, |_| ResultLine::SegF),
         map(av, |_| ResultLine::AssertionViolation),
-        map(generic, |s| ResultLine::Generic(s)),
+        map(generic, |s| ResultLine::Generic(s.to_owned())),
     ))))(s)
     .map(|(i, mut o)| {
         if i != "" {
-            o.push(ResultLine::Generic(i));
+            o.push(ResultLine::Generic(i.to_string()));
         }
         (i, o)
     })
