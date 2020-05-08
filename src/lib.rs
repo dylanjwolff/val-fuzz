@@ -15,6 +15,7 @@ pub mod parser;
 pub mod solver;
 pub mod transforms;
 
+use crate::solver::RSolve;
 use ast::Script;
 use bit_vec::BitVec;
 use crossbeam::queue::ArrayQueue;
@@ -23,23 +24,7 @@ use crossbeam::queue::SegQueue;
 use crossbeam::utils::Backoff;
 use nom::branch::alt;
 use nom::bytes::complete::take_until;
-
-
-
-
-
-
-
-
-
-
-
-
 use nom::multi::many1;
-
-
-
-
 
 use nom::{bytes::complete::tag, IResult};
 use parser::{rmv_comments, script};
@@ -351,24 +336,21 @@ fn bav_assign_worker(
         // TODO below
         let empty_skel_name = &filepaths.0.file_name().and_then(|s| s.to_str()).unwrap();
 
-        match solve(empty_skel_name) {
-            SolveResult::Timeout => {
-                println!("Timeout on file {}", empty_skel_name);
-                fs::remove_file(filepaths.0).unwrap_or(());
-                fs::remove_file(filepaths.1).unwrap_or(());
-            }
-            SolveResult::Error | SolveResult::ProcessError => {
-                fs::remove_file(filepaths.0).unwrap_or(());
-                fs::remove_file(filepaths.1).unwrap_or(());
-            }
-            SolveResult::ErrorBug => report_bug(filepaths.0.as_path(), SolveResult::ErrorBug),
-            SolveResult::SoundnessBug => {
-                report_bug(filepaths.0.as_path(), SolveResult::SoundnessBug)
-            }
-            SolveResult::Sat | SolveResult::Unsat | SolveResult::Unknown => {
-                add_iterations_to_q(script, bavns, &filepaths.0, &filepaths.1, Arc::clone(&qout));
-                ()
-            }
+        let (resultA, resultB) = solve(empty_skel_name);
+
+        if resultA.has_bug_error() || resultB.has_bug_error() {
+            report_bug(filepaths.0.as_path(), SolveResult::ErrorBug);
+        } else if RSolve::differential(&resultA, &resultB) {
+            report_bug(filepaths.0.as_path(), SolveResult::SoundnessBug);
+        } else if resultA.was_timeout() || resultB.was_timeout() {
+            println!("Timeout on file {}", empty_skel_name);
+            fs::remove_file(filepaths.0).unwrap_or(());
+            fs::remove_file(filepaths.1).unwrap_or(());
+        } else if resultA.has_unrecoverable_error() || resultB.has_unrecoverable_error() {
+            fs::remove_file(filepaths.0).unwrap_or(());
+            fs::remove_file(filepaths.1).unwrap_or(());
+        } else {
+            add_iterations_to_q(script, bavns, &filepaths.0, &filepaths.1, Arc::clone(&qout));
         }
     }
 
@@ -518,19 +500,16 @@ fn solver_worker(qin: BavAssingedQ, prev_stage: StageCompleteA) {
         };
 
         println!("Checking file {:?}", filepaths.0);
-        let outcome = solve(filepaths.0.to_str().unwrap_or("defaultname"));
-        match outcome {
-            SolveResult::ErrorBug | SolveResult::SoundnessBug => {
-                report_bug(filepaths.0.as_path(), outcome)
-            }
-            SolveResult::Timeout => {
-                println!("Timeout on file {:?}", filepaths.0);
-                fs::remove_file(&filepaths.0).unwrap_or(());
-                // no need to remove metadata file, as there is only one per seed right now
-            }
-            _ => {
-                fs::remove_file(&filepaths.0).unwrap_or(());
-            }
+        let (resultA, resultB) = solve(filepaths.0.to_str().unwrap_or("defaultname"));
+        if resultA.has_bug_error() || resultB.has_bug_error() {
+            report_bug(filepaths.0.as_path(), SolveResult::ErrorBug);
+        } else if RSolve::differential(&resultA, &resultB) {
+            report_bug(filepaths.0.as_path(), SolveResult::SoundnessBug);
+        } else if resultA.was_timeout() || resultB.was_timeout() {
+            println!("Timeout on file {:?}", filepaths.0);
+            fs::remove_file(&filepaths.0).unwrap_or(());
+        } else {
+            fs::remove_file(&filepaths.0).unwrap_or(());
         }
         println!("Done hecking file {:?}", &filepaths.0);
     }
@@ -686,7 +665,7 @@ fn to_strs(bv: &BitVec) -> Vec<&'static str> {
 mod tests {
     use super::*;
     use std::fs;
-    
+
     use std::thread;
 
     const STACK_SIZE: usize = 20 * 1024 * 1024;

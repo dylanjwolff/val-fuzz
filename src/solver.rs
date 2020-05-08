@@ -30,7 +30,7 @@ const MNA_CVC4: &str = "Cannot get model unless";
 const NON_FATAL_ERRORS: [&str; 2] = [MNA_CVC4, MNA_Z3];
 
 #[allow(dead_code)]
-struct RSolve {
+pub struct RSolve {
     stdout: String,
     stderr: String,
     lines: Vec<ResultLine>,
@@ -38,7 +38,7 @@ struct RSolve {
 
 #[allow(dead_code)]
 impl RSolve {
-    fn process_error() -> Self {
+    pub fn process_error() -> Self {
         RSolve {
             stdout: "".to_owned(),
             stderr: "".to_owned(),
@@ -46,7 +46,7 @@ impl RSolve {
         }
     }
 
-    fn move_new(stdout: String, stderr: String) -> Self {
+    pub fn move_new(stdout: String, stderr: String) -> Self {
         RSolve {
             // Following should never panic, as parser should never throw an error
             lines: {
@@ -59,7 +59,7 @@ impl RSolve {
         }
     }
 
-    fn new(stdout: &str, stderr: &str) -> Self {
+    pub fn new(stdout: &str, stderr: &str) -> Self {
         RSolve {
             stdout: stdout.to_owned(),
             stderr: stderr.to_owned(),
@@ -72,7 +72,7 @@ impl RSolve {
         }
     }
 
-    fn has_bug_error(&self) -> bool {
+    pub fn has_bug_error(&self) -> bool {
         for bug_error in BUG_ERRORS.iter() {
             if self.stdout.contains(bug_error) || self.stderr.contains(bug_error) {
                 return true;
@@ -81,7 +81,7 @@ impl RSolve {
         return false;
     }
 
-    fn has_unrecoverable_error(&self) -> bool {
+    pub fn has_unrecoverable_error(&self) -> bool {
         self.lines
             .iter()
             .filter_map(|l| match l {
@@ -92,14 +92,14 @@ impl RSolve {
             .any(|s| NON_FATAL_ERRORS.iter().all(|e| !s.contains(e)))
     }
 
-    fn was_timeout(&self) -> bool {
+    pub fn was_timeout(&self) -> bool {
         self.lines.iter().any(|l| match l {
             ResultLine::Timeout => true,
             _ => false,
         })
     }
 
-    fn differential(a: Self, b: Self) -> bool {
+    pub fn differential(a: &Self, b: &Self) -> bool {
         let is_out_result = |l: &&ResultLine| match l {
             ResultLine::Sat | ResultLine::Unsat | ResultLine::Unknown => true,
             _ => false,
@@ -114,14 +114,14 @@ impl RSolve {
             })
     }
 
-    fn has_sat(&self) -> bool {
+    pub fn has_sat(&self) -> bool {
         self.lines.iter().any(|l| match l {
             ResultLine::Sat => true,
             _ => false,
         })
     }
 
-    fn extract_const_var_vals(&self, varnames: Vec<&str>) -> Vec<(&Symbol, &SExp)> {
+    pub fn extract_const_var_vals(&self, varnames: Vec<&str>) -> Vec<(&Symbol, &SExp)> {
         self.lines
             .iter()
             .filter_map(|l| match l {
@@ -163,8 +163,8 @@ fn solve_z3(z3path: &str, filename: &str) -> RSolve {
     }
 }
 
-pub fn solve(filename: &str) -> SolveResult {
-    SolveResult::Unsat
+pub fn solve(filename: &str) -> (RSolve, RSolve) {
+    (solve_z3("z3", filename), solve_z3("z3", filename))
 }
 
 #[cfg(test)]
@@ -216,7 +216,7 @@ mod tests {
         let rstring = "sat (model (define-fun b () Int 0) (define-fun a () Int 1))";
         let r1 = RSolve::new("", rstring);
         let r2 = RSolve::new(rstring, "");
-        assert!(!RSolve::differential(r1, r2))
+        assert!(!RSolve::differential(&r1, &r2))
     }
 
     #[test]
@@ -224,7 +224,7 @@ mod tests {
         let rstring = "sat (model (define-fun b () Int 0) (define-fun a () Int 1))";
         let r1 = RSolve::new("", rstring);
         let r2 = RSolve::new("unsat", "");
-        assert!(RSolve::differential(r1, r2))
+        assert!(RSolve::differential(&r1, &r2))
     }
 
     #[test]
@@ -249,7 +249,7 @@ mod tests {
             unsat";
         let r1 = RSolve::new(r1str, "");
         let r2 = RSolve::new(r2str, "");
-        assert!(!RSolve::differential(r1, r2));
+        assert!(!RSolve::differential(&r1, &r2));
     }
 
     #[test]
@@ -272,20 +272,6 @@ mod tests {
         let rstr = "unsat \n (error \"something went wrong\")";
         let r = RSolve::new(rstr, "");
         assert!(r.has_unrecoverable_error());
-    }
-
-    #[ignore]
-    #[test]
-    fn to_detect() {
-        // need to manually shorten timeout for this one, hence ignored for now
-        let segf_file = "test/prp-13-24.smt2";
-        assert!(solve(segf_file) == SolveResult::Timeout);
-    }
-
-    #[test]
-    fn segf_detect() {
-        let segf_file = "known/8/352f4b5b3/3773_segf.smt2";
-        assert!(solve(segf_file) == SolveResult::ErrorBug);
     }
 
     #[test]
