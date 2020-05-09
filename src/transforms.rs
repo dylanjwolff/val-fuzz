@@ -1,6 +1,7 @@
 use crate::ast::{AstNode, BoolOp, Command, Constant, Logic, SExp, Script, Sort, Symbol};
 use crate::ast::{CommandRc, SExpRc, SortRc, SymbolRc};
 
+use crate::Metadata;
 use crate::Timer;
 use bit_vec::BitVec;
 use std::collections::BTreeMap;
@@ -160,28 +161,26 @@ pub fn get_bav_assign_fmt_str(bavns: &Vec<String>) -> Command {
 }
 
 /// returns the Boolean Abstract Variables added as vector of their names
-pub fn to_skel(script: &mut Script) -> Result<Vec<String>, ()> {
+pub fn to_skel(script: &mut Script, md: &mut Metadata) -> Result<(), ()> {
     let mut vng = VarNameGenerator::new("GEN");
-    rc(script, &mut vng);
-    println!("rc done");
+    rc(script, &mut vng, md);
     set_logic_all(script);
 
     let mut scopes = BTreeMap::new();
     rl(script, &mut scopes)?;
-    println!("rl done");
 
     vng.basename = "BAV".to_owned();
     let mut bavs = vec![];
     bav(script, &mut vng, &mut bavs).ok_or(())?;
-    println!("bav done");
 
     init_vars(script, vng.vars_generated);
-    let bavns = bavs
+    let mut bavns = bavs
         .iter()
         .map(|(name, _, _)| name.clone())
         .collect::<Vec<String>>();
+    md.bavns.append(&mut bavns);
     add_ba(script, bavs);
-    Ok(bavns)
+    Ok(())
 }
 
 pub fn rl(script: &mut Script, scoped_vars: &mut BTreeMap<String, Vec<SExp>>) -> Result<(), ()> {
@@ -289,26 +288,26 @@ fn rl_s(
     }
 }
 
-pub fn rc(script: &mut Script, vng: &mut VarNameGenerator) {
+pub fn rc(script: &mut Script, vng: &mut VarNameGenerator, md: &mut Metadata) {
     match script {
         Script::Commands(cmds) => {
             for cmd in cmds.iter_mut() {
-                rc_c(&mut *cmd.borrow_mut(), vng);
+                rc_c(&mut *cmd.borrow_mut(), vng, md);
             }
         }
     }
 }
 
-fn rc_c(cmd: &mut Command, vng: &mut VarNameGenerator) {
+fn rc_c(cmd: &mut Command, vng: &mut VarNameGenerator, md: &mut Metadata) {
     match cmd {
         Command::Assert(sexp) | Command::CheckSatAssuming(sexp) => {
-            rc_se(&mut *sexp.borrow_mut(), vng)
+            rc_se(&mut *sexp.borrow_mut(), vng, md)
         }
         _ => (),
     }
 }
 
-fn rc_se(sexp: &mut SExp, vng: &mut VarNameGenerator) {
+fn rc_se(sexp: &mut SExp, vng: &mut VarNameGenerator, md: &mut Metadata) {
     match sexp {
         SExp::Constant(c) => {
             let sort = match &*c.borrow_mut() {
@@ -320,20 +319,21 @@ fn rc_se(sexp: &mut SExp, vng: &mut VarNameGenerator) {
                 Constant::Hex(hit_s) => Sort::BitVec((hit_s.len() as u32) * 4),
             };
             let name = vng.get_name(sort);
+            md.constvns.push(name.clone());
             *sexp = SExp::Symbol(rccell!(Symbol::Var(name)));
         }
         SExp::Compound(sexps) | SExp::BExp(_, sexps) => {
             for sexp in sexps {
-                rc_se(&mut *sexp.borrow_mut(), vng)
+                rc_se(&mut *sexp.borrow_mut(), vng, md)
             }
         }
         SExp::Let(vbs, rest) => {
             for (_, sexp) in vbs {
-                rc_se(&mut *sexp.borrow_mut(), vng)
+                rc_se(&mut *sexp.borrow_mut(), vng, md)
             }
-            rc_se(&mut *rest.borrow_mut(), vng);
+            rc_se(&mut *rest.borrow_mut(), vng, md);
         }
-        SExp::QForAll(_, rest) => rc_se(&mut *rest.borrow_mut(), vng),
+        SExp::QForAll(_, rest) => rc_se(&mut *rest.borrow_mut(), vng, md),
         _ => (),
     }
 }

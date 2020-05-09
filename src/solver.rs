@@ -52,8 +52,6 @@ impl RSolve {
     pub fn move_new(stdout: String, stderr: String) -> Self {
         let mut v = z3o(&stdout).unwrap().1;
         v.extend(z3o(&stderr).unwrap().1);
-        println!("lines: {:?}", v);
-        println!("stoe: {}\n{}", stdout, stderr);
         RSolve {
             // Following should never panic, as parser should never throw an error
             lines: {
@@ -153,7 +151,7 @@ impl RSolve {
         })
     }
 
-    pub fn extract_const_var_vals(&self, varnames: Vec<&str>) -> Vec<(&Symbol, &SExp)> {
+    pub fn extract_const_var_vals(&self, varnames: &Vec<&str>) -> Vec<(&Symbol, &SExp)> {
         self.lines
             .iter()
             .filter_map(|l| match l {
@@ -255,7 +253,7 @@ mod tests {
                             0.0)
                         )";
         let r = RSolve::new(rstr, "");
-        assert_debug_snapshot!(r.extract_const_var_vals(vec!["GEN1", "GEN2", "BAV3"]));
+        assert_debug_snapshot!(r.extract_const_var_vals(&vec!["GEN1", "GEN2", "BAV3"]));
     }
 
     #[test]

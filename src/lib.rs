@@ -26,6 +26,7 @@ use nom::branch::alt;
 use nom::bytes::complete::take_until;
 use nom::multi::many1;
 
+use crate::ast::Symbol;
 use nom::{bytes::complete::tag, IResult};
 use parser::{rmv_comments, script};
 use rand::Rng;
@@ -45,11 +46,34 @@ use std::thread::JoinHandle;
 use std::time::Duration;
 use transforms::{end_insert_pt, get_bav_assign_fmt_str, to_skel};
 use walkdir::WalkDir;
+#[macro_use]
+use serde::{Serialize, Deserialize};
 
 type InputPPQ = Arc<SegQueue<Result<PathBuf, PoisonPill>>>;
 type SkeletonQueue = Arc<SegQueue<(PathBuf, PathBuf)>>;
 type BavAssingedQ = Arc<ArrayQueue<(PathBuf, PathBuf)>>;
 type StageCompleteA = Arc<StageComplete>;
+
+#[derive(Serialize, Deserialize, Debug, Eq, PartialEq, Clone)]
+pub struct Metadata {
+    bavns: Vec<String>,
+    constvns: Vec<String>,
+    seed_file: PathBuf,
+    skeleton_file: PathBuf,
+    metadata_file: PathBuf,
+}
+
+impl Metadata {
+    pub fn new_empty() -> Self {
+        Metadata {
+            bavns: vec![],
+            constvns: vec![],
+            seed_file: Path::new("").to_path_buf(),
+            skeleton_file: Path::new("").to_path_buf(),
+            metadata_file: Path::new("").to_path_buf(),
+        }
+    }
+}
 
 pub struct Timer {
     done: Arc<AtomicBool>,
@@ -132,7 +156,7 @@ pub fn from_skels() {
         .filter(|e| {
             e.file_name()
                 .to_str()
-                .map(|s| s.starts_with("bavns_skel"))
+                .map(|s| s.starts_with("md_skel"))
                 .unwrap_or(false)
         })
     {
@@ -291,11 +315,11 @@ fn mutator_worker(qin: InputPPQ, qout: SkeletonQueue, stage: StageCompleteA) {
         println!("Begin file {:?}", filepath);
         backoff.reset();
         match strip_and_transform(&filepath) {
-            Some((script, bavns)) => {
+            Some((script, md)) => {
                 let skel_name = get_new_name(&filepath, "skel");
 
                 let skel_file = Path::new(&skel_name).to_path_buf();
-                match serialize_to_f(&skel_file.as_path(), &script, &bavns) {
+                match serialize_to_f(&skel_file.as_path(), &script, &md) {
                     Ok(to_push) => qout.push(to_push),
                     Err(_) => continue,
                 }
@@ -325,7 +349,7 @@ fn bav_assign_worker(
             }
         };
 
-        let (script, bavns) = match deserialize_from_f(&filepaths) {
+        let (script, md) = match deserialize_from_f(&filepaths) {
             Ok(deserial) => deserial,
             Err(e) => {
                 println!("baw deserial err in {:?}: {}", filepaths, e);
@@ -350,7 +374,7 @@ fn bav_assign_worker(
             fs::remove_file(filepaths.0).unwrap_or(());
             fs::remove_file(filepaths.1).unwrap_or(());
         } else {
-            add_iterations_to_q(script, bavns, &filepaths.0, &filepaths.1, Arc::clone(&qout));
+            add_iterations_to_q(script, md, &filepaths.0, &filepaths.1, Arc::clone(&qout));
         }
     }
 
@@ -359,19 +383,19 @@ fn bav_assign_worker(
 
 fn add_iterations_to_q(
     mut script: Script,
-    bavns: Vec<String>,
+    md: Metadata,
     filepath: &Path,
-    bavn_fp: &Path,
+    md_fp: &Path,
     qout: BavAssingedQ,
 ) -> Option<()> {
     let backoff = Backoff::new();
 
     let eip = end_insert_pt(&script);
     script.init(eip);
-    script.replace(eip, get_bav_assign_fmt_str(&bavns));
+    script.replace(eip, get_bav_assign_fmt_str(&md.bavns));
     let script_str = script.to_string_dfltto()?;
 
-    let num_bavs = bavns.len();
+    let num_bavs = md.bavns.len();
     const MAX_ITER: u32 = 10;
     println!("starting max(2^{}, {}) iterations", num_bavs, MAX_ITER);
     let mut urng = RandUniqPermGen::new_definite(num_bavs, MAX_ITER);
@@ -381,7 +405,7 @@ fn add_iterations_to_q(
 
         let str_with_model = dyn_fmt(&script_str, to_strs(&truth_values)).ok()?;
         fs::write(&new_file, str_with_model).ok()?;
-        let mut to_push = (new_file.to_path_buf(), bavn_fp.to_path_buf());
+        let mut to_push = (new_file.to_path_buf(), md_fp.to_path_buf());
         while let Err(PushError(reject)) = qout.push(to_push) {
             to_push = reject;
             backoff.snooze();
@@ -409,20 +433,20 @@ fn get_new_name(source_file: &Path, prefix: &str) -> String {
 fn serialize_to_f(
     based_off_of: &Path,
     script: &Script,
-    bavns: &Vec<String>,
+    md: &Metadata,
 ) -> Result<(PathBuf, PathBuf), ()> {
-    let bavns_name = get_new_name(based_off_of, "bavns");
+    let md_name = get_new_name(based_off_of, "md");
     let script_name = get_new_name(based_off_of, "script");
-    let bavns_file = Path::new(&bavns_name);
+    let md_file = Path::new(&md_name);
     let script_file = Path::new(&script_name);
 
     match {
-        let bavns_serial = serde_lexpr::to_string(&(&bavns, &script_name)).map_err(|_| ())?;
+        let md_serial = serde_lexpr::to_string(&(&md, &script_name)).map_err(|_| ())?;
         let script_serial = script.to_string_dfltto().ok_or(())?;
 
-        fs::write(bavns_file, bavns_serial).map_err(|_| ())?;
+        fs::write(md_file, md_serial).map_err(|_| ())?;
         fs::write(script_file, script_serial).map_err(|_| ())?;
-        Ok((script_file.to_path_buf(), bavns_file.to_path_buf()))
+        Ok((script_file.to_path_buf(), md_file.to_path_buf()))
     } {
         Ok(r) => Ok(r),
         Err(()) => Err(println!("serial error file {:?}", based_off_of)),
@@ -430,8 +454,8 @@ fn serialize_to_f(
 }
 
 fn deserialize_from_f(
-    (script_file, bavns_file): &(PathBuf, PathBuf),
-) -> Result<(Script, Vec<String>), String> {
+    (script_file, md_file): &(PathBuf, PathBuf),
+) -> Result<(Script, Metadata), String> {
     let script_contents =
         fs::read_to_string(&script_file).map_err(|e| e.to_string() + " from IO")?;
     let presult = script(&script_contents).map_err(|e| e.to_string() + " from parsing")?;
@@ -441,38 +465,20 @@ fn deserialize_from_f(
     } else {
         let script = presult.1;
 
-        let bavns_contents =
-            fs::read_to_string(&bavns_file).map_err(|e| e.to_string() + " from bavn IO")?;
-        let (bavns, _): (Vec<String>, PathBuf) =
-            serde_lexpr::from_str(&bavns_contents).map_err(|e| e.to_string() + " from serde")?;
+        let md_contents =
+            fs::read_to_string(&md_file).map_err(|e| e.to_string() + " from metadata IO")?;
+        let (md, _): (Metadata, PathBuf) =
+            serde_lexpr::from_str(&md_contents).map_err(|e| e.to_string() + " from serde")?;
 
-        Ok((script, bavns))
+        Ok((script, md))
     }
 }
 
-fn deserialize_from_metadata_f(bavns_file: &PathBuf) -> Result<(Script, Vec<String>), String> {
-    let bavns_contents =
-        fs::read_to_string(&bavns_file).map_err(|e| e.to_string() + " from bavn IO")?;
-    let (bavns, script_file): (Vec<String>, PathBuf) =
-        serde_lexpr::from_str(&bavns_contents).map_err(|e| e.to_string() + " from serde")?;
-
-    let script_contents =
-        fs::read_to_string(&script_file).map_err(|e| e.to_string() + " from IO")?;
-    let presult = script(&script_contents).map_err(|e| e.to_string() + " from parsing")?;
-
-    if presult.0 != "" {
-        Err("Incomplete Parse!".to_owned())
-    } else {
-        let script = presult.1;
-        Ok((script, bavns))
-    }
-}
-
-fn script_f_from_metadata_f(bavns_file: &PathBuf) -> Result<PathBuf, String> {
-    let bavns_contents =
-        fs::read_to_string(&bavns_file).map_err(|e| e.to_string() + " from bavn IO")?;
-    let (_, script_file): (Vec<String>, PathBuf) =
-        serde_lexpr::from_str(&bavns_contents).map_err(|e| e.to_string() + " from serde")?;
+fn script_f_from_metadata_f(md_file: &PathBuf) -> Result<PathBuf, String> {
+    let md_contents =
+        fs::read_to_string(&md_file).map_err(|e| e.to_string() + " from metadata IO")?;
+    let (_, script_file): (Metadata, PathBuf) =
+        serde_lexpr::from_str(&md_contents).map_err(|e| e.to_string() + " from serde")?;
 
     Ok(script_file)
 }
@@ -579,7 +585,7 @@ impl RandUniqPermGen {
     }
 }
 
-pub fn strip_and_transform(source_file: &Path) -> Option<(Script, Vec<String>)> {
+pub fn strip_and_transform(source_file: &Path) -> Option<(Script, Metadata)> {
     let contents: String = fs::read_to_string(source_file).ok()?;
     let stripped_contents = &rmv_comments(&contents[..]).ok()?.1.join(" ")[..];
     let mut script = script(&stripped_contents[..]).ok()?.1;
@@ -590,9 +596,10 @@ pub fn strip_and_transform(source_file: &Path) -> Option<(Script, Vec<String>)> 
         return None;
     }
 
-    let bavns = to_skel(&mut script).ok()?;
+    let mut md = Metadata::new_empty();
+    to_skel(&mut script, &mut md).ok()?;
     println!("Done skelling");
-    return Some((script, bavns));
+    return Some((script, md));
 }
 
 fn get_iter_fileout_name(source_file: &Path, iter: u32) -> String {
