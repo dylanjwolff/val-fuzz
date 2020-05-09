@@ -138,6 +138,31 @@ impl RSolve {
     }
 }
 
+fn solve_cvc4(cvc4path: &str, filename: &str) -> RSolve {
+    let cvc4_res = process::Command::new("timeout")
+        .args(&[
+            "-v",
+            "6s",
+            cvc4path,
+            "--produce-models",
+            "--incremental",
+            filename,
+        ])
+        .output();
+
+    let cvc4mrs = cvc4_res.map(|out| {
+        let stderr = from_utf8(&out.stderr[..]).unwrap_or("");
+        let stdout = from_utf8(&out.stdout[..]).unwrap_or("");
+        let success = out.status.success();
+        (success, stderr.to_owned(), stdout.to_owned())
+    });
+
+    match cvc4mrs {
+        Ok((cvc4_succ, cvc4_out, cvc4_err)) => RSolve::move_new(cvc4_out, cvc4_err),
+        Err(_) => RSolve::process_error(),
+    }
+}
+
 fn solve_z3(z3path: &str, filename: &str) -> RSolve {
     let z3_res = process::Command::new("timeout")
         .args(&[
@@ -162,9 +187,8 @@ fn solve_z3(z3path: &str, filename: &str) -> RSolve {
         Err(_) => RSolve::process_error(),
     }
 }
-
 pub fn solve(filename: &str) -> (RSolve, RSolve) {
-    (solve_z3("z3", filename), solve_z3("z3", filename))
+    (solve_cvc4("cvc4", filename), solve_z3("z3", filename))
 }
 
 #[cfg(test)]
