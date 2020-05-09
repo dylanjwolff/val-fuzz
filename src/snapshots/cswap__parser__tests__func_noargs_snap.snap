@@ -1,0 +1,23 @@
+---
+source: src/parser.rs
+expression: "define_func(\"(define-fun foo () Int 7)\")"
+---
+Ok(
+    (
+        "",
+        (
+            Token(
+                "foo",
+            ),
+            [],
+            UInt,
+            Constant(
+                RefCell {
+                    value: UInt(
+                        "7",
+                    ),
+                },
+            ),
+        ),
+    ),
+)

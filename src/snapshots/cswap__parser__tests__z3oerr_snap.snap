@@ -1,0 +1,10 @@
+---
+source: src/parser.rs
+expression: "z3_oerror(\"(error \\\"line 6 column 52: unknown constant emptyset\\\")\")"
+---
+Ok(
+    (
+        "",
+        "line 6 column 52: unknown constant emptyset",
+    ),
+)

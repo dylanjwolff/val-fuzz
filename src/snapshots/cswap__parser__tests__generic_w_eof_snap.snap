@@ -1,0 +1,14 @@
+---
+source: src/parser.rs
+expression: "z3o(\"no linebreak before end\")"
+---
+Ok(
+    (
+        "no linebreak before end",
+        [
+            Generic(
+                "no linebreak before end",
+            ),
+        ],
+    ),
+)

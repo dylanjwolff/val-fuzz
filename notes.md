@@ -20,3 +20,10 @@ Weekly email
 Nested Macros
 parsing model
 more manual
+
+@TODO 7th May
+[] Add model parsing to solver.rs
+add (get-model) to scripts...
+i.e. be able to automatically run the fuzzer and get a model for SAT formulas
+(stretch): replug the model back to a second solver call
+(stretch): determine why there were so many unsat results

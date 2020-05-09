@@ -1,0 +1,87 @@
+---
+source: src/parser.rs
+expression: r
+---
+(
+    "",
+    Commands(
+        [
+            RefCell {
+                value: Assert(
+                    RefCell {
+                        value: Compound(
+                            [
+                                RefCell {
+                                    value: Symbol(
+                                        RefCell {
+                                            value: Token(
+                                                "exists",
+                                            ),
+                                        },
+                                    ),
+                                },
+                                RefCell {
+                                    value: Compound(
+                                        [
+                                            RefCell {
+                                                value: Compound(
+                                                    [
+                                                        RefCell {
+                                                            value: Symbol(
+                                                                RefCell {
+                                                                    value: Token(
+                                                                        "ah",
+                                                                    ),
+                                                                },
+                                                            ),
+                                                        },
+                                                        RefCell {
+                                                            value: Symbol(
+                                                                RefCell {
+                                                                    value: Token(
+                                                                        "Real",
+                                                                    ),
+                                                                },
+                                                            ),
+                                                        },
+                                                    ],
+                                                ),
+                                            },
+                                        ],
+                                    ),
+                                },
+                                RefCell {
+                                    value: BExp(
+                                        RefCell {
+                                            value: Equals,
+                                        },
+                                        [
+                                            RefCell {
+                                                value: Symbol(
+                                                    RefCell {
+                                                        value: Token(
+                                                            "ah",
+                                                        ),
+                                                    },
+                                                ),
+                                            },
+                                            RefCell {
+                                                value: Constant(
+                                                    RefCell {
+                                                        value: UInt(
+                                                            "4",
+                                                        ),
+                                                    },
+                                                ),
+                                            },
+                                        ],
+                                    ),
+                                },
+                            ],
+                        ),
+                    },
+                ),
+            },
+        ],
+    ),
+)

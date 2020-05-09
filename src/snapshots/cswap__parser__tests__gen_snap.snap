@@ -1,0 +1,10 @@
+---
+source: src/parser.rs
+expression: "generic(\"no linebreak before end\")"
+---
+Ok(
+    (
+        "",
+        "no linebreak before end",
+    ),
+)

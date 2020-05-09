@@ -1,0 +1,10 @@
+---
+source: src/parser.rs
+expression: z3_oerror(response)
+---
+Ok(
+    (
+        "",
+        "Parse Error: ../samples/z3.44.produced.smt2:3.3: Unexpected token: \'sat\'.\n\n              sat\n              ^\n            ",
+    ),
+)

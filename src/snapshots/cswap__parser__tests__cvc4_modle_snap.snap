@@ -1,0 +1,314 @@
+---
+source: src/parser.rs
+expression: model(response)
+---
+Ok(
+    (
+        "",
+        [
+            (
+                Token(
+                    "f",
+                ),
+                [
+                    (
+                        RefCell {
+                            value: Var(
+                                "BOUND_VARIABLE_397",
+                            ),
+                        },
+                        RefCell {
+                            value: UInt,
+                        },
+                    ),
+                ],
+                Compound(
+                    [
+                        RefCell {
+                            value: UserDef(
+                                "Set",
+                            ),
+                        },
+                        RefCell {
+                            value: UInt,
+                        },
+                    ],
+                ),
+                Compound(
+                    [
+                        RefCell {
+                            value: Symbol(
+                                RefCell {
+                                    value: Token(
+                                        "ite",
+                                    ),
+                                },
+                            ),
+                        },
+                        RefCell {
+                            value: BExp(
+                                RefCell {
+                                    value: Equals,
+                                },
+                                [
+                                    RefCell {
+                                        value: Symbol(
+                                            RefCell {
+                                                value: Token(
+                                                    "BOUND_VARIABLE_397",
+                                                ),
+                                            },
+                                        ),
+                                    },
+                                    RefCell {
+                                        value: Compound(
+                                            [
+                                                RefCell {
+                                                    value: Symbol(
+                                                        RefCell {
+                                                            value: Token(
+                                                                "-",
+                                                            ),
+                                                        },
+                                                    ),
+                                                },
+                                                RefCell {
+                                                    value: Constant(
+                                                        RefCell {
+                                                            value: UInt(
+                                                                "1",
+                                                            ),
+                                                        },
+                                                    ),
+                                                },
+                                            ],
+                                        ),
+                                    },
+                                ],
+                            ),
+                        },
+                        RefCell {
+                            value: Compound(
+                                [
+                                    RefCell {
+                                        value: Symbol(
+                                            RefCell {
+                                                value: Token(
+                                                    "singleton",
+                                                ),
+                                            },
+                                        ),
+                                    },
+                                    RefCell {
+                                        value: Constant(
+                                            RefCell {
+                                                value: UInt(
+                                                    "0",
+                                                ),
+                                            },
+                                        ),
+                                    },
+                                ],
+                            ),
+                        },
+                        RefCell {
+                            value: Compound(
+                                [
+                                    RefCell {
+                                        value: Symbol(
+                                            RefCell {
+                                                value: Token(
+                                                    "as",
+                                                ),
+                                            },
+                                        ),
+                                    },
+                                    RefCell {
+                                        value: Symbol(
+                                            RefCell {
+                                                value: Token(
+                                                    "emptyset",
+                                                ),
+                                            },
+                                        ),
+                                    },
+                                    RefCell {
+                                        value: Compound(
+                                            [
+                                                RefCell {
+                                                    value: Symbol(
+                                                        RefCell {
+                                                            value: Token(
+                                                                "Set",
+                                                            ),
+                                                        },
+                                                    ),
+                                                },
+                                                RefCell {
+                                                    value: Symbol(
+                                                        RefCell {
+                                                            value: Token(
+                                                                "Int",
+                                                            ),
+                                                        },
+                                                    ),
+                                                },
+                                            ],
+                                        ),
+                                    },
+                                ],
+                            ),
+                        },
+                    ],
+                ),
+            ),
+            (
+                Token(
+                    "x",
+                ),
+                [],
+                UInt,
+                Compound(
+                    [
+                        RefCell {
+                            value: Symbol(
+                                RefCell {
+                                    value: Token(
+                                        "-",
+                                    ),
+                                },
+                            ),
+                        },
+                        RefCell {
+                            value: Constant(
+                                RefCell {
+                                    value: UInt(
+                                        "1",
+                                    ),
+                                },
+                            ),
+                        },
+                    ],
+                ),
+            ),
+            (
+                Token(
+                    "y",
+                ),
+                [],
+                UInt,
+                Constant(
+                    RefCell {
+                        value: UInt(
+                            "0",
+                        ),
+                    },
+                ),
+            ),
+            (
+                Token(
+                    "S",
+                ),
+                [],
+                Compound(
+                    [
+                        RefCell {
+                            value: UserDef(
+                                "Set",
+                            ),
+                        },
+                        RefCell {
+                            value: UInt,
+                        },
+                    ],
+                ),
+                Compound(
+                    [
+                        RefCell {
+                            value: Symbol(
+                                RefCell {
+                                    value: Token(
+                                        "as",
+                                    ),
+                                },
+                            ),
+                        },
+                        RefCell {
+                            value: Symbol(
+                                RefCell {
+                                    value: Token(
+                                        "emptyset",
+                                    ),
+                                },
+                            ),
+                        },
+                        RefCell {
+                            value: Compound(
+                                [
+                                    RefCell {
+                                        value: Symbol(
+                                            RefCell {
+                                                value: Token(
+                                                    "Set",
+                                                ),
+                                            },
+                                        ),
+                                    },
+                                    RefCell {
+                                        value: Symbol(
+                                            RefCell {
+                                                value: Token(
+                                                    "Int",
+                                                ),
+                                            },
+                                        ),
+                                    },
+                                ],
+                            ),
+                        },
+                    ],
+                ),
+            ),
+            (
+                Token(
+                    "T",
+                ),
+                [],
+                Compound(
+                    [
+                        RefCell {
+                            value: UserDef(
+                                "Set",
+                            ),
+                        },
+                        RefCell {
+                            value: UInt,
+                        },
+                    ],
+                ),
+                Compound(
+                    [
+                        RefCell {
+                            value: Symbol(
+                                RefCell {
+                                    value: Token(
+                                        "singleton",
+                                    ),
+                                },
+                            ),
+                        },
+                        RefCell {
+                            value: Constant(
+                                RefCell {
+                                    value: UInt(
+                                        "0",
+                                    ),
+                                },
+                            ),
+                        },
+                    ],
+                ),
+            ),
+        ],
+    ),
+)

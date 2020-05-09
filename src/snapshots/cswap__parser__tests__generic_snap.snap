@@ -1,0 +1,10 @@
+---
+source: src/parser.rs
+expression: "generic(\"line \\n break\")"
+---
+Ok(
+    (
+        " break",
+        "line ",
+    ),
+)

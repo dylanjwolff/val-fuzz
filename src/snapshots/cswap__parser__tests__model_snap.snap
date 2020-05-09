@@ -1,0 +1,25 @@
+---
+source: src/parser.rs
+expression: "model(\"(model (define-fun f () Int 7))\")"
+---
+Ok(
+    (
+        "",
+        [
+            (
+                Token(
+                    "f",
+                ),
+                [],
+                UInt,
+                Constant(
+                    RefCell {
+                        value: UInt(
+                            "7",
+                        ),
+                    },
+                ),
+            ),
+        ],
+    ),
+)

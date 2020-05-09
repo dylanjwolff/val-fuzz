@@ -3,6 +3,7 @@ use super::ast::{
     SymbolRc,
 };
 use nom::branch::alt;
+use nom::bytes::complete::take_until;
 use nom::bytes::complete::take_while;
 use nom::bytes::complete::take_while1;
 use nom::character::complete::char;
@@ -18,6 +19,7 @@ use nom::multi::many1;
 use nom::number::complete::recognize_float;
 use nom::sequence::delimited;
 use nom::sequence::preceded;
+use nom::sequence::terminated;
 use nom::{bytes::complete::tag, combinator::map, sequence::tuple, IResult};
 
 macro_rules! ws {
@@ -276,10 +278,231 @@ pub fn rmv_comments(s: &str) -> IResult<&str, Vec<&str>> {
     many1(alt((not_comment, map(comment, |_| ""))))(s)
 }
 
+pub fn define_func(s: &str) -> IResult<&str, (Symbol, Vec<(SymbolRc, SortRc)>, Sort, SExp)> {
+    let mapped_symbol = map(symbol, |s| Symbol::Token(s.to_owned()));
+    brack!(preceded(
+        ws!(tag("define-fun")),
+        tuple((
+            ws!(mapped_symbol),
+            brack!(many0(ws!(var_binding))),
+            ws!(sort),
+            ws!(sexp)
+        ))
+    ))(s)
+}
+
+pub fn model(s: &str) -> IResult<&str, Vec<(Symbol, Vec<(SymbolRc, SortRc)>, Sort, SExp)>> {
+    brack!(preceded(ws!(tag("model")), many0(ws!(define_func))))(s)
+}
+
+pub fn z3_oerror(s: &str) -> IResult<&str, &str> {
+    brack!(preceded(ws!(tag("error")), ws!(string)))(s)
+}
+type FuncDefine = (Symbol, Vec<(SymbolRc, SortRc)>, Sort, SExp);
+
+#[derive(Debug, Eq, PartialEq, Clone)]
+pub enum ResultLine {
+    Sat,
+    Unsat,
+    Unknown,
+    Unsupported,
+    Comment,
+    Timeout,
+    Generic(String),
+    SegF,
+    AssertionViolation,
+    Error(String),
+    Model(Vec<FuncDefine>),
+}
+
+fn timeout(s: &str) -> IResult<&str, &str> {
+    preceded(
+        ws!(tag("timeout: sending signal TERM to command")),
+        ws!(symbol),
+    )(s)
+}
+
+fn segf(s: &str) -> IResult<&str, &str> {
+    tag("timeout: the monitored command dumped core")(s)
+}
+
+pub fn z3o(s: &str) -> IResult<&str, Vec<ResultLine>> {
+    many0(ws!(alt((
+        map(tag("sat"), |_| ResultLine::Sat),
+        map(tag("unsat"), |_| ResultLine::Unsat),
+        map(tag("unknown"), |_| ResultLine::Unknown),
+        map(tag("unsupported"), |_| ResultLine::Unsupported),
+        map(delimited(char(';'), not_line_ending, line_ending), |_| {
+            ResultLine::Comment
+        }),
+        map(z3_oerror, |e| ResultLine::Error(e.to_owned())),
+        map(model, |m| ResultLine::Model(m)),
+        map(timeout, |_| ResultLine::Timeout),
+        map(segf, |_| ResultLine::SegF),
+        map(av, |_| ResultLine::AssertionViolation),
+        map(generic, |s| ResultLine::Generic(s.to_owned())),
+    ))))(s)
+    .map(|(i, mut o)| {
+        if i != "" {
+            o.push(ResultLine::Generic(i.to_string()));
+        }
+        (i, o)
+    })
+}
+
+fn iv_model_err(s: &str) -> IResult<&str, &str> {
+    brack!(preceded(
+        ws!(tag("error")),
+        delimited(
+            char('"'),
+            preceded(
+                take_until("invalid model was generated"),
+                tag("invalid model was generated")
+            ),
+            char('"')
+        )
+    ))(s)
+}
+
+fn av(s: &str) -> IResult<&str, &str> {
+    delimited(
+        ws!(tag("ASSERTION VIOLATION")),
+        take_until("(G)DB"),
+        tag("(G)DB"),
+    )(s)
+}
+
+fn generic(s: &str) -> IResult<&str, &str> {
+    terminated(not_line_ending, line_ending)(s)
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
+    use insta::assert_debug_snapshot;
     use std::fs;
+
+    #[test]
+    fn generic_snap() {
+        assert_debug_snapshot!(generic("line \n break"));
+    }
+
+    #[test]
+    fn generic_w_eof_snap() {
+        assert_debug_snapshot!(z3o("no linebreak before end"));
+    }
+
+    #[test]
+    fn av_snap() {
+        assert_debug_snapshot!(av("ASSERTION VIOLATION
+                File: ../src/qe/qsat.cpp
+                Line: 631
+                validate_defs(\"check_sat\")
+                (C)ontinue, (A)bort, (S)top, (T)hrow exception, Invoke (G)DB"));
+    }
+
+    #[test]
+    fn iv_snap() {
+        assert_debug_snapshot!(iv_model_err(
+            "(error \"line 5 column 10: an invalid model was generated\")"
+        ));
+    }
+
+    #[test]
+    fn segf_snap() {
+        assert_debug_snapshot!(segf("timeout: the monitored command dumped core"));
+    }
+
+    #[test]
+    fn timeout_snap() {
+        assert_debug_snapshot!(timeout("timeout: sending signal TERM to command ‘z3’"));
+    }
+
+    #[test]
+    fn z3o_model_snap() {
+        let response = "sat
+                        (model 
+                          (define-fun b () Int
+                            0)
+                          (define-fun a () Int
+                            1)
+                          (define-fun e () Real
+                            1.0)
+                          (define-fun GEN1 () Real
+                            (- 1.0))
+                          (define-fun BAV5 () Bool
+                            true)
+                          (define-fun BAV4 () Bool
+                            true)
+                          (define-fun BAV3 () Bool
+                            true)
+                          (define-fun c () Int
+                            0)
+                          (define-fun GEN2 () Real
+                            0.0)
+                          (define-fun d () Real
+                            0.0)
+                        )";
+        assert_debug_snapshot!(z3o(response));
+    }
+
+    #[test]
+    fn z3o_errors_snap() {
+        let response = "unsupported
+                        ; ignoring unsupported logic QF_ALL_SUPPORTED line: 2 position: 1
+                        (error \"line 5 column 52: unknown constant emptyset\")
+                        (error \"line 6 column 60: unknown function/constant member\")
+                        (error \"line 7 column 71: unknown function/constant singleton\")
+                        (error \"line 168 column 52: unknown function/constant smt_set_mem\")
+                        sat";
+        assert_debug_snapshot!(z3o(response));
+    }
+
+    #[test]
+    fn cvc4_modle_snap() {
+        let response = "(model
+            (define-fun f ((BOUND_VARIABLE_397 Int)) (Set Int) (ite (= BOUND_VARIABLE_397 (- 1)) (singleton 0) (as emptyset (Set Int))))
+            (define-fun x () Int (- 1))
+            (define-fun y () Int 0)
+            (define-fun S () (Set Int) (as emptyset (Set Int)))
+            (define-fun T () (Set Int) (singleton 0))
+            )";
+        assert_debug_snapshot!(model(response));
+    }
+
+    #[test]
+    fn cvc4o_err_snap() {
+        let response =
+            "(error \"Parse Error: ../samples/z3.44.produced.smt2:3.3: Unexpected token: 'sat'.
+
+              sat
+              ^
+            \")";
+
+        assert_debug_snapshot!(z3_oerror(response));
+    }
+
+    #[test]
+    fn z3oerr_snap() {
+        assert_debug_snapshot!(z3_oerror(
+            "(error \"line 6 column 52: unknown constant emptyset\")"
+        ));
+    }
+
+    #[test]
+    fn model_snap() {
+        assert_debug_snapshot!(model("(model (define-fun f () Int 7))"));
+    }
+
+    #[test]
+    fn func_snap() {
+        assert_debug_snapshot!(define_func("(define-fun foo ((a Real) (b String)) Int 7)"));
+    }
+
+    #[test]
+    fn func_noargs_snap() {
+        assert_debug_snapshot!(define_func("(define-fun foo () Int 7)"));
+    }
 
     fn parse_file(f: &str) -> Script {
         let contents = &fs::read_to_string(f).expect("error reading file")[..];
@@ -292,17 +515,13 @@ mod tests {
     }
 
     #[test]
-    fn quant() {
-        quantifier("(forall ((ah Real)) (= ah 4))").unwrap();
+    fn quant_snap() {
+        assert_debug_snapshot!(quantifier("(forall ((ah Real)) (= ah 4))"));
     }
 
     #[test]
     fn equant() {
-        let r =
-            script("(assert (forall ((ah Real)) (= ah 4)))(assert (exists ((ah Real)) (= ah 4)))")
-                .unwrap();
-        let Script::Commands(cmds) = r.1;
-        println!("CEXSIT {:?}", cmds.last());
-        println!("not p {:?}", r.0);
+        let r = script("(assert (exists ((ah Real)) (= ah 4)))").unwrap();
+        assert_debug_snapshot!(r);
     }
 }

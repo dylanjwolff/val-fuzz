@@ -1,0 +1,48 @@
+---
+source: src/parser.rs
+expression: "quantifier(\"(forall ((ah Real)) (= ah 4))\")"
+---
+Ok(
+    (
+        "",
+        (
+            [
+                (
+                    RefCell {
+                        value: Var(
+                            "ah",
+                        ),
+                    },
+                    RefCell {
+                        value: Dec,
+                    },
+                ),
+            ],
+            BExp(
+                RefCell {
+                    value: Equals,
+                },
+                [
+                    RefCell {
+                        value: Symbol(
+                            RefCell {
+                                value: Token(
+                                    "ah",
+                                ),
+                            },
+                        ),
+                    },
+                    RefCell {
+                        value: Constant(
+                            RefCell {
+                                value: UInt(
+                                    "4",
+                                ),
+                            },
+                        ),
+                    },
+                ],
+            ),
+        ),
+    ),
+)
