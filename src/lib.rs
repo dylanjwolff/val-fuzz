@@ -372,7 +372,7 @@ fn add_iterations_to_q(
     let script_str = script.to_string_dfltto()?;
 
     let num_bavs = bavns.len();
-    const MAX_ITER: u32 = 1000;
+    const MAX_ITER: u32 = 10;
     println!("starting max(2^{}, {}) iterations", num_bavs, MAX_ITER);
     let mut urng = RandUniqPermGen::new_definite(num_bavs, MAX_ITER);
     while let Some(truth_values) = urng.sample() {

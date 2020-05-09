@@ -28,6 +28,9 @@ const BUG_ERRORS: [&str; 7] = [SF, SF_L, SF_DC, AV, AF, IE, IVM];
 const MNA_Z3: &str = "model is not available";
 const MNA_CVC4: &str = "Cannot get model unless";
 const NON_FATAL_ERRORS: [&str; 2] = [MNA_CVC4, MNA_Z3];
+const SIGTERM_TO: &str = "interrupted by SIGTERM";
+const UNIMPL: &str = "Unimplemented code";
+const NON_BUG_ERRORS: [&str; 2] = [SIGTERM_TO, UNIMPL];
 
 #[allow(dead_code)]
 pub struct RSolve {
@@ -47,6 +50,10 @@ impl RSolve {
     }
 
     pub fn move_new(stdout: String, stderr: String) -> Self {
+        let mut v = z3o(&stdout).unwrap().1;
+        v.extend(z3o(&stderr).unwrap().1);
+        println!("lines: {:?}", v);
+        println!("stoe: {}\n{}", stdout, stderr);
         RSolve {
             // Following should never panic, as parser should never throw an error
             lines: {
@@ -60,6 +67,10 @@ impl RSolve {
     }
 
     pub fn new(stdout: &str, stderr: &str) -> Self {
+        let mut v = z3o(&stdout).unwrap().1;
+        v.extend(z3o(&stderr).unwrap().1);
+        println!("lines: {:?}", v);
+        println!("stoe: {}\n{}", stdout, stderr);
         RSolve {
             stdout: stdout.to_owned(),
             stderr: stderr.to_owned(),
@@ -72,9 +83,22 @@ impl RSolve {
         }
     }
 
+    fn bug_is_negated(&self, bug_error: &str) -> bool {
+        if bug_error == SF_DC {
+            for nbe in NON_BUG_ERRORS.iter() {
+                if self.stdout.contains(nbe) || self.stderr.contains(nbe) {
+                    return true;
+                }
+            }
+        }
+        return false;
+    }
+
     pub fn has_bug_error(&self) -> bool {
         for bug_error in BUG_ERRORS.iter() {
-            if self.stdout.contains(bug_error) || self.stderr.contains(bug_error) {
+            if (self.stdout.contains(bug_error) || self.stderr.contains(bug_error))
+                && !self.bug_is_negated(bug_error)
+            {
                 return true;
             }
         }
@@ -100,6 +124,14 @@ impl RSolve {
     }
 
     pub fn differential(a: &Self, b: &Self) -> bool {
+        if a.has_unrecoverable_error()
+            || b.has_unrecoverable_error()
+            || a.was_timeout()
+            || b.was_timeout()
+        {
+            return false;
+        }
+
         let is_out_result = |l: &&ResultLine| match l {
             ResultLine::Sat | ResultLine::Unsat | ResultLine::Unknown => true,
             _ => false,
@@ -289,6 +321,33 @@ mod tests {
                 (error \"Cannot get model unless immediately preceded by SAT/NOT_ENTAILED or UNKNOWN response.\")";
         let r = RSolve::new(rstr, "");
         assert!(!r.has_unrecoverable_error());
+    }
+
+    #[test]
+    fn cvc4_timeout() {
+        let rstr = "timeout: sending signal TERM to command ‘cvc4’\nCVC4 interrupted by SIGTERM.\n timeout: the monitored command dumped core";
+        let r = RSolve::new(rstr, "");
+        assert!(!r.has_bug_error());
+    }
+
+    #[test]
+    fn cvc4_unimpl_not_bug() {
+        let rstr = "Fatal failure within CVC4::Node CVC4::theory::fp::FpConverter::convert(CVC4::TNode) at /home/dylan/git/constant-swap/scripts/.solvers/cvc4/src/theory/fp/fp_converter.cpp:1700
+        Unimplemented code encounteredConversion is dependent on SymFPU
+        timeout: the monitored command dumped core";
+        let r = RSolve::new(rstr, "");
+        assert!(!r.has_bug_error());
+    }
+
+    #[test]
+    fn difft_diff_w_error() {
+        let rstr1 =
+            "(error \"line 11 column 79: Sort mismatch between first argument and argument 2\")
+                sat";
+        let rstr2 = "unsat";
+        let r1 = RSolve::new(rstr1, "");
+        let r2 = RSolve::new(rstr2, "");
+        assert!(!RSolve::differential(&r1, &r2));
     }
 
     #[test]
