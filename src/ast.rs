@@ -133,7 +133,11 @@ impl Script {
 
     pub fn insert(&mut self, i: usize, cmd: Command) {
         let Script::Commands(cmds) = self;
-        cmds.insert(i, rccell!(cmd));
+        if i > cmds.len() {
+            cmds.push(rccell!(cmd));
+        } else {
+            cmds.insert(i, rccell!(cmd));
+        }
     }
 
     pub fn replace(&mut self, i: usize, cmd: Command) {
@@ -144,6 +148,17 @@ impl Script {
     pub fn init(&mut self, i: usize) {
         let Script::Commands(cmds) = self;
         cmds.insert(i, rccell!(Command::Assert(rccell!(SExp::true_sexp()))));
+    }
+
+    pub fn index_is_gm(&self, i: usize) -> bool {
+        let Script::Commands(cmds) = self;
+        if i >= cmds.len() {
+            return false;
+        }
+        match &*cmds[i].borrow() {
+            Command::GetModel() => true,
+            _ => false,
+        }
     }
 
     pub fn is_unsupported_logic(&self) -> bool {

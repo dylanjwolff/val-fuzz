@@ -127,6 +127,19 @@ pub fn end_insert_pt(script: &Script) -> usize {
     }
 }
 
+pub fn checksat_positions(script: &Script) -> Vec<usize> {
+    let Script::Commands(cmds) = script;
+
+    let mut cmds_iter = cmds.iter();
+
+    let mut checksats = vec![];
+    while let Some(pos) = cmds_iter.position(|cmd| cmd.borrow().is_checksat()) {
+        checksats.push(pos);
+    }
+
+    checksats
+}
+
 pub fn get_bav_assign(bavns: &Vec<String>, ta: BitVec) -> Command {
     let bavs = bavns.into_iter().zip(ta.into_iter());
     let mut baveq = bavs.into_iter().map(|(vname, bval)| {
@@ -161,7 +174,6 @@ pub fn get_bav_assign_fmt_str(bavns: &Vec<String>) -> Command {
     assert_many(&mut baveq)
 }
 
-/// returns the Boolean Abstract Variables added as vector of their names
 pub fn to_skel(script: &mut Script, md: &mut Metadata) -> Result<(), ()> {
     let mut vng = VarNameGenerator::new("GEN");
     rc(script, &mut vng, md);
@@ -181,7 +193,17 @@ pub fn to_skel(script: &mut Script, md: &mut Metadata) -> Result<(), ()> {
         .collect::<Vec<String>>();
     md.bavns.append(&mut bavns);
     add_ba(script, bavs);
+    add_get_model(script);
     Ok(())
+}
+
+pub fn add_get_model(script: &mut Script) {
+    let csps = checksat_positions(script);
+    csps.iter().for_each(|p| {
+        if !script.index_is_gm(p + 1) {
+            script.insert(p + 1, Command::GetModel());
+        }
+    });
 }
 
 pub fn rl(script: &mut Script, scoped_vars: &mut BTreeMap<String, Vec<SExp>>) -> Result<(), ()> {
@@ -568,6 +590,46 @@ mod tests {
     use crate::parser::script;
     use insta::assert_debug_snapshot;
 
+    #[test]
+    fn add_get_model_already_snap() {
+        let str_script = "(declare-const x Int)(assert (= x 4))(check-sat)(get-model)";
+        let mut p = script(str_script).unwrap().1;
+        add_get_model(&mut p);
+        assert_debug_snapshot!(p.to_string_dfltto().unwrap());
+    }
+
+    #[test]
+    fn add_get_model_snap() {
+        let str_script = "(declare-const x Int)(assert (= x 4))(check-sat)";
+        let mut p = script(str_script).unwrap().1;
+        add_get_model(&mut p);
+        assert_debug_snapshot!(p.to_string_dfltto().unwrap());
+    }
+
+    #[test]
+    fn checksat_pts_none_snap() {
+        let str_script = "(declare-const x Int)(assert (= x 4))";
+        let p = script(str_script).unwrap().1;
+        let pts = checksat_positions(&p);
+        assert_debug_snapshot!(pts);
+    }
+
+    #[test]
+    fn checksat_pts_many_snap() {
+        let str_script =
+            "(declare-const x Int)(assert (= x 4))(check-sat)(assert (= x 5))(check-sat)";
+        let p = script(str_script).unwrap().1;
+        let pts = checksat_positions(&p);
+        assert_debug_snapshot!(pts);
+    }
+
+    #[test]
+    fn checksat_pts_single_snap() {
+        let str_script = "(declare-const x Int)(assert (= x 4))(check-sat)";
+        let p = script(str_script).unwrap().1;
+        let pts = checksat_positions(&p);
+        assert_debug_snapshot!(pts);
+    }
     #[test]
     fn rv_with_decl_snap() {
         let str_script = "(declare-const x Int)(assert (forall ((x Real)) (= x 4)))";

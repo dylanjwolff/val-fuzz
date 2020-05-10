@@ -1,0 +1,5 @@
+---
+source: src/transforms.rs
+expression: p.to_string_dfltto().unwrap()
+---
+"(declare-const x Int)\n(assert (= x 4))\n(check-sat)\n(get-model)"
