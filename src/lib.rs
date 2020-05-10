@@ -16,6 +16,7 @@ pub mod solver;
 pub mod transforms;
 
 use crate::solver::RSolve;
+use crate::transforms::rv;
 use ast::Script;
 use bit_vec::BitVec;
 use crossbeam::queue::ArrayQueue;
@@ -26,6 +27,7 @@ use nom::branch::alt;
 use nom::bytes::complete::take_until;
 use nom::multi::many1;
 
+use crate::ast::SExp;
 use crate::ast::Symbol;
 use nom::{bytes::complete::tag, IResult};
 use parser::{rmv_comments, script};
@@ -497,14 +499,6 @@ fn solver_worker(qin: BavAssingedQ, prev_stage: StageCompleteA) {
             }
         };
 
-        let (_script, _) = match deserialize_from_f(&filepaths) {
-            Ok(deserial) => deserial,
-            Err(e) => {
-                println!("solver deserial err from {:?}: {}", filepaths, e);
-                continue;
-            }
-        };
-
         println!("Checking file {:?}", filepaths.0);
         let (resultA, resultB) = solve(filepaths.0.to_str().unwrap_or("defaultname"));
         if resultA.has_bug_error() || resultB.has_bug_error() {
@@ -515,9 +509,42 @@ fn solver_worker(qin: BavAssingedQ, prev_stage: StageCompleteA) {
             println!("Timeout on file {:?}", filepaths.0);
             fs::remove_file(&filepaths.0).unwrap_or(());
         } else {
-            fs::remove_file(&filepaths.0).unwrap_or(());
+            if resultA.has_sat() {
+                resub_model(&resultA, &filepaths, &qin);
+            }
+            if resultB.has_sat() {
+                resub_model(&resultB, &filepaths, &qin);
+            }
+            // fs::remove_file(&filepaths.0).unwrap_or(());
         }
         println!("Done hecking file {:?}", &filepaths.0);
+    }
+}
+
+pub fn resub_model(result: &RSolve, filepaths: &(PathBuf, PathBuf), q: &BavAssingedQ) {
+    let backoff = Backoff::new();
+    let (mut script, md) = match deserialize_from_f(&filepaths) {
+        Ok(deserial) => deserial,
+        Err(e) => {
+            println!("solver deserial err from {:?}: {}", filepaths, e);
+            return;
+        }
+    };
+    let mut to_replace: Vec<(String, SExp)> = result
+        .extract_const_var_vals(&md.constvns)
+        .into_iter()
+        .map(|(sym, val)| (sym.to_string(), val.clone()))
+        .collect();
+    if to_replace.len() > 0 {
+        rv(&mut script, &mut to_replace);
+
+        let new_name = get_new_name(&filepaths.0, &format!("resub_{:?}", result.solver));
+        let mut resubbed_fs = serialize_to_f(Path::new(&new_name), &script, &md).unwrap();
+        println!("RESUB~~~ {:?} ", resubbed_fs);
+        while let Err(PushError(reject)) = q.push(resubbed_fs) {
+            resubbed_fs = reject;
+            backoff.snooze();
+        }
     }
 }
 

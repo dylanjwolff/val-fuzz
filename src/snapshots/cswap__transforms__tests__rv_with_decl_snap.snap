@@ -1,0 +1,5 @@
+---
+source: src/transforms.rs
+expression: p.to_string_dfltto().unwrap()
+---
+"\n(assert (forall ((x Real)) (= 7 4)))"

@@ -27,3 +27,8 @@ add (get-model) to scripts...
 i.e. be able to automatically run the fuzzer and get a model for SAT formulas
 (stretch): replug the model back to a second solver call
 (stretch): determine why there were so many unsat results
+
+@TODO 10th May
+add (get-model) to scripts
+do a medium run with the resubstitution
+why so many unsat

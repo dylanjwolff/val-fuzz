@@ -1,0 +1,55 @@
+---
+source: src/transforms.rs
+expression: p
+---
+Commands(
+    [
+        RefCell {
+            value: Assert(
+                RefCell {
+                    value: QForAll(
+                        [
+                            (
+                                RefCell {
+                                    value: Var(
+                                        "x",
+                                    ),
+                                },
+                                RefCell {
+                                    value: Dec,
+                                },
+                            ),
+                        ],
+                        RefCell {
+                            value: BExp(
+                                RefCell {
+                                    value: Equals,
+                                },
+                                [
+                                    RefCell {
+                                        value: Constant(
+                                            RefCell {
+                                                value: UInt(
+                                                    "7",
+                                                ),
+                                            },
+                                        ),
+                                    },
+                                    RefCell {
+                                        value: Constant(
+                                            RefCell {
+                                                value: UInt(
+                                                    "4",
+                                                ),
+                                            },
+                                        ),
+                                    },
+                                ],
+                            ),
+                        },
+                    ),
+                },
+            ),
+        },
+    ],
+)

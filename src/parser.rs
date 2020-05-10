@@ -164,7 +164,7 @@ fn let_sexp(s: &str) -> IResult<&str, (Vec<(SymbolRc, SExpRc)>, SExpBoxRc)> {
     mapped(s)
 }
 
-fn sexp(s: &str) -> IResult<&str, SExp> {
+pub fn sexp(s: &str) -> IResult<&str, SExp> {
     let rec_sexp = brack!(many1(sexp));
     ws!(alt((
         bool_sexp,

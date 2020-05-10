@@ -32,24 +32,32 @@ const SIGTERM_TO: &str = "interrupted by SIGTERM";
 const UNIMPL: &str = "Unimplemented code";
 const NON_BUG_ERRORS: [&str; 2] = [SIGTERM_TO, UNIMPL];
 
-#[allow(dead_code)]
+#[derive(Debug, Eq, PartialEq, Clone)]
+pub enum Solver {
+    Z3,
+    CVC4,
+    NONE,
+}
+
+#[derive(Debug, Eq, PartialEq, Clone)]
 pub struct RSolve {
     stdout: String,
     stderr: String,
     lines: Vec<ResultLine>,
+    pub solver: Solver,
 }
 
-#[allow(dead_code)]
 impl RSolve {
     pub fn process_error() -> Self {
         RSolve {
             stdout: "".to_owned(),
             stderr: "".to_owned(),
             lines: vec![ResultLine::Error("Process Error".to_owned())],
+            solver: Solver::NONE,
         }
     }
 
-    pub fn move_new(stdout: String, stderr: String) -> Self {
+    pub fn move_new(solver: Solver, stdout: String, stderr: String) -> Self {
         let mut v = z3o(&stdout).unwrap().1;
         v.extend(z3o(&stderr).unwrap().1);
         RSolve {
@@ -61,14 +69,13 @@ impl RSolve {
             },
             stdout: stdout,
             stderr: stderr,
+            solver: solver,
         }
     }
 
-    pub fn new(stdout: &str, stderr: &str) -> Self {
+    pub fn new(solver: Solver, stdout: &str, stderr: &str) -> Self {
         let mut v = z3o(&stdout).unwrap().1;
         v.extend(z3o(&stderr).unwrap().1);
-        println!("lines: {:?}", v);
-        println!("stoe: {}\n{}", stdout, stderr);
         RSolve {
             stdout: stdout.to_owned(),
             stderr: stderr.to_owned(),
@@ -78,6 +85,7 @@ impl RSolve {
                 v.extend(z3o(&stderr).unwrap().1);
                 v
             },
+            solver: solver,
         }
     }
 
@@ -151,13 +159,13 @@ impl RSolve {
         })
     }
 
-    pub fn extract_const_var_vals(&self, varnames: &Vec<&str>) -> Vec<(&Symbol, &SExp)> {
+    pub fn extract_const_var_vals(&self, varnames: &Vec<String>) -> Vec<(&Symbol, &SExp)> {
         self.lines
             .iter()
             .filter_map(|l| match l {
                 ResultLine::Model(m) => Some(
                     m.iter()
-                        .filter(|(name, _, _, _)| varnames.contains(&&name.to_string()[..]))
+                        .filter(|(name, _, _, _)| varnames.contains(&name.to_string()))
                         .map(|(name, _, _, val)| (name, val))
                         .collect::<Vec<(&Symbol, &SExp)>>(),
                 ),
@@ -188,7 +196,7 @@ fn solve_cvc4(cvc4path: &str, filename: &str) -> RSolve {
     });
 
     match cvc4mrs {
-        Ok((cvc4_succ, cvc4_out, cvc4_err)) => RSolve::move_new(cvc4_out, cvc4_err),
+        Ok((cvc4_succ, cvc4_out, cvc4_err)) => RSolve::move_new(Solver::CVC4, cvc4_out, cvc4_err),
         Err(_) => RSolve::process_error(),
     }
 }
@@ -213,7 +221,7 @@ fn solve_z3(z3path: &str, filename: &str) -> RSolve {
     });
 
     match z3mrs {
-        Ok((z3_succ, z3_out, z3_err)) => RSolve::move_new(z3_out, z3_err),
+        Ok((z3_succ, z3_out, z3_err)) => RSolve::move_new(Solver::Z3, z3_out, z3_err),
         Err(_) => RSolve::process_error(),
     }
 }
@@ -252,14 +260,18 @@ mod tests {
                           (define-fun d () Real
                             0.0)
                         )";
-        let r = RSolve::new(rstr, "");
-        assert_debug_snapshot!(r.extract_const_var_vals(&vec!["GEN1", "GEN2", "BAV3"]));
+        let r = RSolve::new(Solver::Z3, rstr, "");
+        assert_debug_snapshot!(r.extract_const_var_vals(&vec![
+            "GEN1".to_owned(),
+            "GEN2".to_owned(),
+            "BAV3".to_owned()
+        ]));
     }
 
     #[test]
     fn z3_new() {
         let rstring = "sat (model (define-fun b () Int 0) (define-fun a () Int 1))";
-        let r = RSolve::new("", rstring);
+        let r = RSolve::new(Solver::Z3, "", rstring);
         assert!(r.has_sat());
         assert!(!r.has_unrecoverable_error());
         assert!(!r.has_bug_error());
@@ -268,16 +280,16 @@ mod tests {
     #[test]
     fn diff_self() {
         let rstring = "sat (model (define-fun b () Int 0) (define-fun a () Int 1))";
-        let r1 = RSolve::new("", rstring);
-        let r2 = RSolve::new(rstring, "");
+        let r1 = RSolve::new(Solver::Z3, "", rstring);
+        let r2 = RSolve::new(Solver::Z3, rstring, "");
         assert!(!RSolve::differential(&r1, &r2))
     }
 
     #[test]
     fn diff_difft() {
         let rstring = "sat (model (define-fun b () Int 0) (define-fun a () Int 1))";
-        let r1 = RSolve::new("", rstring);
-        let r2 = RSolve::new("unsat", "");
+        let r1 = RSolve::new(Solver::Z3, "", rstring);
+        let r2 = RSolve::new(Solver::Z3, "unsat", "");
         assert!(RSolve::differential(&r1, &r2))
     }
 
@@ -301,8 +313,8 @@ mod tests {
                 10.0)
             )
             unsat";
-        let r1 = RSolve::new(r1str, "");
-        let r2 = RSolve::new(r2str, "");
+        let r1 = RSolve::new(Solver::Z3, r1str, "");
+        let r2 = RSolve::new(Solver::Z3, r2str, "");
         assert!(!RSolve::differential(&r1, &r2));
     }
 
@@ -317,14 +329,14 @@ mod tests {
                 testfile.smt2:8.12: To suppress this warning in the future use (set-logic ALL).
                 unsat
                 (error \"Cannot get model unless immediately preceded by SAT/NOT_ENTAILED or UNKNOWN response.\")";
-        let r = RSolve::new(rstr, "");
+        let r = RSolve::new(Solver::Z3, rstr, "");
         assert!(!r.has_unrecoverable_error());
     }
 
     #[test]
     fn cvc4_timeout() {
         let rstr = "timeout: sending signal TERM to command ‘cvc4’\nCVC4 interrupted by SIGTERM.\n timeout: the monitored command dumped core";
-        let r = RSolve::new(rstr, "");
+        let r = RSolve::new(Solver::Z3, rstr, "");
         assert!(!r.has_bug_error());
     }
 
@@ -333,7 +345,7 @@ mod tests {
         let rstr = "Fatal failure within CVC4::Node CVC4::theory::fp::FpConverter::convert(CVC4::TNode) at /home/dylan/git/constant-swap/scripts/.solvers/cvc4/src/theory/fp/fp_converter.cpp:1700
         Unimplemented code encounteredConversion is dependent on SymFPU
         timeout: the monitored command dumped core";
-        let r = RSolve::new(rstr, "");
+        let r = RSolve::new(Solver::Z3, rstr, "");
         assert!(!r.has_bug_error());
     }
 
@@ -343,15 +355,15 @@ mod tests {
             "(error \"line 11 column 79: Sort mismatch between first argument and argument 2\")
                 sat";
         let rstr2 = "unsat";
-        let r1 = RSolve::new(rstr1, "");
-        let r2 = RSolve::new(rstr2, "");
+        let r1 = RSolve::new(Solver::Z3, rstr1, "");
+        let r2 = RSolve::new(Solver::Z3, rstr2, "");
         assert!(!RSolve::differential(&r1, &r2));
     }
 
     #[test]
     fn fatal_error() {
         let rstr = "unsat \n (error \"something went wrong\")";
-        let r = RSolve::new(rstr, "");
+        let r = RSolve::new(Solver::Z3, rstr, "");
         assert!(r.has_unrecoverable_error());
     }
 

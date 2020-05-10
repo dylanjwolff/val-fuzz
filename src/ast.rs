@@ -199,6 +199,10 @@ impl Command {
             _ => false,
         }
     }
+
+    pub fn no_op() -> Self {
+        Command::Generic("".to_string())
+    }
 }
 
 impl Constant {

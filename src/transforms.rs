@@ -1,6 +1,7 @@
 use crate::ast::{AstNode, BoolOp, Command, Constant, Logic, SExp, Script, Sort, Symbol};
 use crate::ast::{CommandRc, SExpRc, SortRc, SymbolRc};
 
+use crate::parser::sexp;
 use crate::Metadata;
 use crate::Timer;
 use bit_vec::BitVec;
@@ -288,6 +289,62 @@ fn rl_s(
     }
 }
 
+pub fn rv(script: &mut Script, to_replace: &Vec<(String, SExp)>) {
+    match script {
+        Script::Commands(cmds) => {
+            for cmd in cmds.iter_mut() {
+                rv_c(&mut *cmd.borrow_mut(), to_replace);
+            }
+        }
+    }
+}
+
+fn rv_c(cmd: &mut Command, to_replace: &Vec<(String, SExp)>) {
+    match cmd {
+        Command::Assert(sexp) | Command::CheckSatAssuming(sexp) => {
+            rv_se(&mut *sexp.borrow_mut(), to_replace)
+        }
+        Command::DeclConst(vname, _) => {
+            let vname = vname.clone();
+            for (to_be_rep, _) in to_replace {
+                if vname == *to_be_rep {
+                    *cmd = Command::no_op();
+                }
+            }
+        }
+        _ => (),
+    }
+}
+
+fn rv_se(sexp: &mut SExp, to_replace: &Vec<(String, SExp)>) {
+    match sexp {
+        SExp::Compound(sexps) | SExp::BExp(_, sexps) => {
+            for sexp in sexps {
+                rv_se(&mut *sexp.borrow_mut(), to_replace)
+            }
+        }
+        SExp::Let(vbs, rest) => {
+            for (_, sexp) in vbs {
+                rv_se(&mut *sexp.borrow_mut(), to_replace)
+            }
+            rv_se(&mut *rest.borrow_mut(), to_replace);
+        }
+        SExp::QForAll(_, rest) => rv_se(&mut *rest.borrow_mut(), to_replace),
+        SExp::Symbol(sym) => {
+            let name = match &*sym.borrow() {
+                Symbol::Token(n) | Symbol::Var(n) => n,
+            }
+            .clone();
+            for (to_be_rep, val) in to_replace {
+                if name == *to_be_rep {
+                    *sexp = val.clone();
+                    break;
+                }
+            }
+        }
+        _ => (),
+    }
+}
 pub fn rc(script: &mut Script, vng: &mut VarNameGenerator, md: &mut Metadata) {
     match script {
         Script::Commands(cmds) => {
@@ -509,6 +566,23 @@ pub trait Visitor {
 mod tests {
     use super::*;
     use crate::parser::script;
+    use insta::assert_debug_snapshot;
+
+    #[test]
+    fn rv_with_decl_snap() {
+        let str_script = "(declare-const x Int)(assert (forall ((x Real)) (= x 4)))";
+        let mut p = script(str_script).unwrap().1;
+        rv(&mut p, &vec![("x".to_owned(), sexp("7").unwrap().1)]);
+        assert_debug_snapshot!(p.to_string_dfltto().unwrap());
+    }
+
+    #[test]
+    fn rv_snap() {
+        let str_script = "(assert (forall ((x Real)) (= x 4)))";
+        let mut p = script(str_script).unwrap().1;
+        rv(&mut p, &vec![("x".to_owned(), sexp("7").unwrap().1)]);
+        assert_debug_snapshot!(p);
+    }
 
     #[test]
     fn bav_fmt_str() {
