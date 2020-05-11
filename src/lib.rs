@@ -515,7 +515,7 @@ fn solver_worker(qin: BavAssingedQ, prev_stage: StageCompleteA) {
             if resultB.has_sat() {
                 resub_model(&resultB, &filepaths, &qin);
             }
-            // fs::remove_file(&filepaths.0).unwrap_or(());
+            fs::remove_file(&filepaths.0).unwrap_or(());
         }
         println!("Done hecking file {:?}", &filepaths.0);
     }
