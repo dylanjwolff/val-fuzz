@@ -32,3 +32,8 @@ i.e. be able to automatically run the fuzzer and get a model for SAT formulas
 add (get-model) to scripts
 do a medium run with the resubstitution
 why so many unsat
+
+
+@TODO 11th May
+why so many unsat
+1st draft of thesis proposal
