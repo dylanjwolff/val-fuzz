@@ -398,7 +398,7 @@ fn add_iterations_to_q(
     let script_str = script.to_string_dfltto()?;
 
     let num_bavs = md.bavns.len();
-    const MAX_ITER: u32 = 10;
+    const MAX_ITER: u32 = 2000;
     println!("starting max(2^{}, {}) iterations", num_bavs, MAX_ITER);
     let mut urng = RandUniqPermGen::new_definite(num_bavs, MAX_ITER);
     while let Some(truth_values) = urng.sample() {
@@ -515,7 +515,7 @@ fn solver_worker(qin: BavAssingedQ, prev_stage: StageCompleteA) {
             if resultB.has_sat() {
                 resub_model(&resultB, &filepaths, &qin);
             }
-            // fs::remove_file(&filepaths.0).unwrap_or(());
+            fs::remove_file(&filepaths.0).unwrap_or(());
         }
         println!("Done hecking file {:?}", &filepaths.0);
     }
@@ -539,13 +539,23 @@ pub fn resub_model(result: &RSolve, filepaths: &(PathBuf, PathBuf), q: &BavAssin
         rv(&mut script, &mut to_replace);
 
         let new_name = get_new_name(&filepaths.0, &format!("resub_{:?}", result.solver));
-        let mut resubbed_fs = serialize_to_f(Path::new(&new_name), &script, &md).unwrap();
+        let resubbed_fs = serialize_to_f(Path::new(&new_name), &script, &md).unwrap();
         println!("RESUB~~~ {:?} ", resubbed_fs);
-        while let Err(PushError(reject)) = q.push(resubbed_fs) {
-            resubbed_fs = reject;
-            backoff.snooze();
+
+        let (resultA, resultB) = solve(resubbed_fs.0.to_str().unwrap_or("defaultname"));
+        if resultA.has_bug_error() || resultB.has_bug_error() {
+            report_bug(resubbed_fs.0.as_path(), SolveResult::ErrorBug);
+        } else if RSolve::differential(&resultA, &resultB) {
+            report_bug(resubbed_fs.0.as_path(), SolveResult::SoundnessBug);
+        } else if resultA.was_timeout() || resultB.was_timeout() {
+            println!("Timeout on file {:?}", resubbed_fs.0);
+            fs::remove_file(&resubbed_fs.0).unwrap_or(());
+        } else {
+            fs::remove_file(&resubbed_fs.0).unwrap_or(());
         }
-    }
+        fs::remove_file(&resubbed_fs.1).unwrap_or(());
+        println!("Done hecking file {:?}", &resubbed_fs.0);
+}
 }
 
 #[allow(unused)]
@@ -565,7 +575,7 @@ impl RandUniqPermGen {
     fn new_definite(numbits: usize, maxiter: u32) -> Self {
         let buf = BitVec::from_elem(numbits, false).to_bytes();
         let seen = BTreeSet::new();
-        let rng = Xoshiro256Plus::seed_from_u64(9281);
+        let rng = Xoshiro256Plus::seed_from_u64(8085);
 
         let true_max = if (maxiter as f64).log2() < (numbits as f64) {
             maxiter
