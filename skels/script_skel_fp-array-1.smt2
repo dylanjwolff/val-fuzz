@@ -6,4 +6,5 @@
 (assert (= (select A GEN1) (select A GEN2)))
 (assert (= BAV3 (= (select A GEN1) (select A GEN2))))
 (check-sat)
+(get-model)
 (exit)

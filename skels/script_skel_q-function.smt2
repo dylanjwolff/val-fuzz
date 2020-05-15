@@ -11,3 +11,4 @@
 (assert (not (Q a)))
 (assert (= BAV1 (or (forall ((x Int)) (P x)) (forall ((x Int)) (Q x)))))
 (check-sat)
+(get-model)

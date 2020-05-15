@@ -16,3 +16,4 @@
 (assert (= BAV2 (= (f x) (union T (f y)))))
 (assert (= BAV3 (= (f y) (union T (f y)))))
 (check-sat)
+(get-model)

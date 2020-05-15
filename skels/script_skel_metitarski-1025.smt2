@@ -60,4 +60,5 @@ Submitted by Dejan Jovanovic for SMT-LIB.
 (assert (= BAV22 (<= GEN10 skoCOSS)))
 (assert (= BAV23 (<= skoSINS skoS)))
 (check-sat)
+(get-model)
 (exit)

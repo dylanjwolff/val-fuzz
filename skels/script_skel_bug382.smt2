@@ -3,6 +3,7 @@
 (declare-fun f (Int) Int)
 (declare-fun x () Int)
 (check-sat)
+(get-model)
 (get-value (x))
 (get-value (x))
 (get-value ((f x)))

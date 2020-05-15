@@ -13,3 +13,4 @@
 (assert (= BAV7 (forall ((x Int)) (and (or (Q GEN1 x) (Q GEN2 x)) (Q GEN3 x)))))
 (assert (= BAV8 (forall ((x Int)) (or (Q GEN1 x) (Q GEN2 x)))))
 (check-sat)
+(get-model)

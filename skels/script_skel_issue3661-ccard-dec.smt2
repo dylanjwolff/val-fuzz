@@ -1,5 +1,6 @@
 (set-logic ALL)
 (declare-const GEN1 Int)
+(get-model)
 (declare-const GEN2 Int)
 (declare-const BAV3 Bool)
 (declare-fun a (Int) Bool)
@@ -8,5 +9,6 @@
 (push)
 (assert (= BAV3 (= (a GEN1) (b GEN2))))
 (check-sat)
+(get-model)
 (pop)
 (check-sat)

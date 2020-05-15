@@ -6,4 +6,5 @@
 (assert (= || GEN1))
 (assert (= BAV2 (= || GEN1)))
 (check-sat)
+(get-model)
 (get-value (||))

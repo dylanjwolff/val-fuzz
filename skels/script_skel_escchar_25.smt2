@@ -11,3 +11,4 @@
 (assert (= BAV3 (= x GEN1 GEN2)))
 (assert (= BAV4 (= I (str.len x))))
 (check-sat)
+(get-model)

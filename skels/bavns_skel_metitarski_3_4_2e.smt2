@@ -1,1 +1,0 @@
-#(("BAV31" "BAV32" "BAV33" "BAV34" "BAV35" "BAV36" "BAV37" "BAV38" "BAV39" "BAV40" "BAV41" "BAV42" "BAV43" "BAV44" "BAV45" "BAV46" "BAV47" "BAV48" "BAV49") "script_skel_metitarski_3_4_2e.smt2")

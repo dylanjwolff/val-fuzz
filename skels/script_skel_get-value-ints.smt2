@@ -17,4 +17,5 @@
 (assert (= BAV5 (= zero GEN2)))
 (assert (= BAV6 (= neg (- GEN3))))
 (check-sat)
+(get-model)
 (get-value (pos zero neg))

@@ -1,1 +1,0 @@
-#(() "script_skel_fp-sqrt-9.smt2")

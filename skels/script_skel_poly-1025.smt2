@@ -125,4 +125,5 @@ Submitted by Dejan Jovanovic for SMT-LIB.
 (assert (= BAV66 (<= (* skoZ (* skoY (+ (* skoX (+ (/ (- GEN29) GEN30) (* skoX (/ GEN8 GEN9)))) (* skoY (* skoX (+ (/ GEN31 GEN32) (* skoX (/ GEN8 GEN9)))))))) (+ (+ (/ (- GEN10) GEN11) (* skoX (/ (- GEN12) GEN13))) (* skoY (+ (/ (- GEN10) GEN11) (* skoX (/ (- GEN12) GEN13))))))))
 (assert (= BAV67 (<= skoZ GEN1)))
 (check-sat)
+(get-model)
 (exit)

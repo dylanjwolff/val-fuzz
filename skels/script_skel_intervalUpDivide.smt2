@@ -51,3 +51,4 @@
 (assert (= BAV22 (<= (/ _X _Y) _z)))
 (assert (= BAV23 (<= (/ _x _y) _z)))
 (check-sat)
+(get-model)

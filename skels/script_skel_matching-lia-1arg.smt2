@@ -5,3 +5,4 @@
 (assert (forall ((x Int)) (P (* GEN1 x))))
 (assert (not (P GEN2)))
 (check-sat)
+(get-model)

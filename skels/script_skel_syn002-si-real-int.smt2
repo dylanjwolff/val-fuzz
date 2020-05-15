@@ -18,3 +18,4 @@
 (assert (= BAV8 (= ($$utr ($$rtu GEN1)) GEN2)))
 (assert (= BAV9 (= ($$utr ($$rtu (/ GEN3 GEN4))) (/ GEN5 GEN6))))
 (check-sat)
+(get-model)

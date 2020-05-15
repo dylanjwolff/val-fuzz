@@ -16,3 +16,4 @@
 (assert (= BAV6 (forall ((x (_ BitVec 8))(y (_ BitVec 8))) (= (bvmul x y) GEN2))))
 (assert (= BAV7 (forall ((x (_ BitVec 8))(y (_ BitVec 8))) (= (bvadd y a) GEN3))))
 (check-sat)
+(get-model)

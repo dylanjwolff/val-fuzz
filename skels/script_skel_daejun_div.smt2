@@ -12,3 +12,4 @@
 (assert (= BAV4 (> y GEN2)))
 (assert (= BAV5 (= (div (* x y) y) x)))
 (check-sat)
+(get-model)

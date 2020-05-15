@@ -6,3 +6,4 @@
 (assert (not (= (bvand (bvnot x) (bvnot y)) (bvnot (bvor x y)))))
 (assert (= BAV1 (= (bvand (bvnot x) (bvnot y)) (bvnot (bvor x y)))))
 (check-sat)
+(get-model)

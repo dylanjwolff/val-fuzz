@@ -1,1 +1,0 @@
-#(("BAV1") "script_skel_ite_arith.smt2")

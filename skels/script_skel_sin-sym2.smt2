@@ -25,3 +25,4 @@
 (assert (= BAV12 (= (+ (sin x) (sin y)) GEN5)))
 (assert (= BAV13 (= (+ x y) GEN6)))
 (check-sat)
+(get-model)

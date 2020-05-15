@@ -9,3 +9,4 @@
 (assert (= BAV2 (= y GEN1)))
 (assert (= BAV3 (= (- y (* (div y x) x)) (mod y x))))
 (check-sat)
+(get-model)

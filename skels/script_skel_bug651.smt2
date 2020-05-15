@@ -33,3 +33,4 @@
 )
 (declare-const title T_titleType)
 (check-sat)
+(get-model)

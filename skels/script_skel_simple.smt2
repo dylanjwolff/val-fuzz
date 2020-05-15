@@ -4,3 +4,4 @@
 (assert (not (= x (fp.neg (fp.neg x)))))
 (assert (= BAV1 (= x (fp.neg (fp.neg x)))))
 (check-sat)
+(get-model)

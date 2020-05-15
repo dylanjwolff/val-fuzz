@@ -9,4 +9,5 @@
 (assert (= BAV1 (distinct x y)))
 (assert (= BAV2 (= y x)))
 (check-sat)
+(get-model)
 (exit)

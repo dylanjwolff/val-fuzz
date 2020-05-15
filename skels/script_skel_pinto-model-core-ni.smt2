@@ -69,3 +69,4 @@
 (assert (= BAV31 (= (- GEN8) i21)))
 (assert (= BAV32 (= i21 GEN9)))
 (check-sat)
+(get-model)

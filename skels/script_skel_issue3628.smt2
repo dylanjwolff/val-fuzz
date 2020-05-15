@@ -18,3 +18,4 @@
 (assert (= BAV6 (distinct (* (to_real GEN2) a c) GEN3)))
 (assert (= BAV7 (= a (* c e))))
 (check-sat)
+(get-model)

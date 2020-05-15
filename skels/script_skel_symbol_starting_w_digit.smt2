@@ -11,5 +11,6 @@
 (assert (= BAV3 (= |0_0| GEN1)))
 (assert (= BAV4 (= x GEN2)))
 (check-sat)
+(get-model)
 (get-value (|0_0|))
 (get-value (x))

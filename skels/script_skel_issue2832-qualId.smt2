@@ -6,3 +6,4 @@
 (declare-fun s0 () U)
 (define-fun s1 () (D U U) ((as CL (D U U)) s0))
 (check-sat)
+(get-model)

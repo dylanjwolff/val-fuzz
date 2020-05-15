@@ -1,1 +1,0 @@
-#(() "script_skel_bool-pred-nested.smt2")

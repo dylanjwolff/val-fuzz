@@ -1,1 +1,0 @@
-#(("BAV2" "BAV3" "BAV4") "script_skel_leonardoalt_F1.smt2")

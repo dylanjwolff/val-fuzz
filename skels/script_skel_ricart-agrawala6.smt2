@@ -350,4 +350,5 @@
 (assert (= BAV163 (forall ((?s Int)(?r Int)) (= ?r p))))
 (assert (= BAV164 (forall ((?s Int)(?r Int)) (< (sn ?s) (sn ?r)))))
 (check-sat)
+(get-model)
 (exit)

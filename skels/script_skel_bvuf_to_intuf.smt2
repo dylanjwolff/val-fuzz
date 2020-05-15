@@ -6,3 +6,4 @@
 (assert (distinct (bvadd a b) (f a)))
 (assert (= BAV1 (distinct (bvadd a b) (f a))))
 (check-sat)
+(get-model)

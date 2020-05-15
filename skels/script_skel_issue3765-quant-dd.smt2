@@ -15,3 +15,4 @@
 (assert (= BAV4 (forall ((?i U)(?z V)) (= (f ?z) (div (- GEN1) (g ?i))))))
 (assert (= BAV5 (= (g k) GEN2)))
 (check-sat)
+(get-model)

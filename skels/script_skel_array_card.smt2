@@ -19,3 +19,4 @@
 (assert (= BAV4 (forall ((x U)) (= (select f x) c))))
 (assert (= BAV5 (forall ((x U)) (= (select f x) b))))
 (check-sat)
+(get-model)

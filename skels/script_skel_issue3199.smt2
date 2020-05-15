@@ -5,4 +5,5 @@
 (assert (= v GEN1))
 (assert (= BAV2 (= v GEN1)))
 (check-sat)
+(get-model)
 (exit)

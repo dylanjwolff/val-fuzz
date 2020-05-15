@@ -14,3 +14,4 @@
 (assert (= BAV2 (forall ((x Int)) (> x a))))
 (assert (= BAV3 (forall ((x Int)) (< x b))))
 (check-sat)
+(get-model)

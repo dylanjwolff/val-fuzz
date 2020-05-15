@@ -4,3 +4,4 @@
 (declare-fun c () (_ BitVec 16))
 (assert (bvult a (bvadd b c)))
 (check-sat)
+(get-model)

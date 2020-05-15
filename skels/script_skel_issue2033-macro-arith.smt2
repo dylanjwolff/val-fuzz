@@ -7,3 +7,4 @@
 (assert (forall ((?v0 S10)(?v1 S2)) (= _substvar_4_ (- (f22 ?v0 ?v1)))))
 (assert (= BAV1 (forall ((?v0 S10)(?v1 S2)) (= _substvar_4_ (- (f22 ?v0 ?v1))))))
 (check-sat)
+(get-model)

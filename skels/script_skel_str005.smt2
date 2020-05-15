@@ -14,3 +14,4 @@
 (assert (= BAV3 (= (str.len yy) GEN1)))
 (assert (= BAV4 (= yy GEN2)))
 (check-sat)
+(get-model)

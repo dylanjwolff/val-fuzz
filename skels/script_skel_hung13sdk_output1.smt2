@@ -13,4 +13,5 @@
 (assert (= GEN1 (+ fReal (myRealIte x1 x2 x3))))
 (assert (= BAV2 (= GEN1 (+ fReal (myRealIte x1 x2 x3)))))
 (check-sat)
+(get-model)
 (exit)

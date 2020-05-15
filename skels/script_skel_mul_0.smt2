@@ -8,3 +8,4 @@
 (assert (= BAV1 (= a z)))
 (assert (= BAV2 (= (* a b) (* z b))))
 (check-sat)
+(get-model)

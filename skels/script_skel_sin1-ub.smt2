@@ -10,3 +10,4 @@
 (assert (= BAV4 (< (sin GEN1) GEN2)))
 (assert (= BAV5 (= x (sin GEN3))))
 (check-sat)
+(get-model)

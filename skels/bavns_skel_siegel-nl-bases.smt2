@@ -1,1 +1,0 @@
-#(("BAV4" "BAV5" "BAV6" "BAV7" "BAV8" "BAV9" "BAV10" "BAV11" "BAV12" "BAV13" "BAV14" "BAV15" "BAV16") "script_skel_siegel-nl-bases.smt2")

@@ -5,3 +5,4 @@
 (assert (forall ((x (_ BitVec 8))) (= (concat a x) b)))
 (assert (= BAV1 (forall ((x (_ BitVec 8))) (= (concat a x) b))))
 (check-sat)
+(get-model)

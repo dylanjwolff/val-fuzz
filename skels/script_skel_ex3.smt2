@@ -12,4 +12,5 @@
 (assert (= BAV2 (= (f (f a)) a)))
 (assert (= BAV3 (forall ((x U)) (= (f x) x))))
 (check-sat)
+(get-model)
 (exit)

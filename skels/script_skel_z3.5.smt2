@@ -6,3 +6,4 @@
     (= (and a b) (not (or (not a) (not b)))))
 (assert (not demorgan))
 (check-sat)
+(get-model)

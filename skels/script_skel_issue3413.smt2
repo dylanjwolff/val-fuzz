@@ -18,3 +18,4 @@
 (assert (= BAV7 (= e (- GEN2))))
 (assert (= BAV8 (= (div a (- GEN3)) (- GEN4))))
 (check-sat)
+(get-model)

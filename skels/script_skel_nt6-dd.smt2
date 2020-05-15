@@ -11,3 +11,4 @@
 (assert (= p1.0.resource (str.in.re resource_resource (re.++ (str.to.re GEN3) (re.* re.allchar) (str.to.re GEN4)))))
 (assert (= BAV5 (= p1.0.resource (str.in.re resource_resource (re.++ (str.to.re GEN3) (re.* re.allchar) (str.to.re GEN4))))))
 (check-sat)
+(get-model)

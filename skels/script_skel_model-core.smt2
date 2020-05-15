@@ -17,3 +17,4 @@
 (assert (= BAV6 (> z GEN2)))
 (assert (= BAV7 (> y GEN3)))
 (check-sat)
+(get-model)

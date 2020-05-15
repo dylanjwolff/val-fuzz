@@ -5,3 +5,4 @@
 (assert (= a b))
 (assert (= BAV1 (= a b)))
 (check-sat)
+(get-model)

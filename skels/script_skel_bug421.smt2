@@ -6,4 +6,5 @@
 (assert (not (= a b)))
 (assert (= BAV1 (= a b)))
 (check-sat)
+(get-model)
 (get-value (a b))

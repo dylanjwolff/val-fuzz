@@ -13,4 +13,5 @@
 (assert (= BAV1 (= (f (g (h v0))) (f (g (h v1))))))
 (assert (= BAV2 (= v0 v1)))
 (check-sat)
+(get-model)
 (exit)

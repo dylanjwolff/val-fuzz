@@ -21,3 +21,4 @@
 (assert (= BAV4 (= splust (bvadd s t))))
 (assert (= BAV5 (distinct negshift1 shift2)))
 (check-sat)
+(get-model)

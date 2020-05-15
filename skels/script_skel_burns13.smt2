@@ -206,4 +206,5 @@
 (assert (= BAV95 (forall ((?t Int)(?r Int)) (= ?t q))))
 (assert (= BAV96 (forall ((?t Int)(?r Int)) (= ?r p))))
 (check-sat)
+(get-model)
 (exit)

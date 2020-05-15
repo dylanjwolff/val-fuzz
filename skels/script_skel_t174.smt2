@@ -7,3 +7,4 @@
 (assert (= (select t GEN1) GEN2))
 (assert (= BAV3 (= (select t GEN1) GEN2)))
 (check-sat)
+(get-model)

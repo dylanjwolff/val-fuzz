@@ -5738,4 +5738,5 @@ http://www.cs.bham.ac.uk/~vxs/quasigroups/benchmark/
 (assert (= BAV2797 (= e2 (op e1 e4))))
 (assert (= BAV2798 (= e1 (op e4 e5))))
 (check-sat)
+(get-model)
 (exit)

@@ -20,3 +20,4 @@
 (assert (= BAV9 (<= GEN1 _substvar_15_)))
 (assert (= BAV10 (= (* _substvar_15_ _substvar_15_) (+ GEN2 (* _substvar_17_ (* _substvar_17_ (- GEN3)))))))
 (check-sat)
+(get-model)

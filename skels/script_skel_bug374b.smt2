@@ -24,3 +24,4 @@
 (assert (= BAV9 (=> _substvar_247_ (bvsge group_id_x$2 GEN4))))
 (assert (= BAV10 (= _substvar_245_ _substvar_246_)))
 (check-sat)
+(get-model)

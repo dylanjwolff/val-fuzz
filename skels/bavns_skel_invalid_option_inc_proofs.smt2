@@ -1,1 +1,0 @@
-#(() "script_skel_invalid_option_inc_proofs.smt2")

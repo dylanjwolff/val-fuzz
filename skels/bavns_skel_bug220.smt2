@@ -1,1 +1,0 @@
-#(() "script_skel_bug220.smt2")

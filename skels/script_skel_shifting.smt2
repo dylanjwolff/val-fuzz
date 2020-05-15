@@ -28,3 +28,4 @@
 (assert (= BAV11 (= z (* GEN3 pi s))))
 (assert (= BAV12 (> z GEN4)))
 (check-sat)
+(get-model)

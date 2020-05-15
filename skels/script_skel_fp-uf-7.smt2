@@ -7,5 +7,6 @@
 (assert (= BAV1 (= (my_rm_uf_brm false) RTP)))
 (assert (= BAV2 (= (my_rm_uf_brm true) RTN)))
 (check-sat)
+(get-model)
 (check-sat-using smt)
 (exit)

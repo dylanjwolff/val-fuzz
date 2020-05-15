@@ -1,1 +1,0 @@
-#(() "script_skel_buggy-ite.smt2")

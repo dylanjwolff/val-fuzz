@@ -5,3 +5,4 @@
 (assert (forall ((x (_ BitVec 8))) (or (bvuge x (bvadd a b)) (bvule x b))))
 (assert (= BAV1 (forall ((x (_ BitVec 8))) (or (bvuge x (bvadd a b)) (bvule x b)))))
 (check-sat)
+(get-model)

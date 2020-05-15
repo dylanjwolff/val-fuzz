@@ -1,1 +1,0 @@
-#(() "script_skel_string-literals.smt2")

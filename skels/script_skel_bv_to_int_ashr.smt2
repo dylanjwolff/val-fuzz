@@ -3,3 +3,4 @@
 (declare-fun b () (_ BitVec 8))
 (assert (bvult (bvashr a b) (bvlshr a b)))
 (check-sat)
+(get-model)

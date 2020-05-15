@@ -19,6 +19,7 @@
 (assert (= BAV8 (= r (fp.roundToIntegral roundNearestTiesToEven x))))
 (assert (= BAV9 (= r (fp GEN4 GEN5 GEN6))))
 (check-sat)
+(get-model)
 (check-sat-using smt)
 (check-sat-using (then
                      fpa2bv

@@ -10,3 +10,4 @@
 (assert (= BAV4 (forall ((x Real)) (<= x GEN1))))
 (assert (= BAV5 (forall ((x Real)) (>= x (+ c GEN2)))))
 (check-sat)
+(get-model)

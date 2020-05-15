@@ -1,1 +1,0 @@
-#(("BAV1") "script_skel_as.smt2")

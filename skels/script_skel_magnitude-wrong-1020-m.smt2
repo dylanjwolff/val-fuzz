@@ -311,3 +311,4 @@ Submitted by Harald Roman Zankl <Harald.Zankl@uibk.ac.at>
 (assert (= BAV134 (>= (* x11 x4) (* x11 x8))))
 (assert (= BAV135 (>= (* x12 x4) (+ (* x11 x9) (* x12 x4)))))
 (check-sat)
+(get-model)

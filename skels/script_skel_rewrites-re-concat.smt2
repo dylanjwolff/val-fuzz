@@ -29,3 +29,4 @@
 (assert (= BAV20 (< (str.len y) GEN4)))
 (assert (= BAV21 (or (not (str.in.re x (re.++ (str.to.re GEN5) (re.* (str.to.re GEN6)) (re.* (str.to.re GEN7)) (re.* (str.to.re GEN8))))) (not (str.in.re x (re.++ (str.to.re GEN9) (str.to.re GEN10) (re.* (str.to.re GEN11)) (str.to.re GEN12) (re.* (str.to.re GEN13))))) (not (str.in.re x (re.++ (str.to.re GEN14) (re.* (str.to.re GEN15)) (str.to.re GEN16) (re.* (str.to.re GEN17)) (str.to.re GEN18) (re.* (str.to.re GEN19))))) (str.in.re y (re.++ re.allchar re.allchar (re.* re.allchar) re.allchar)) (str.in.re y (re.++ re.allchar re.allchar re.allchar)))))
 (check-sat)
+(get-model)

@@ -1,1 +1,0 @@
-#(("BAV1" "BAV2") "script_skel_string8.smt2")

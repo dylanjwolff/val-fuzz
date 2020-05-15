@@ -14,3 +14,4 @@
 (assert (= BAV3 (or (not (P (to_int k))) (not (P k2)))))
 (assert (= BAV4 (= k GEN1)))
 (check-sat)
+(get-model)

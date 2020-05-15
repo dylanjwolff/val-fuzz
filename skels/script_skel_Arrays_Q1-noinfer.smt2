@@ -243,4 +243,5 @@
 (assert (= BAV86 (= start_correct Smt.true)))
 (assert (= BAV87 (= start_correct Smt.true)))
 (check-sat)
+(get-model)
 (exit)

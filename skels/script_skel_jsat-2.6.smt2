@@ -26,3 +26,4 @@
 (assert (= BAV2 (and (= x9 x7) ((_ is node) x11))))
 (assert (= BAV3 (= x9 x7)))
 (check-sat)
+(get-model)

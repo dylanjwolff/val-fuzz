@@ -11,3 +11,4 @@
 (assert (not ((_ is insert) y)))
 (assert (= BAV1 (distinct x y z)))
 (check-sat)
+(get-model)

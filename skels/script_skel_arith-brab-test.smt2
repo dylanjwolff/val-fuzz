@@ -28,4 +28,5 @@
 (assert (= BAV9 (> x x1)))
 (assert (= BAV10 (> y y1)))
 (check-sat)
+(get-model)
 (exit)

@@ -27,3 +27,4 @@
 (assert (= BAV7 (forall ((X $$unsorted)) (or (not (cowlThing X)) (= X _is)))))
 (assert (= BAV8 (forall ((X $$unsorted)) (= X _is))))
 (check-sat)
+(get-model)

@@ -9,3 +9,4 @@
 (assert (= BAV1 (= x y)))
 (assert (= BAV2 (= (str.len x) (str.len y))))
 (check-sat)
+(get-model)

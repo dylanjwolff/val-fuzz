@@ -6,3 +6,4 @@
 (assert (= (is-even GEN1) GEN2))
 (assert (= BAV3 (= (is-even GEN1) GEN2)))
 (check-sat)
+(get-model)

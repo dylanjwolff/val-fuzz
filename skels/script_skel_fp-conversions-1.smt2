@@ -5,5 +5,6 @@
 (declare-fun X () (_ FloatingPoint 11 53))
 (assert (fp.eq X (fp GEN1 GEN2 GEN3)))
 (check-sat)
+(get-model)
 (check-sat-using smt)
 (exit)

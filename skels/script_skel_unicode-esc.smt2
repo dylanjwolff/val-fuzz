@@ -120,3 +120,4 @@
 (assert (= BAV71 (= (str.len GEN45) GEN46)))
 (assert (= BAV72 (= (str.len GEN47) GEN48)))
 (check-sat)
+(get-model)

@@ -19,3 +19,4 @@
 (assert (= i1002$$1002 f12345678$myConst))
 (assert (= BAV1 (= i1002$$1002 f12345678$myConst)))
 (check-sat)
+(get-model)

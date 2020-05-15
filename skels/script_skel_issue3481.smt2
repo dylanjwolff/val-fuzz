@@ -312,3 +312,4 @@
 (assert (= BAV18 (= (rec__test_route__point_acc__is_null_pointer test_route__shift_nth_x__p__assume) (rec__test_route__point_acc__is_null_pointer temp___brower_249))))
 (assert (= BAV19 (= (length temp___borrowed_250) (length o2))))
 (check-sat)
+(get-model)

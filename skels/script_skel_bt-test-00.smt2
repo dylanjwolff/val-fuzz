@@ -17,4 +17,5 @@
 (assert (= BAV2 (= (g y) (g z))))
 (assert (= BAV3 (= (h z) (h x))))
 (check-sat)
+(get-model)
 (exit)

@@ -4,3 +4,4 @@
 (assert (forall ((X Int)) (= X GEN1)))
 (assert (= BAV2 (forall ((X Int)) (= X GEN1))))
 (check-sat)
+(get-model)

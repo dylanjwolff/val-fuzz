@@ -12,3 +12,4 @@
 (assert (= BAV3 (= c (* a b))))
 (assert (= BAV4 (= b (div c a))))
 (check-sat)
+(get-model)

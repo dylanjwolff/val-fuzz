@@ -1,4 +1,5 @@
 (set-logic ALL)
+(get-model)
 (declare-const GEN1 (_ BitVec 3))
 (declare-const GEN2 (_ BitVec 3))
 (declare-const BAV3 Bool)
@@ -7,4 +8,5 @@
 (assert (bvult GEN2 x0))
 (assert (= BAV3 (= GEN1 x0)))
 (check-sat)
+(get-model)
 (check-sat)

@@ -35,3 +35,4 @@
 (assert (not (= (bvsmod_def a b) (bvsmod a b))))
 (assert (= BAV1 (= (bvsmod_def a b) (bvsmod a b))))
 (check-sat)
+(get-model)

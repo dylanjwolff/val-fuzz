@@ -1,1 +1,0 @@
-#(() "script_skel_is-even-pred.smt2")

@@ -1,1 +1,0 @@
-#(() "script_skel_nl-pow-trick.smt2")

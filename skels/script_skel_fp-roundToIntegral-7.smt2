@@ -14,6 +14,7 @@
 (assert (= BAV4 (= x (fp GEN1 GEN2 GEN3))))
 (assert (= BAV5 (= r (fp.roundToIntegral RNE x))))
 (check-sat)
+(get-model)
 (get-value (x))
 (get-value (r))
 (check-sat-using (then

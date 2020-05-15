@@ -397,4 +397,5 @@
 (assert (= BAV164 (and (lambda_B q_accept_all (tau t_7 i_not_stop)) (> (lambda_sharp q_accept_all (tau t_7 i_not_stop)) (lambda_sharp q_T0_init t_7)))))
 (assert (= BAV165 (> (lambda_sharp q_accept_all (tau t_7 i_not_stop)) (lambda_sharp q_T0_init t_7))))
 (check-sat)
+(get-model)
 (exit)

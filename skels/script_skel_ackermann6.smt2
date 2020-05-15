@@ -30,4 +30,5 @@
 (assert (= BAV5 (= t1 t2)))
 (assert (= BAV6 (= s1 (h (i t2)))))
 (check-sat)
+(get-model)
 (exit)

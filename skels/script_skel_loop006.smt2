@@ -9,3 +9,4 @@
 (assert (not (= (str.++ x y) (str.++ y x))))
 (assert (= BAV1 (= (str.++ x y) (str.++ y x))))
 (check-sat)
+(get-model)

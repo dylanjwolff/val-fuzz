@@ -6,3 +6,4 @@
 (assert (not (= x zero)))
 (assert (= BAV1 (= x zero)))
 (check-sat)
+(get-model)

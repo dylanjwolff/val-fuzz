@@ -18,4 +18,5 @@
 (assert (= BAV8 (= r (fp GEN4 GEN5 GEN6))))
 (assert (= BAV9 (= (fp.roundToIntegral roundTowardZero x) r)))
 (check-sat)
+(get-model)
 (check-sat-using smt)

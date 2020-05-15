@@ -6,4 +6,5 @@
 (assert (<= (* GEN1 x3) GEN2))
 (assert (= BAV3 (<= (* GEN1 x3) GEN2)))
 (check-sat)
+(get-model)
 (exit)

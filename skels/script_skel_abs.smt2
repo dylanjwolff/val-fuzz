@@ -7,3 +7,4 @@
 (assert (< (abs a) GEN1))
 (assert (= BAV2 (< (abs a) GEN1)))
 (check-sat)
+(get-model)

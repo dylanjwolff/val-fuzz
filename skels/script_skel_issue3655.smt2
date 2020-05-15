@@ -13,3 +13,4 @@
 (assert (= BAV2 (and (forall ((j A)) (or (not (b j)) (d (e j)))) (forall ((i A)) (b i)) (forall ((g A)) (not (b g))))))
 (assert (= BAV3 (forall ((j A)) (or (not (b j)) (d (e j))))))
 (check-sat)
+(get-model)

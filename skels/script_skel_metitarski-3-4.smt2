@@ -87,4 +87,5 @@ Submitted by Dejan Jovanovic for SMT-LIB.
 (assert (= BAV38 (<= GEN14 skoY)))
 (assert (= BAV39 (<= skoY skoX)))
 (check-sat)
+(get-model)
 (exit)

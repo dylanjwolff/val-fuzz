@@ -19,4 +19,5 @@ http://www.ai.dist.unige.it/pdpar05/
 (assert (not (= (store (store (store (store a1 i1 (select a1 i1)) i1 (select a1 i1)) i0 (select (store (store a1 i1 (select a1 i1)) i1 (select a1 i1)) i0)) i0 (select (store (store a1 i1 (select a1 i1)) i1 (select a1 i1)) i0)) (store (store (store (store a1 i1 (select a1 i1)) i1 (select a1 i1)) i0 (select (store (store a1 i1 (select a1 i1)) i1 (select a1 i1)) i0)) i0 (select (store (store a1 i1 (select a1 i1)) i1 (select a1 i1)) i0)))))
 (assert (= BAV1 (= (store (store (store (store a1 i1 (select a1 i1)) i1 (select a1 i1)) i0 (select (store (store a1 i1 (select a1 i1)) i1 (select a1 i1)) i0)) i0 (select (store (store a1 i1 (select a1 i1)) i1 (select a1 i1)) i0)) (store (store (store (store a1 i1 (select a1 i1)) i1 (select a1 i1)) i0 (select (store (store a1 i1 (select a1 i1)) i1 (select a1 i1)) i0)) i0 (select (store (store a1 i1 (select a1 i1)) i1 (select a1 i1)) i0)))))
 (check-sat)
+(get-model)
 (exit)

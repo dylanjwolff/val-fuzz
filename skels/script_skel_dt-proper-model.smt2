@@ -15,3 +15,4 @@
 (assert (= BAV1 (distinct d1 d2 d3 d4)))
 (assert (= BAV2 (forall ((x U)(y U)) (= x y))))
 (check-sat)
+(get-model)

@@ -22,5 +22,6 @@
 (assert (= BAV9 (= q (fp.abs x))))
 (assert (= BAV10 (= q r)))
 (check-sat)
+(get-model)
 (check-sat-using smt)
 (get-model)

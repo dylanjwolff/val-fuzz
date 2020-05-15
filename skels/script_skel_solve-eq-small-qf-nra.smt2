@@ -24,3 +24,4 @@
 (assert (= BAV12 (<= skoSX GEN6)))
 (assert (= BAV13 (<= skoS3 GEN7)))
 (check-sat)
+(get-model)

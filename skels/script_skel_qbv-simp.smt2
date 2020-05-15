@@ -15,3 +15,4 @@
 (assert (= BAV6 (forall ((A (_ BitVec 8))(B (_ BitVec 8))(C (_ BitVec 8))(D (_ BitVec 8))) (= A C))))
 (assert (= BAV7 (forall ((A (_ BitVec 8))(B (_ BitVec 8))(C (_ BitVec 8))(D (_ BitVec 8))) (= B D))))
 (check-sat)
+(get-model)

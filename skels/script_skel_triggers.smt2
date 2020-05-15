@@ -114,3 +114,4 @@
 (assert (= BAV38 (=> (= (vals2 Heap@@2 this@@2) (vals3 Heap@@2 this@@2)) true)))
 (assert (= BAV39 (= (vals2 Heap@@2 this@@2) (vals3 Heap@@2 this@@2))))
 (check-sat)
+(get-model)

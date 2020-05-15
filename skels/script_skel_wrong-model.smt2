@@ -6,3 +6,4 @@
 (assert (not (= (fp.isSubnormal x) false)))
 (assert (= BAV1 (= (fp.isSubnormal x) false)))
 (check-sat)
+(get-model)

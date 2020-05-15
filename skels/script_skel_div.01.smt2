@@ -12,3 +12,4 @@
 (assert (= BAV3 (= (div (div n n) n) (div (div (div n n) n) n))))
 (assert (= BAV4 (distinct (div (div n n) n) (div (div (div (div (div n n) n) n) n) n))))
 (check-sat)
+(get-model)

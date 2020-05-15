@@ -1,1 +1,0 @@
-#(("BAV2") "script_skel_empty_symbol_name.smt2")

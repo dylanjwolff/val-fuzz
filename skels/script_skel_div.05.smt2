@@ -12,3 +12,4 @@
 (assert (= BAV3 (= (/ x n) GEN1)))
 (assert (= BAV4 (= (/ y n) GEN2)))
 (check-sat)
+(get-model)

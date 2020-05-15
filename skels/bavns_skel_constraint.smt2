@@ -1,1 +1,0 @@
-#(() "script_skel_constraint.smt2")

@@ -1,1 +1,0 @@
-#(("BAV2") "script_skel_model-friendly.smt2")

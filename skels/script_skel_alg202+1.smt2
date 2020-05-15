@@ -73,3 +73,4 @@
 (assert (= BAV29 (forall ((X2 $$unsorted)) (or (not (sorti1 X2)) (= X2 (j (h X2)))))))
 (assert (= BAV30 (forall ((X2 $$unsorted)) (= X2 (j (h X2))))))
 (check-sat)
+(get-model)

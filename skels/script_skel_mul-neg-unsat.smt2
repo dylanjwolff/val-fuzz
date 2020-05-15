@@ -5,3 +5,4 @@
 (assert (not (= (bvmul a b) (bvmul (bvneg a) (bvneg b)))))
 (assert (= BAV1 (= (bvmul a b) (bvmul (bvneg a) (bvneg b)))))
 (check-sat)
+(get-model)

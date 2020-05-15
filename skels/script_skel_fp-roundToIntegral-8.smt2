@@ -5,3 +5,4 @@
 (assert (not (= (fp.roundToIntegral rm (fp.roundToIntegral rm x)) (fp.roundToIntegral rm x))))
 (assert (= BAV1 (= (fp.roundToIntegral rm (fp.roundToIntegral rm x)) (fp.roundToIntegral rm x))))
 (check-sat)
+(get-model)

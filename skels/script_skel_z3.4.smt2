@@ -8,3 +8,4 @@
 		(=> p r)))
 (assert (not conjecture))
 (check-sat)
+(get-model)

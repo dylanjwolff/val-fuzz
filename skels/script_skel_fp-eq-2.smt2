@@ -6,5 +6,6 @@
 (assert (fp.eq X Y))
 (assert (= BAV1 (= X Y)))
 (check-sat)
+(get-model)
 (check-sat-using smt)
 (exit)

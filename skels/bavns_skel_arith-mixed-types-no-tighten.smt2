@@ -1,1 +1,0 @@
-#(("BAV4" "BAV5" "BAV6" "BAV7") "script_skel_arith-mixed-types-no-tighten.smt2")

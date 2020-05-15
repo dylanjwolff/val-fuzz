@@ -1,1 +1,0 @@
-#(("BAV1" "BAV2" "BAV3" "BAV4" "BAV5" "BAV6" "BAV7" "BAV8" "BAV9" "BAV10" "BAV11" "BAV12") "script_skel_fp-feature-check-1.smt2")

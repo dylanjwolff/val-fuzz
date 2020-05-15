@@ -5,4 +5,5 @@
 (declare-fun a () (Array U Bool))
 (assert (select a x))
 (check-sat)
+(get-model)
 (get-value ((not (select a x))))

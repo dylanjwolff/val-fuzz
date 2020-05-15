@@ -4,5 +4,6 @@
 (assert (fp.lt X Y))
 (assert (not (fp.gt X Y)))
 (check-sat)
+(get-model)
 (check-sat-using smt)
 (exit)

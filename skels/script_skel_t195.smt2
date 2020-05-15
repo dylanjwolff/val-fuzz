@@ -21,3 +21,4 @@
 (assert (= BAV7 (<= d c)))
 (assert (= BAV8 (<= (* a d) c)))
 (check-sat)
+(get-model)

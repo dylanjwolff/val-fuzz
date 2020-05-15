@@ -24,3 +24,4 @@
 (assert (= BAV5 (= y z)))
 (assert (= BAV6 (or (P x) (P y) (P z) (P w))))
 (check-sat)
+(get-model)

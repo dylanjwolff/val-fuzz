@@ -11,3 +11,4 @@
 (assert (= BAV3 (< (mod x n) GEN1)))
 (assert (= BAV4 (< (div x n) GEN2)))
 (check-sat)
+(get-model)

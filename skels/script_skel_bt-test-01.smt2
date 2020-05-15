@@ -23,4 +23,5 @@
 (assert (= BAV4 (or x0 z0)))
 (assert (= BAV5 (and x1 y1)))
 (check-sat)
+(get-model)
 (exit)

@@ -11,4 +11,5 @@
 (assert (and (bvult v2 v4) (bvult v3 v4) (bvult v0 v1) (bvult v1 v2) (bvult v1 v3) (bvult v4 v5) (bvult v5 v1)))
 (assert (= BAV1 (and (bvult v2 v4) (bvult v3 v4) (bvult v0 v1) (bvult v1 v2) (bvult v1 v3) (bvult v4 v5) (bvult v5 v1))))
 (check-sat)
+(get-model)
 (exit)

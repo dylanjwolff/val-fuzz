@@ -7,3 +7,4 @@
 (assert (= (sumr GEN1) GEN2))
 (assert (= BAV3 (= (sumr GEN1) GEN2)))
 (check-sat)
+(get-model)

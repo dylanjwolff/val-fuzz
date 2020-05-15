@@ -288,3 +288,4 @@
 (assert (= BAV133 (or s39 s41)))
 (assert (= BAV134 (= (bvcomp s40 s42) GEN18)))
 (check-sat)
+(get-model)

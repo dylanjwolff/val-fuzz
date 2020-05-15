@@ -15,3 +15,4 @@
 (assert (= BAV7 (= (bvmul (bvneg x) x) GEN2)))
 (assert (= BAV8 (= (bvmul (bvneg GEN3) GEN4) GEN5)))
 (check-sat)
+(get-model)

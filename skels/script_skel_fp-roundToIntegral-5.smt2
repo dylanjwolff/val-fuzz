@@ -20,6 +20,7 @@
 (assert (= BAV8 (= r (fp.roundToIntegral roundNearestTiesToAway x))))
 (assert (= BAV9 (= m (fp.roundToIntegral roundNearestTiesToAway (fp GEN4 GEN5 GEN6)))))
 (check-sat)
+(get-model)
 (get-value (x))
 (get-value (r))
 (get-value (m))

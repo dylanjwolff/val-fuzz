@@ -10,3 +10,4 @@
 (assert (= BAV2 (=> (<= (mod i12 GEN1) i16) v10)))
 (assert (= BAV3 (<= (mod i12 GEN1) i16)))
 (check-sat)
+(get-model)

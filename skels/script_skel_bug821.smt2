@@ -4,3 +4,4 @@
 (assert _substvar_4_)
 (assert _substvar_4_)
 (check-sat)
+(get-model)

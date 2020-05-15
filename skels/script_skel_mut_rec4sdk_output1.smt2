@@ -44,4 +44,5 @@
 (assert (= BAV13 (= (SumOdd o3) GEN6)))
 (assert (= BAV14 (= (SumEven e1) GEN7)))
 (check-sat)
+(get-model)
 (exit)

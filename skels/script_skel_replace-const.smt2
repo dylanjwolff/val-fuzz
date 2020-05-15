@@ -22,3 +22,4 @@
 (assert (= BAV11 (= y (str.replace GEN4 GEN5 GEN6))))
 (assert (= BAV12 (= z (str.replace GEN7 GEN8 GEN9))))
 (check-sat)
+(get-model)

@@ -310,4 +310,5 @@
 (assert (= BAV192 (<= y2@10 GEN2)))
 (assert (= BAV193 (<= (- GEN1) y2@10)))
 (check-sat)
+(get-model)
 (exit)

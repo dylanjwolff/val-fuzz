@@ -10,3 +10,4 @@
 (assert (= BAV1 (= A (union D C))))
 (assert (= BAV2 (= A (union E A))))
 (check-sat)
+(get-model)

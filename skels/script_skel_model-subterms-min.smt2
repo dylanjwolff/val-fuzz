@@ -13,3 +13,4 @@
 (assert (= BAV1 (distinct x1 (a x2))))
 (assert (= BAV2 (distinct x2 (e2 x3))))
 (check-sat)
+(get-model)

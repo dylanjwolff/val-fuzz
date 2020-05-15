@@ -6,3 +6,4 @@
 (assert (= a (store b GEN1 true)))
 (assert (= BAV2 (= a (store b GEN1 true))))
 (check-sat)
+(get-model)

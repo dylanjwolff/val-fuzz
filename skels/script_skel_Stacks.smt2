@@ -868,4 +868,5 @@
 (assert (= BAV401 (=> (! (and %lbl%+6542 true) :lblpos GEN165) true)))
 (assert (= BAV402 (and %lbl%+6542 true)))
 (check-sat)
+(get-model)
 (pop 1)

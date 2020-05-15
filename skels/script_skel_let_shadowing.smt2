@@ -36,3 +36,4 @@
 (assert (= BAV14 (forall ((x Int)(y Int)) (and b a))))
 (assert (= BAV15 (forall ((x Int)(y Int)) (= GEN2 _let_0))))
 (check-sat)
+(get-model)

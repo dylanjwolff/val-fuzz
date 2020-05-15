@@ -6,3 +6,4 @@
 (assert (forall ((x T)) (= (bool_2_U (U_2_bool x)) x)))
 (assert (= BAV1 (forall ((x T)) (= (bool_2_U (U_2_bool x)) x))))
 (check-sat)
+(get-model)

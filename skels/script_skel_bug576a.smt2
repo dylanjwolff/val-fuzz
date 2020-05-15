@@ -164,4 +164,5 @@
 (assert (= BAV59 (= (assign c_4) r1)))
 (assert (= BAV60 (= (assign b_3) r0)))
 (check-sat)
+(get-model)
 (exit)

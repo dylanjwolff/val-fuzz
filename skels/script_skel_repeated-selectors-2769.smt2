@@ -9,3 +9,4 @@
 (assert (= s3 s4))
 (assert (= BAV1 (= s3 s4)))
 (check-sat)
+(get-model)

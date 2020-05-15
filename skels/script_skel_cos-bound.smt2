@@ -5,3 +5,4 @@
 (assert (> (cos x) GEN1))
 (assert (= BAV2 (> (cos x) GEN1)))
 (check-sat)
+(get-model)

@@ -13,3 +13,4 @@
 (assert (= BAV5 (forall ((x Int)(y Int)) (or (> x y) (P x)))))
 (assert (= BAV6 (forall ((x Int)(y Int)) (> x y))))
 (check-sat)
+(get-model)

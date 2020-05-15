@@ -4,4 +4,5 @@
 (declare-fun A () (Array Int (_ FloatingPoint 53 11)))
 (assert (fp.lt (select A x) (select A y)))
 (check-sat)
+(get-model)
 (exit)

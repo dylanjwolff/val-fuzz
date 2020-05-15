@@ -11,5 +11,6 @@
 (assert (not (= X (fp GEN4 GEN5 GEN6))))
 (assert (= BAV7 (= X (fp GEN4 GEN5 GEN6))))
 (check-sat)
+(get-model)
 (check-sat-using smt)
 (exit)

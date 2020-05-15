@@ -14,3 +14,4 @@
 (assert (= BAV4 (forall ((t1 String)(t2 String)) (= t1 s))))
 (assert (= BAV5 (= (str.prefixof s t) false)))
 (check-sat)
+(get-model)

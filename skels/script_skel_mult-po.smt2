@@ -32,3 +32,4 @@
 (assert (= BAV12 (> c d)))
 (assert (= BAV13 (< (* a d) (* b c))))
 (check-sat)
+(get-model)

@@ -6,3 +6,4 @@
 (assert (= (div GEN1 (- GEN2)) (- GEN3)))
 (assert (= BAV4 (= (div GEN1 (- GEN2)) (- GEN3))))
 (check-sat)
+(get-model)

@@ -37,3 +37,4 @@
 (assert (= BAV16 (= b GEN4)))
 (assert (= BAV17 (> (chop (+ a b)) a)))
 (check-sat)
+(get-model)

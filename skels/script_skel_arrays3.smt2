@@ -23,4 +23,5 @@ http://www.ai.dist.unige.it/pdpar05/
 (assert (= BAV1 (= (store (store a1 i1 (select a2 i1)) i1 (select (store a2 i1 (select a1 i1)) i2)) (store (store a2 i1 (select a1 i1)) i2 (select (store a1 i1 (select a2 i1)) i2)))))
 (assert (= BAV2 (= a1 a2)))
 (check-sat)
+(get-model)
 (exit)

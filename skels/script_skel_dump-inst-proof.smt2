@@ -27,3 +27,4 @@
 (assert (= BAV9 (forall ((x Int)) (or (not (S x)) (not (Q x))))))
 (assert (= BAV10 (and (not (R GEN1)) (not (R GEN2)) (not (S GEN3)) (not (P GEN4)))))
 (check-sat)
+(get-model)

@@ -5,3 +5,4 @@
 (assert (< (* x x) GEN1))
 (assert (= BAV2 (< (* x x) GEN1)))
 (check-sat)
+(get-model)

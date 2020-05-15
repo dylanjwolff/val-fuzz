@@ -14,3 +14,4 @@
 (assert (= BAV5 (= (* b b) GEN2)))
 (assert (= BAV6 (= (+ (* a a) (* b b)) GEN3)))
 (check-sat)
+(get-model)

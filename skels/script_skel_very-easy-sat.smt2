@@ -58,3 +58,4 @@ Submitted by Dejan Jovanovic for SMT-LIB.
 (assert (= BAV21 (<= skoX (/ GEN9 GEN10))))
 (assert (= BAV22 (<= GEN11 skoX)))
 (check-sat)
+(get-model)

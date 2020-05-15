@@ -27,3 +27,4 @@
 (assert (= BAV6 (= b4 (select B b2))))
 (assert (= BAV7 (xor b4 b2)))
 (check-sat)
+(get-model)

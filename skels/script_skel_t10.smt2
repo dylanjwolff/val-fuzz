@@ -22,4 +22,5 @@
 (assert (= BAV4 (=> s t)))
 (assert (= BAV5 (=> q s)))
 (check-sat)
+(get-model)
 (get-unsat-core)

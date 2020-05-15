@@ -13,3 +13,4 @@
 (assert (not (R c b)))
 (assert (= BAV1 (or (forall ((x Int)) (R x a)) (forall ((x Int)) (R x b)))))
 (check-sat)
+(get-model)

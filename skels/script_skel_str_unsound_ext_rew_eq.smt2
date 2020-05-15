@@ -9,3 +9,4 @@
 (assert (= (str.++ (str.++ (str.++ y GEN1) GEN2) x) (str.++ (str.++ GEN3 x) GEN4)))
 (assert (= BAV5 (= (str.++ (str.++ (str.++ y GEN1) GEN2) x) (str.++ (str.++ GEN3 x) GEN4))))
 (check-sat)
+(get-model)

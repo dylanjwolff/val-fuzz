@@ -1,1 +1,0 @@
-#(("BAV3") "script_skel_issue3647.smt2")

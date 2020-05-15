@@ -3737,4 +3737,5 @@
 (assert (= BAV603 (>= (* (- GEN399) x212) (- GEN400))))
 (assert (= BAV604 (>= (+ (* GEN401 x113) (* (- GEN402) x164)) GEN403)))
 (check-sat)
+(get-model)
 (exit)

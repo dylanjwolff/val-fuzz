@@ -7,4 +7,5 @@
 (assert (= A B))
 (assert (= BAV1 (= A B)))
 (check-sat)
+(get-model)
 (exit)

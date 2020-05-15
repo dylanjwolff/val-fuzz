@@ -8,4 +8,5 @@
 (assert (= (+ (* z GEN1) GEN2) (* x y)))
 (assert (= BAV3 (= (+ (* z GEN1) GEN2) (* x y))))
 (check-sat)
+(get-model)
 (exit)

@@ -15,4 +15,5 @@
 (assert (= BAV7 (> (ite P GEN1 x) GEN3)))
 (assert (= BAV8 (<= (ite P GEN1 x) GEN4)))
 (check-sat)
+(get-model)
 (exit)

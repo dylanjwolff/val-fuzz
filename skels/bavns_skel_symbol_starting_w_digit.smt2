@@ -1,1 +1,0 @@
-#(("BAV3" "BAV4") "script_skel_symbol_starting_w_digit.smt2")

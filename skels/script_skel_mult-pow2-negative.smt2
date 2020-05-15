@@ -7,3 +7,4 @@
 (assert (not (= (bvmul (bvneg (bvmul GEN1 GEN2)) GEN3) x)))
 (assert (= BAV4 (= (bvmul (bvneg (bvmul GEN1 GEN2)) GEN3) x)))
 (check-sat)
+(get-model)

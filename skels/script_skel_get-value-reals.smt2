@@ -29,4 +29,5 @@
 (assert (= BAV11 (= neg_rat (/ (- GEN5) GEN6))))
 (assert (= BAV12 (= neg_int (- GEN7))))
 (check-sat)
+(get-model)
 (get-value (pos_int pos_rat zero neg_rat neg_int))

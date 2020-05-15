@@ -1,1 +1,0 @@
-#(() "script_skel_fp-array-4.smt2")

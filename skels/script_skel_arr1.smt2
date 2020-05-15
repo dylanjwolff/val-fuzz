@@ -12,3 +12,4 @@
 (assert (= BAV2 (= i1 i2)))
 (assert (= BAV3 (= (select a i1) (select a i2))))
 (check-sat)
+(get-model)

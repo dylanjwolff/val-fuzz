@@ -7,3 +7,4 @@
 (assert (not (= x (ite a (ite a x y) (ite (not a) x y)))))
 (assert (= BAV1 (= x (ite a (ite a x y) (ite (not a) x y)))))
 (check-sat)
+(get-model)

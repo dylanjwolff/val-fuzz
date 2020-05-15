@@ -7,3 +7,4 @@
 (assert (= (len (cons GEN1 nil)) GEN2))
 (assert (= BAV3 (= (len (cons GEN1 nil)) GEN2)))
 (check-sat)
+(get-model)

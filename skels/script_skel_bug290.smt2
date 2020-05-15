@@ -28,4 +28,5 @@
 (assert (= BAV6 (forall ((?x Elem)(?y1 List)(?y2 List)) (= (append (cons ?x ?y1) ?y2) (cons ?x (append ?y1 ?y2))))))
 (assert (= BAV7 (= (append (cons x nil) y) (cons x y))))
 (check-sat)
+(get-model)
 (exit)

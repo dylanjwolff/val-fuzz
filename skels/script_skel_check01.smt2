@@ -8,3 +8,4 @@
 (assert (not (f GEN2)))
 (pop 1)
 (check-sat)
+(get-model)

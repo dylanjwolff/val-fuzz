@@ -6,6 +6,7 @@
 (define-fun s3 () Bool (distinct s0 s1 s2))
 (assert s3)
 (check-sat)
+(get-model)
 (get-value (s0))
 (get-value (s1))
 (get-value (s2))

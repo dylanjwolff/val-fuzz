@@ -12,3 +12,4 @@
 (assert (distinct (mktest x1 x2 x2) (mktest y1 y2 y2)))
 (assert (= BAV1 (distinct (mktest x1 x2 x2) (mktest y1 y2 y2))))
 (check-sat)
+(get-model)

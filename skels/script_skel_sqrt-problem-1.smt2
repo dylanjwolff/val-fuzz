@@ -67,4 +67,5 @@
 (assert (= BAV37 (<= (to_real (- GEN2)) X)))
 (assert (= BAV38 (<= X (to_real GEN1))))
 (check-sat)
+(get-model)
 (exit)

@@ -19,4 +19,5 @@
 (assert (= BAV3 (= xxx (fp.roundToIntegral RNE xx))))
 (assert (= BAV4 (= xx xxx)))
 (check-sat)
+(get-model)
 (exit)

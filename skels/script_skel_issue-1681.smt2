@@ -61,3 +61,4 @@
 (assert (= BAV26 (forall ((x Int)) (< x (+ lena lenb)))))
 (assert (= BAV27 (forall ((x Int)) (= (select c x) (select a (- x lenb))))))
 (check-sat)
+(get-model)

@@ -8,3 +8,4 @@
 (assert (= GEN1 x2))
 (assert (= BAV2 (= GEN1 x2)))
 (check-sat)
+(get-model)

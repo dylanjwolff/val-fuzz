@@ -28,3 +28,4 @@
 (assert (= BAV6 (xor b1 b3)))
 (assert (= BAV7 (xor b2 b2)))
 (check-sat)
+(get-model)

@@ -27,4 +27,5 @@
 (declare-fun x6 () Int)
 (declare-fun x7 () Int)
 (check-sat)
+(get-model)
 (exit)

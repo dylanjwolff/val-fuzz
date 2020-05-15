@@ -14,3 +14,4 @@
 )
 (declare-const boolean Bool)
 (check-sat)
+(get-model)

@@ -6,3 +6,4 @@
 (assert (distinct (div n n) GEN1))
 (assert (= BAV2 (distinct (div n n) GEN1)))
 (check-sat)
+(get-model)

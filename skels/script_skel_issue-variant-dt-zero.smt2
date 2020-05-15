@@ -12,3 +12,4 @@
 (define-funs-rec ((f0((v0 a6))a4))
                   (c4$2))
 (check-sat)
+(get-model)

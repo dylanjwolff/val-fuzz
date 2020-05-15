@@ -45,3 +45,4 @@
 (assert (= BAV20 (< u GEN11)))
 (assert (= BAV21 (< v GEN12)))
 (check-sat)
+(get-model)

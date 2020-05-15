@@ -69,3 +69,4 @@
 (assert (forall ((x Int)) (not (R x))))
 (assert (= BAV32 (forall ((x Int)(y Int)(z Int)(w Int)(q Int)) (or (not (P x)) (not (P y)) (not (P z)) (not (P w)) (not (P q)) (Q x y z w q)))))
 (check-sat)
+(get-model)

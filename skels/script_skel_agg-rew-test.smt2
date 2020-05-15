@@ -11,3 +11,4 @@
 (assert (= BAV6 (forall ((x Int)) (=> (Q GEN1 x) (or (ite (Q GEN2 x) (not (Q GEN3 x)) (Q GEN4 x)) (Q GEN5 x))))))
 (assert (= BAV7 (forall ((x Int)) (or (ite (Q GEN2 x) (not (Q GEN3 x)) (Q GEN4 x)) (Q GEN5 x)))))
 (check-sat)
+(get-model)

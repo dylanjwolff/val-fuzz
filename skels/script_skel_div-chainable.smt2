@@ -14,3 +14,4 @@
 (assert (= BAV8 (= (div GEN1 GEN2 GEN3) GEN4)))
 (assert (= BAV9 (= (div x GEN5 GEN6) GEN7)))
 (check-sat)
+(get-model)

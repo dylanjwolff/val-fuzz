@@ -22,3 +22,4 @@
 (assert (= BAV7 (<= j (+ x GEN2))))
 (assert (= BAV8 (<= i GEN3)))
 (check-sat)
+(get-model)

@@ -1,1 +1,0 @@
-#(() "script_skel_fp-eq-1.smt2")

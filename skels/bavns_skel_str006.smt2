@@ -1,1 +1,0 @@
-#(("BAV5" "BAV6" "BAV7") "script_skel_str006.smt2")

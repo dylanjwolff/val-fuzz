@@ -7,3 +7,4 @@
 (assert (not (= (+ (sin GEN1) (sin (- GEN2))) GEN3)))
 (assert (= BAV4 (= (+ (sin GEN1) (sin (- GEN2))) GEN3)))
 (check-sat)
+(get-model)

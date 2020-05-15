@@ -6,4 +6,5 @@
 (declare-fun g (U) Bool)
 (assert (g (ite c a a)))
 (check-sat)
+(get-model)
 (exit)

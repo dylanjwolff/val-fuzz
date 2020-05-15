@@ -7,3 +7,4 @@
 (assert (= BAV1 (forall ((Q (Array Int Bool))) (=> (select Q x) (select Q y)))))
 (assert (= BAV2 (= x y)))
 (check-sat)
+(get-model)

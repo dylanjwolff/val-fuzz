@@ -16,3 +16,4 @@
 (assert (= BAV6 (= z (str.++ x y))))
 (assert (= BAV7 (= (str.++ x GEN3) (str.++ GEN4 x))))
 (check-sat)
+(get-model)

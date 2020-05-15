@@ -87,4 +87,5 @@ Submitted by Dejan Jovanovic for SMT-LIB.
 (assert (= BAV52 (= (* skoY skoY) (+ GEN11 (* skoX (* skoX (+ GEN12 (* skoX (* skoX (+ GEN13 (* skoX (* skoX (+ GEN14 (* skoX (* skoX (+ GEN15 (* skoX (* skoX GEN16))))))))))))))))))
 (assert (= BAV53 (= (* skoY skoY) (+ GEN17 (* (/ GEN18 GEN19) (* (/ GEN20 GEN21) (+ GEN22 (* (/ GEN23 GEN24) (* (/ GEN25 GEN26) (+ GEN27 (* (/ GEN28 GEN29) (* (/ GEN30 GEN31) (+ GEN32 (* (/ GEN33 GEN34) (* (/ GEN35 GEN36) (+ GEN37 (* (/ GEN38 GEN39) (* (/ GEN40 GEN41) GEN42))))))))))))))))))
 (check-sat)
+(get-model)
 (exit)

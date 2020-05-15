@@ -10,3 +10,4 @@
 (assert (= BAV3 (< (- x y) GEN1)))
 (assert (= BAV4 (< x y)))
 (check-sat)
+(get-model)

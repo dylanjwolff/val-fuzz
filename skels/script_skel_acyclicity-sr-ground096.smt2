@@ -235,3 +235,4 @@
 (assert (= BAV79 (= uc71 (f3 (f3 uc72 (f3 uc72 uc72)) (f3 (f3 uc72 uc72) (f1 uc72 uc72 uc72 uc72))))))
 (assert (= BAV80 (= uc72 (f1 uc53 uc53 uc53 uc53))))
 (check-sat)
+(get-model)

@@ -37,3 +37,7 @@ why so many unsat
 @TODO 11th May
 why so many unsat
 1st draft of thesis proposal
+
+@TODO 15th May
+NSolv (flags)
+pick at code coverage

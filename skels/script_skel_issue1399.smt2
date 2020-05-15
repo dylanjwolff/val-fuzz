@@ -44,3 +44,4 @@
 (assert (= BAV20 (< k x2)))
 (assert (= BAV21 (= (findIdx x1 x2 k) GEN3)))
 (check-sat)
+(get-model)

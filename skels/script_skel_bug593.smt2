@@ -15,3 +15,4 @@
 (assert (= BAV3 (= (f (g x)) (f (g z)))))
 (assert (= BAV4 (= (f (g y)) (f (g z)))))
 (check-sat)
+(get-model)

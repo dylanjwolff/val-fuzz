@@ -10,3 +10,4 @@
 (assert (= BAV2 (= c (f d))))
 (assert (= BAV3 (= d (f d))))
 (check-sat)
+(get-model)

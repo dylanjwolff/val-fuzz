@@ -418,4 +418,5 @@
 (assert (= BAV234 (>= GEN82 GEN83)))
 (assert (= BAV235 (= _substvar_54_ GEN84)))
 (check-sat)
+(get-model)
 (exit)

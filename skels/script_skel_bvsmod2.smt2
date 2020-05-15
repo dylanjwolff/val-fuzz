@@ -2,6 +2,7 @@
 (declare-const GEN1 (_ BitVec 2))
 (declare-const GEN2 (_ BitVec 2))
 (declare-const GEN3 (_ BitVec 2))
+(get-model)
 (declare-const GEN4 (_ BitVec 2))
 (declare-const GEN5 (_ BitVec 2))
 (declare-const GEN6 (_ BitVec 2))

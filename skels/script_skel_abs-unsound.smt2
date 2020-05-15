@@ -8,3 +8,4 @@
 (assert (= BAV1 (= (fp.abs (fp.abs x)) x)))
 (assert (= BAV2 (= (fp.abs (fp.neg y)) y)))
 (check-sat)
+(get-model)

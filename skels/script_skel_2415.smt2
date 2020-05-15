@@ -12,3 +12,4 @@
 (define-fun s9 () Bool (or s3 s8))
 (assert (not s9))
 (check-sat)
+(get-model)

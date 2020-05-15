@@ -13,3 +13,4 @@
 (assert (= BAV6 (forall ((s Int)(m Int)) (< s GEN2))))
 (assert (= BAV7 (forall ((s Int)(m Int)) (>= s GEN3))))
 (check-sat)
+(get-model)

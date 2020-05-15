@@ -50,4 +50,5 @@
 (assert (= BAV19 (>= i (select (store (select d j) m GEN10) GEN11))))
 (assert (= BAV20 (= i GEN12)))
 (check-sat)
+(get-model)
 (exit)

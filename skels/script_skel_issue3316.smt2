@@ -18,3 +18,4 @@
                   "" 
                   c4$2))
 (check-sat)
+(get-model)

@@ -38,3 +38,4 @@
 (assert (= BAV21 (>= (dbz GEN1) GEN10)))
 (assert (= BAV22 (> a GEN11)))
 (check-sat)
+(get-model)

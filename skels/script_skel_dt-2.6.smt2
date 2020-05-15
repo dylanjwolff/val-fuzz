@@ -9,3 +9,4 @@
 (assert (distinct x y z))
 (assert (= BAV1 (distinct x y z)))
 (check-sat)
+(get-model)

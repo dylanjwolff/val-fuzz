@@ -16,3 +16,4 @@
 (assert (= BAV2 (= (store a1 x y) a1)))
 (assert (= BAV3 (= x y)))
 (check-sat)
+(get-model)

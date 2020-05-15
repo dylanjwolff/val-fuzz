@@ -27,5 +27,6 @@
 (assert (= BAV11 (= RM RTN)))
 (assert (= BAV12 (= RM RTZ)))
 (check-sat)
+(get-model)
 (check-sat-using smt)
 (exit)

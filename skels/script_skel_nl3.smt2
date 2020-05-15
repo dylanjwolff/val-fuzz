@@ -24,3 +24,4 @@
 (assert (= BAV9 (= (* x1 x2 x2) GEN3)))
 (assert (= BAV10 (< (* GEN4 x1 x1 x1 x2 x3 x3 x4 x4 x4 x4 x4 x4) GEN5)))
 (check-sat)
+(get-model)

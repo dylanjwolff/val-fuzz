@@ -1,1 +1,0 @@
-#(() "script_skel_qe-partial.smt2")

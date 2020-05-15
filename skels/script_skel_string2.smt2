@@ -12,3 +12,4 @@
 (assert (str.in.re t (re.++ (re.* (re.range GEN3 GEN4)) (str.to.re GEN5))))
 (assert (= BAV6 (= t (str.replace s GEN1 GEN2))))
 (check-sat)
+(get-model)

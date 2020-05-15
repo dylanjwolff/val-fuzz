@@ -5,3 +5,4 @@
 (assert (distinct a (sin GEN1)))
 (assert (= BAV2 (distinct a (sin GEN1))))
 (check-sat)
+(get-model)

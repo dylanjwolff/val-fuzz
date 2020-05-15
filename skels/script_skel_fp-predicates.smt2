@@ -8,5 +8,6 @@
 (assert (not (fp.isNegative X)))
 (assert (fp.isPositive X))
 (check-sat)
+(get-model)
 (check-sat-using smt)
 (exit)

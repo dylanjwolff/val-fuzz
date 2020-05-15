@@ -17,3 +17,4 @@
 (assert (= BAV1 (distinct a b c)))
 (assert (= BAV2 (forall ((x ufin1)(y ufin2)(z ufin1)) (or (P x y) (Q x z)))))
 (check-sat)
+(get-model)

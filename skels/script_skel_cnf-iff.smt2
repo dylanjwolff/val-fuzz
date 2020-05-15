@@ -116,3 +116,4 @@
 (assert (= BAV48 (= b h)))
 (assert (= BAV49 (= d h)))
 (check-sat)
+(get-model)

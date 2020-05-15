@@ -8,3 +8,4 @@
 (assert (= (str.++ f0 f1 f0 c0 f1 c0 f2 f2) GEN1))
 (assert (= BAV2 (= (str.++ f0 f1 f0 c0 f1 c0 f2 f2) GEN1)))
 (check-sat)
+(get-model)

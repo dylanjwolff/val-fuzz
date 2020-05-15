@@ -13,4 +13,5 @@
 (assert (= BAV2 (forall ((x U)(y U)(z U)) (=> (and (G x y) (G y z)) (G x z)))))
 (assert (= BAV3 (forall ((x U)(y U)(z U)) (and (G x y) (G y z)))))
 (check-sat)
+(get-model)
 (exit)

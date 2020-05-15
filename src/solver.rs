@@ -159,6 +159,20 @@ impl RSolve {
         })
     }
 
+    pub fn has_unsat(&self) -> bool {
+        self.lines.iter().any(|l| match l {
+            ResultLine::Unsat => true,
+            _ => false,
+        })
+    }
+
+    pub fn has_unknown(&self) -> bool {
+        self.lines.iter().any(|l| match l {
+            ResultLine::Unknown => true,
+            _ => false,
+        })
+    }
+
     pub fn extract_const_var_vals(&self, varnames: &Vec<String>) -> Vec<(&Symbol, &SExp)> {
         self.lines
             .iter()

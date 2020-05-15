@@ -21,3 +21,4 @@
 (assert (= BAV11 (< (- x (sin GEN5)) GEN6)))
 (assert (= BAV12 (< (- (sin GEN7) x) GEN8)))
 (check-sat)
+(get-model)

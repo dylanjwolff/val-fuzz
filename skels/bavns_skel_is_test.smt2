@@ -1,1 +1,0 @@
-#(() "script_skel_is_test.smt2")

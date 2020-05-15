@@ -3,3 +3,4 @@
 (declare-fun x () Unit)
 (assert (not ((_ is u) x)))
 (check-sat)
+(get-model)

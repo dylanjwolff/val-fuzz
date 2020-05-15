@@ -9,3 +9,4 @@
 (assert (not (= (mod (* GEN1 x) GEN2) (mod (* GEN3 (+ x GEN4)) GEN5))))
 (assert (= BAV6 (= (mod (* GEN1 x) GEN2) (mod (* GEN3 (+ x GEN4)) GEN5))))
 (check-sat)
+(get-model)

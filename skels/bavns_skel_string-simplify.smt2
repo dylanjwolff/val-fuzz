@@ -1,1 +1,0 @@
-#(() "script_skel_string-simplify.smt2")

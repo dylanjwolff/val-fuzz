@@ -22,4 +22,5 @@
 (assert (= BAV5 (= (g a) (f a))))
 (assert (= BAV6 (= (g b) (f b))))
 (check-sat)
+(get-model)
 (exit)

@@ -1,1 +1,0 @@
-#(() "script_skel_boolean-terms-bug-array.smt2")

@@ -13,3 +13,4 @@
 (assert (= BAV5 (= (cos x) GEN2)))
 (assert (= BAV6 (= (tan x) GEN3)))
 (check-sat)
+(get-model)

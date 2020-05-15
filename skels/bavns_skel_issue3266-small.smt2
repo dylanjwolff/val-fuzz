@@ -1,1 +1,0 @@
-#(() "script_skel_issue3266-small.smt2")

@@ -6,3 +6,4 @@
 (assert (not (= (cos GEN1) GEN2)))
 (assert (= BAV3 (= (cos GEN1) GEN2)))
 (check-sat)
+(get-model)

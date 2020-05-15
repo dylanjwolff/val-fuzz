@@ -770,4 +770,5 @@
 (assert (= BAV366 (and (= status enclavequiescent) (admintoken__ispresent admintoken__state))))
 (assert (= BAV367 (= status enclavequiescent)))
 (check-sat)
+(get-model)
 (get-unsat-core)

@@ -6,4 +6,5 @@
 (assert (= x (str.++ GEN1 GEN2)))
 (assert (= BAV3 (= x (str.++ GEN1 GEN2))))
 (check-sat)
+(get-model)
 (get-value (x))

@@ -38,3 +38,4 @@
 (assert (= BAV20 (= y GEN9)))
 (assert (= BAV21 (= (* x x) (* y y y))))
 (check-sat)
+(get-model)

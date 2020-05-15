@@ -24,3 +24,4 @@
 (assert (= BAV11 (= a GEN4)))
 (assert (= BAV12 (= a GEN5)))
 (check-sat)
+(get-model)

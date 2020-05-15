@@ -11,3 +11,4 @@
 (assert (= BAV1 (= a (store b c d))))
 (assert (= BAV2 (= e (select a (select b d)))))
 (check-sat)
+(get-model)

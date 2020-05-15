@@ -5,3 +5,4 @@
 (assert (forall ((x (_ BitVec 4))) (not (= (bvurem x a) b))))
 (assert (= BAV1 (forall ((x (_ BitVec 4))) (= (bvurem x a) b))))
 (check-sat)
+(get-model)

@@ -1,1 +1,0 @@
-#(() "script_skel_z3.6.smt2")

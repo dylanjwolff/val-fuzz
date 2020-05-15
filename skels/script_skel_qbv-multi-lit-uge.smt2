@@ -8,3 +8,4 @@
 (assert (= BAV1 (forall ((x (_ BitVec 3))) (or (not (= (bvmul x a) b)) (bvuge x c)))))
 (assert (= BAV2 (forall ((x (_ BitVec 3))) (= (bvmul x a) b))))
 (check-sat)
+(get-model)

@@ -3,3 +3,4 @@
 (assert (forall ((x Int)) (forall ((y Int)) (= y x))))
 (assert (= BAV1 (forall ((x Int)(y Int)) (= y x))))
 (check-sat)
+(get-model)

@@ -18,3 +18,4 @@
 (assert (= BAV6 (= (bvxor x y z) (bvxor (bvxor x y) z))))
 (assert (= BAV7 (= (bvxnor x y z) (bvxnor (bvxnor x y) z))))
 (check-sat)
+(get-model)

@@ -28,3 +28,4 @@
 (assert (= BAV13 (= (str.++ xx GEN3) (str.++ yy GEN4 GEN5))))
 (assert (= BAV14 (= (str.++ zz GEN6) (str.++ yy GEN7 GEN8))))
 (check-sat)
+(get-model)

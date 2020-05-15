@@ -70,4 +70,5 @@
 (assert (= BAV2 (forall ((?v0 Nat$)(?v1 A_stream_bool_fun$)(?v2 A_stream$)) (=> (fun_app$a (less$a (enat$ ?v0)) (sfirst$ ?v1 ?v2)) (not (fun_app$f ?v1 (sdrop$ ?v0 ?v2)))))))
 (assert (= BAV3 (forall ((?v0 Enat$)(?v1 Enat$)) (=> (not (fun_app$a (less$a ?v0) ?v1)) (fun_app$a (less_eq$a ?v1) ?v0)))))
 (check-sat)
+(get-model)
 (exit)

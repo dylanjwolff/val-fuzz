@@ -19,4 +19,5 @@
 (assert (= BAV7 (<= (* (+ skoS3 skoSX) (+ skoS3 skoSX) (+ skoS3 skoSX) (+ skoS3 skoSX) (+ skoS3 skoSX) (+ skoS3 skoSX) (+ skoS3 skoSX) (+ skoS3 skoSX) (+ skoS3 skoSX) (+ skoS3 skoSX) (+ skoS3 skoSX) (+ skoS3 skoSX) (+ skoS3 skoSX) (+ skoS3 skoSX) (+ skoS3 skoSX) (+ skoS3 skoSX) (+ skoS3 skoSX) (+ skoS3 skoSX) (+ skoS3 skoSX) (+ skoS3 skoSX) (+ skoS3 skoSX) (+ skoS3 skoSX) (+ skoS3 skoSX) (+ skoS3 skoSX) (+ skoS3 skoSX) (+ skoS3 skoSX) (+ skoS3 skoSX) (+ skoS3 skoSX) (+ skoS3 skoSX) (+ skoS3 skoSX) (+ skoS3 skoSX) (+ skoS3 skoSX)) GEN2)))
 (assert (= BAV8 (<= skoS3 GEN3)))
 (check-sat)
+(get-model)
 (exit)

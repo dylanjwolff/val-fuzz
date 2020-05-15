@@ -18,3 +18,4 @@
 (assert (= BAV11 (= (str.in.re x (re.++ (str.to.re GEN1) (re.* (str.to.re GEN2)))) (str.in.re x (re.++ (str.to.re GEN3) (str.to.re (str.++ GEN4 GEN5)))))))
 (assert (= BAV12 (= (str.in.re x (re.++ (re.union (re.++ (str.to.re GEN6) re.allchar) re.allchar) (str.to.re GEN7))) (str.in.re x (re.++ (str.to.re GEN8) (str.to.re GEN9))))))
 (check-sat)
+(get-model)

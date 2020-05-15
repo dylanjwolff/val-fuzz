@@ -12,3 +12,4 @@
 (assert (= BAV2 (forall ((x (_ BitVec 1))) (= (f x) a))))
 (assert (= BAV3 (forall ((x (_ BitVec 1))) (or (P x) (Q x)))))
 (check-sat)
+(get-model)

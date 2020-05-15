@@ -62,4 +62,5 @@
 (assert (= BAV23 (forall ((?p Int)(?q Int)) (= ?p ?q))))
 (assert (= BAV24 (forall ((?p Int)(?q Int)) (or (not (s_5 ?p)) (not (s_5 ?q))))))
 (check-sat)
+(get-model)
 (exit)

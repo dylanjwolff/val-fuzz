@@ -16,3 +16,4 @@
 (assert (= BAV3 (forall ((x U)(y U)) (= x y))))
 (assert (= BAV4 (= b c)))
 (check-sat)
+(get-model)

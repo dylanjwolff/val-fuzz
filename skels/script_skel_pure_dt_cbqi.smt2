@@ -5,3 +5,4 @@
 (assert (forall ((x nat)) (not (= y (Suc x)))))
 (assert (= BAV1 (forall ((x nat)) (= y (Suc x)))))
 (check-sat)
+(get-model)

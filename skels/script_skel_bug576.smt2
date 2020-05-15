@@ -61,4 +61,5 @@
 (assert (= BAV18 (= (assign b_1) r1)))
 (assert (= BAV19 (= (assign a_1) r0)))
 (check-sat)
+(get-model)
 (exit)

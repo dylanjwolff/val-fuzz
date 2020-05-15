@@ -18,3 +18,4 @@
 (assert (= BAV7 (= b GEN2)))
 (assert (= BAV8 (= (* a a) (* b b b b))))
 (check-sat)
+(get-model)

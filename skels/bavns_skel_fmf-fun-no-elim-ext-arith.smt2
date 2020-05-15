@@ -1,1 +1,0 @@
-#(() "script_skel_fmf-fun-no-elim-ext-arith.smt2")

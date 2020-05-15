@@ -21,3 +21,4 @@
 (assert (= BAV3 (= GEN1 GEN2)))
 (assert (= BAV4 (=> true $_Z19bitonic_sort_kernelPfjj)))
 (check-sat)
+(get-model)

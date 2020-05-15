@@ -39,3 +39,4 @@
 (assert (= BAV18 (= d GEN8)))
 (assert (= BAV19 (< (* a b c d) GEN9)))
 (check-sat)
+(get-model)

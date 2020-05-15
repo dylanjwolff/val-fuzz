@@ -105,3 +105,4 @@ formula (Albert Oliveras).
 (assert (= BAV43 (= c2 c_0)))
 (assert (= BAV44 (= c2 c_1)))
 (check-sat)
+(get-model)

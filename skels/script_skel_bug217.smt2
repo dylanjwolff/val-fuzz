@@ -10,3 +10,4 @@
 (assert (not (f true)))
 (assert (= BAV1 (or (f x) (f y) (f z))))
 (check-sat)
+(get-model)

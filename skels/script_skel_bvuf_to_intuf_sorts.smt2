@@ -16,3 +16,4 @@
 (assert (= BAV2 (distinct (f a) (g s))))
 (assert (= BAV3 (distinct (h a) s)))
 (check-sat)
+(get-model)

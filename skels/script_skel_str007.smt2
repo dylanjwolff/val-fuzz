@@ -19,3 +19,4 @@
 (assert (= BAV8 (= (str.++ x GEN1) (str.++ GEN2 x))))
 (assert (= BAV9 (= (str.++ y GEN3) (str.++ GEN4 y))))
 (check-sat)
+(get-model)

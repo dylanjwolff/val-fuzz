@@ -22,3 +22,4 @@
 (assert (= BAV4 (= i1_ i3_)))
 (assert (= BAV5 (distinct i4_ i5_ i6_)))
 (check-sat)
+(get-model)

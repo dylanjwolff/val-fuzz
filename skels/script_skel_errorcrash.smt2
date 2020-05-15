@@ -6,4 +6,5 @@
 (assert (= x y))
 (assert (= BAV1 (= x y)))
 (check-sat)
+(get-model)
 (get-value (x y))

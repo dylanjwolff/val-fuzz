@@ -39,4 +39,5 @@
 (assert (= BAV15 (= neg_real_int_value (- GEN8))))
 (assert (= BAV16 (= neg_int (- GEN9))))
 (check-sat)
+(get-model)
 (get-value (pos_int pos_real_int_value pos_rat zero neg_rat neg_real_int_value neg_int))

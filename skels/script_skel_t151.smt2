@@ -21,3 +21,4 @@
 (assert (= BAV9 (forall ((x Real)) (= (f (g x)) GEN3))))
 (assert (= BAV10 (= (f (g a)) GEN4)))
 (check-sat)
+(get-model)

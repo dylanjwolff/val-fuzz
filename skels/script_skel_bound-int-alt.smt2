@@ -34,3 +34,4 @@
 (assert (= BAV19 (forall ((x U)(y Int)(z V)(w Int)(v U)(d Int)) (<= GEN3 y GEN4))))
 (assert (= BAV20 (forall ((x U)(y Int)(z V)(w Int)(v U)(d Int)) (<= GEN5 w (+ GEN6 y)))))
 (check-sat)
+(get-model)

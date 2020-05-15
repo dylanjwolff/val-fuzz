@@ -2,5 +2,6 @@
 (declare-fun X () (_ FloatingPoint 11 53))
 (assert (fp.eq X X))
 (check-sat)
+(get-model)
 (check-sat-using smt)
 (exit)

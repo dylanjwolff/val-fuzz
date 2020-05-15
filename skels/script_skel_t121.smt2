@@ -25,3 +25,4 @@
 (assert (= BAV8 (= b GEN2)))
 (assert (= BAV9 (= (bvsmod a b) b)))
 (check-sat)
+(get-model)

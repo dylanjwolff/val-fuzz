@@ -43,3 +43,4 @@
 (define-fun s41 () Bool (and s35 s40))
 (assert s41)
 (check-sat)
+(get-model)

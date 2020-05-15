@@ -22,4 +22,5 @@
 (assert (= BAV8 (= (one_cons nil) (cons GEN4 nil))))
 (assert (= BAV9 (= (length (one_cons nil)) GEN5)))
 (check-sat)
+(get-model)
 (exit)

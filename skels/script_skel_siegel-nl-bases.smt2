@@ -43,3 +43,4 @@
 (assert (= BAV15 (= (+ (* j1 n) i1) (+ (* i2 n) j2))))
 (assert (= BAV16 (= (+ (* j1 n) i1) (+ (* j2 n) i2))))
 (check-sat)
+(get-model)

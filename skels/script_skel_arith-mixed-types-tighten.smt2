@@ -48,3 +48,4 @@
 (assert (= BAV28 (>= termITE_30 GEN18)))
 (assert (= BAV29 (>= (+ (* (- GEN1) termITE_3) termITE_4) GEN19)))
 (check-sat)
+(get-model)

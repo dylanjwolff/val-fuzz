@@ -5,3 +5,4 @@
 (assert (not (= x (ite true y x))))
 (assert (= BAV1 (= x (ite true y x))))
 (check-sat)
+(get-model)

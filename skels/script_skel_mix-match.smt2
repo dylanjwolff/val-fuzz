@@ -5,3 +5,4 @@
 (assert (is_int a))
 (assert (not (P a)))
 (check-sat)
+(get-model)

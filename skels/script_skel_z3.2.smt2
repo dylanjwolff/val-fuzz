@@ -11,3 +11,4 @@
 (assert (= BAV3 (> a GEN1)))
 (assert (= BAV4 (< (f a true) GEN2)))
 (check-sat)
+(get-model)

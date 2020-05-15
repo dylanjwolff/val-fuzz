@@ -38,3 +38,4 @@
 (assert (= BAV8 (forall ((?v0 A_set_set_bool_fun$)(?v1 A_set_set_bool_fun$)(?v2 A_set_set$)) (= (fun_app$ ?v0 ?v2) (fun_app$ ?v1 ?v2)))))
 (assert (= BAV9 (forall ((?v0 A_set_set_bool_fun$)(?v1 A_set_set_bool_fun$)) (= (collect$ ?v0) (collect$ ?v1)))))
 (check-sat)
+(get-model)

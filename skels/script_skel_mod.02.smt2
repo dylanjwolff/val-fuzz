@@ -10,3 +10,4 @@
 (assert (= BAV3 (distinct n GEN1)))
 (assert (= BAV4 (> (mod n n) GEN2)))
 (check-sat)
+(get-model)

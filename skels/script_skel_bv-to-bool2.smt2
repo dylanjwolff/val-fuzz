@@ -5,4 +5,5 @@
 (assert (= (bvxor v2 v1) v1))
 (assert (= BAV1 (= (bvxor v2 v1) v1)))
 (check-sat)
+(get-model)
 (exit)

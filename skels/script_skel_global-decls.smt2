@@ -26,3 +26,4 @@
 (assert (= BAV3 (= u u)))
 (assert (= BAV4 (= (size nil) GEN1)))
 (check-sat)
+(get-model)

@@ -80,3 +80,4 @@
 (assert (= BAV32 (= e (f b))))
 (assert (= BAV33 (= a b)))
 (check-sat)
+(get-model)

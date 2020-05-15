@@ -4,3 +4,4 @@
 (assert (forall ((x Real)) (P x)))
 (assert (not (P GEN1)))
 (check-sat)
+(get-model)

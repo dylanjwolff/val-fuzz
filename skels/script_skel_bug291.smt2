@@ -15,5 +15,6 @@
 (assert (= BAV2 (forall ((?A Int)(?o Int)(?f Int)(?p Int)(?g Int)(?v Int)) (= ?o ?p))))
 (assert (= BAV3 (forall ((?A Int)(?o Int)(?f Int)(?p Int)(?g Int)(?v Int)) (= (select2 (store2 ?A)) (select2 ?A)))))
 (check-sat)
+(get-model)
 (get-info :reason-unknown)
 (exit)

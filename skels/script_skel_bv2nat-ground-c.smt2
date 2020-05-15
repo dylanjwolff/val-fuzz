@@ -29,3 +29,4 @@
 (assert (= BAV12 (= (bv2nat a) GEN5)))
 (assert (= BAV13 (< (bv2nat a) GEN6)))
 (check-sat)
+(get-model)

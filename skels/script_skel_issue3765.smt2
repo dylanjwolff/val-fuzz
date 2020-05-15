@@ -18,3 +18,4 @@
 (assert (= BAV3 (= GEN1 (f11 v18d))))
 (assert (= BAV4 (= GEN2 v18d)))
 (check-sat)
+(get-model)

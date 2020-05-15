@@ -7,4 +7,5 @@
 (assert (not (= (bvlshr s (bvor (bvand t GEN1) s)) GEN2)))
 (assert (= BAV3 (= (bvlshr s (bvor (bvand t GEN1) s)) GEN2)))
 (check-sat)
+(get-model)
 (exit)

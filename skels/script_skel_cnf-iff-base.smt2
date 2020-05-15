@@ -27,3 +27,4 @@
 (assert (= BAV8 (= (f a) d)))
 (assert (= BAV9 (= d (f b))))
 (check-sat)
+(get-model)

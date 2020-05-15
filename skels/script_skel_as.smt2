@@ -7,4 +7,5 @@
 (assert (= (as e0 I) (as e0 I)))
 (assert (= BAV1 (= (as e0 I) (as e0 I))))
 (check-sat)
+(get-model)
 (exit)

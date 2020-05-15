@@ -23,3 +23,4 @@
 (assert (= BAV8 (>= n GEN4)))
 (assert (= BAV9 (= x y)))
 (check-sat)
+(get-model)

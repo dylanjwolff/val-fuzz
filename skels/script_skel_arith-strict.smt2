@@ -13,3 +13,4 @@
 (assert (= BAV3 (> y x)))
 (assert (= BAV4 (> y (- x))))
 (check-sat)
+(get-model)

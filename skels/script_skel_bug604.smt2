@@ -6,3 +6,4 @@
 ))
 (declare-fun /ArrayIntOfSequenceABC () (Array Int SequenceABC))
 (check-sat)
+(get-model)

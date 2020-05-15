@@ -57,3 +57,4 @@
 (assert (= BAV9 (>= (+ n1 (* (- GEN2) n7)) GEN3)))
 (assert (= BAV10 (>= (+ (* n1 n5) (* (- GEN4) (* n5 n7))) GEN5)))
 (check-sat)
+(get-model)

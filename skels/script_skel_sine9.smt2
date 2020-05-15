@@ -6,3 +6,4 @@
 (assert (< (sin x) GEN1))
 (assert (= BAV2 (< (sin x) GEN1)))
 (check-sat)
+(get-model)

@@ -16,3 +16,4 @@
 (assert (= BAV8 (forall ((x Int)) (<= GEN1 x))))
 (assert (= BAV9 (forall ((x Int)) (<= x (ite (P GEN2 GEN3) GEN4 GEN5)))))
 (check-sat)
+(get-model)

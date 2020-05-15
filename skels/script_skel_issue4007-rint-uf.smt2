@@ -6,3 +6,4 @@
 (assert (= (f a) GEN1))
 (assert (= BAV2 (= (f a) GEN1)))
 (check-sat)
+(get-model)

@@ -1,1 +1,0 @@
-#(("BAV1" "BAV2" "BAV3") "script_skel_sb-wrong.smt2")

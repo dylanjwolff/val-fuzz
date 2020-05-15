@@ -3,3 +3,4 @@
 (define-fun-rec f ((x Int)) Bool false)
 (assert (not (f GEN1)))
 (check-sat)
+(get-model)

@@ -1052,4 +1052,5 @@
 (assert (= BAV399 (= entry_correct Smt.true)))
 (assert (= BAV400 (= entry_correct Smt.true)))
 (check-sat)
+(get-model)
 (exit)

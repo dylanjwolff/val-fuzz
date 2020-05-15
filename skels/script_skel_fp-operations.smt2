@@ -25,4 +25,5 @@
 (assert (= BAV9 (= X (fp.min Y Z))))
 (assert (= BAV10 (= X (fp.max Y Z))))
 (check-sat)
+(get-model)
 (exit)

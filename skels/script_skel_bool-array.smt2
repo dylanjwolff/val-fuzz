@@ -12,3 +12,4 @@
 (assert (= BAV3 (= a b)))
 (assert (= BAV4 (= (select a true) (select a false))))
 (check-sat)
+(get-model)

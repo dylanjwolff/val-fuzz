@@ -8,5 +8,6 @@
 (assert (= (f GEN1) GEN2))
 (assert (= BAV3 (= (f GEN1) GEN2)))
 (check-sat)
+(get-model)
 (get-value ((f 0)))
 (push)

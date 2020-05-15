@@ -20,3 +20,4 @@
 (assert (= BAV10 (= (c GEN3) (* (a GEN4) (b GEN5)))))
 (assert (= BAV11 (= (b GEN6) (div (c GEN7) (a GEN8)))))
 (check-sat)
+(get-model)

@@ -1,1 +1,0 @@
-#(("BAV3" "BAV4" "BAV5" "BAV6") "script_skel_proof_no_support.smt2")

@@ -32,3 +32,4 @@
 (assert (= BAV12 (<= GEN2 x2)))
 (assert (= BAV13 (<= x2 GEN3)))
 (check-sat)
+(get-model)

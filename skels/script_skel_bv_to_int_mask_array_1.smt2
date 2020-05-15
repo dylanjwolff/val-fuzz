@@ -10,3 +10,4 @@
 (assert (= BAV1 (distinct (select A (f (bvand x y))) (select A (f (bvor x y))))))
 (assert (= BAV2 (= x y)))
 (check-sat)
+(get-model)

@@ -1,1 +1,0 @@
-#(() "script_skel_fp-rem-6.smt2")

@@ -1446,4 +1446,5 @@ Translated into SMT-LIB format by Albert Oliveras.
 (assert (= BAV875 (>= (- x8 x10) GEN349)))
 (assert (= BAV876 (>= (- x8 x11) GEN350)))
 (check-sat)
+(get-model)
 (exit)

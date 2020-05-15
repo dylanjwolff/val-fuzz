@@ -203,4 +203,5 @@
 (assert (= BAV83 (= (f a c) (f c c))))
 (assert (= BAV84 (= (f b c) (f c c))))
 (check-sat)
+(get-model)
 (exit)

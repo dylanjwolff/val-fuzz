@@ -1,5 +1,6 @@
 (set-logic ALL)
 (declare-const GEN1 Int)
+(get-model)
 (declare-const GEN2 Int)
 (declare-const GEN3 Int)
 (declare-const BAV4 Bool)
@@ -13,5 +14,6 @@
 (assert (= BAV5 (xor b (< GEN2 a GEN3) false)))
 (assert (= BAV6 (< GEN2 a GEN3)))
 (check-sat)
+(get-model)
 (assert (not b))
 (check-sat)

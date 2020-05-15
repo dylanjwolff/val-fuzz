@@ -13,4 +13,5 @@
 (assert (not (=> true $foo)))
 (assert (= BAV1 (=> true $foo)))
 (check-sat)
+(get-model)
 (exit)

@@ -25,3 +25,4 @@
 (assert (= BAV12 (forall ((x Int)(y Int)) (<= GEN3 y))))
 (assert (= BAV13 (forall ((x Int)(y Int)) (<= y (+ GEN4 x)))))
 (check-sat)
+(get-model)

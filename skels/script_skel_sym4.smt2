@@ -217,4 +217,5 @@
 (assert (= BAV149 (<= (+ (* GEN108 x_0) (* GEN109 x_1) (* GEN110 x_2) (* GEN111 x_3) (* GEN112 x_4) (* GEN113 x_5) (* GEN114 x_6) (* GEN115 x_7) (* GEN116 x_8) (* GEN117 x_9) (* GEN118 x_10) (* GEN119 x_11) (* GEN120 x_12) (* GEN121 x_13) (* GEN122 x_14) (* GEN123 x_15) (* (- GEN124) x_16)) GEN125)))
 (assert (= BAV150 (>= (+ x_0 x_1 x_2 x_3 x_4 x_5 x_6 x_7 x_8 x_9 x_10 x_11 x_12 x_13 x_14 x_15 x_16) GEN126)))
 (check-sat)
+(get-model)
 (exit)

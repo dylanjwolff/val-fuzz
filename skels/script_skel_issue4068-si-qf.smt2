@@ -7,4 +7,5 @@
 (assert (= BAV2 (= true true true (not (= i15 GEN1)))))
 (assert (= BAV3 (= i15 GEN1)))
 (check-sat)
+(get-model)
 (exit)

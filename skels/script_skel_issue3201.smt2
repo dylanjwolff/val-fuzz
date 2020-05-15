@@ -3,4 +3,5 @@
 (assert false)
 (assert v)
 (check-sat)
+(get-model)
 (exit)

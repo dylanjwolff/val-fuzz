@@ -8,3 +8,4 @@
 (assert (= (/ GEN1 (+ GEN2 (* a a b))) GEN3))
 (assert (= BAV4 (= (/ GEN1 (+ GEN2 (* a a b))) GEN3)))
 (check-sat)
+(get-model)

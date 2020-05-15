@@ -18,3 +18,4 @@
 (assert (= BAV6 (forall ((e S)(f Int)) (> f GEN1))))
 (assert (= BAV7 (forall ((e S)(f Int)) (< f GEN2))))
 (check-sat)
+(get-model)

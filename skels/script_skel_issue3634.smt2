@@ -6,3 +6,4 @@
 (assert (= (/ GEN1 (to_real a)) b))
 (assert (= BAV2 (= (/ GEN1 (to_real a)) b)))
 (check-sat)
+(get-model)

@@ -8,3 +8,4 @@
 (assert (= BAV2 (or _substvar_7_ (= GEN1 _substvar_3_))))
 (assert (= BAV3 (= GEN1 _substvar_3_)))
 (check-sat)
+(get-model)

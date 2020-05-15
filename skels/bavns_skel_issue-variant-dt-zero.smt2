@@ -1,1 +1,0 @@
-#(() "script_skel_issue-variant-dt-zero.smt2")

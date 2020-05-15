@@ -9,3 +9,4 @@
 (assert (= t (f Nil)))
 (assert (= BAV1 (= t (f Nil))))
 (check-sat)
+(get-model)

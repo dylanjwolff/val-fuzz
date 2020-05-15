@@ -15,4 +15,5 @@
 (assert (= BAV3 (< v3 v2)))
 (assert (= BAV4 (> v3 (- v2 GEN1))))
 (check-sat)
+(get-model)
 (exit)

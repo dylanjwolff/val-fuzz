@@ -1,1 +1,0 @@
-#(("BAV4") "script_skel_sin-sym.smt2")

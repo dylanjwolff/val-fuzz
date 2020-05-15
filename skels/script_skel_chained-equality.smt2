@@ -9,3 +9,4 @@
 (assert z)
 (assert (= BAV1 (= x y z)))
 (check-sat)
+(get-model)

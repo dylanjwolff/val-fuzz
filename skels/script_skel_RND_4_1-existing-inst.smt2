@@ -18,4 +18,5 @@
 (assert (= BAV9 (forall ((?y2 Real)(?y3 Real)) (< ?y2 GEN3))))
 (assert (= BAV10 (forall ((?y2 Real)(?y3 Real)) (< ?y3 GEN4))))
 (check-sat)
+(get-model)
 (exit)
