@@ -32,6 +32,102 @@ const SIGTERM_TO: &str = "interrupted by SIGTERM";
 const UNIMPL: &str = "Unimplemented code";
 const NON_BUG_ERRORS: [&str; 2] = [SIGTERM_TO, UNIMPL];
 
+struct CVC4_Command_Builder {
+    cmd: Vec<&'static str>,
+}
+
+impl CVC4_Command_Builder {
+    fn new() -> Self {
+        CVC4_Command_Builder {
+            cmd: vec![
+                "timeout",
+                "-v",
+                "6s",
+                "cvc4",
+                "--incremental",
+                "--produce-models",
+                "--check_models",
+            ],
+        }
+    }
+
+    fn check_unsat_cores(&mut self) -> &mut Self {
+        self.cmd.push("--check-unsat-cores");
+        self
+    }
+
+    fn unconstrained_simp(&mut self) -> &mut Self {
+        self.cmd.push("--unconstrained-simp");
+        self
+    }
+
+    fn strings_exp(&mut self) -> &mut Self {
+        self.cmd.push("--strings-exp");
+        self
+    }
+
+    fn dump_models(&mut self) -> &mut Self {
+        self.cmd.push("--dump-models");
+        self
+    }
+
+    fn dump_unsat_cores(&mut self) -> &mut Self {
+        self.cmd.push("--dump-unsat-cores");
+        self
+    }
+
+    fn dump_unsat_cores_full(&mut self) -> &mut Self {
+        self.cmd.push("--dump-unsat-cores-full");
+        self
+    }
+
+    fn dump_all(&mut self) -> &mut Self {
+        self.dump_models()
+            .dump_unsat_cores()
+            .dump_unsat_cores_full()
+    }
+}
+
+struct Z3_Command_Builder {
+    cmd: Vec<&'static str>,
+}
+
+impl Z3_Command_Builder {
+    fn new() -> Self {
+        Z3_Command_Builder {
+            cmd: vec!["timeout", "-v", "6s", "z3", "model_validate=true"],
+        }
+    }
+
+    fn ematching(&mut self, should_ematch: bool) -> &mut Self {
+        if !should_ematch {
+            self.cmd.push("smt.ematching=false");
+        } else {
+            self.cmd.push("smt.ematching=true");
+        }
+        self
+    }
+
+    fn flat_rw(&mut self, should_flat_rw: bool) -> &mut Self {
+        if !should_flat_rw {
+            self.cmd.push("rewriter.flat=false");
+        } else {
+            self.cmd.push("rewriter.flat=true");
+        }
+        self
+    }
+
+    fn z3str3(&mut self) -> &mut Self {
+        self.cmd.push("smt.string_solver=z3str3");
+        self
+    }
+
+    fn threads3(&mut self) -> &mut Self {
+        self.cmd.push("smt.threads=3");
+        self
+    }
+}
+
 #[derive(Debug, Eq, PartialEq, Clone)]
 pub enum Solver {
     Z3,
@@ -249,6 +345,29 @@ mod tests {
     use insta::assert_debug_snapshot;
     use walkdir::WalkDir;
 
+    #[test]
+    fn Z3_cmd_snap() {
+        assert_debug_snapshot!(
+            Z3_Command_Builder::new()
+                .ematching(false)
+                .flat_rw(false)
+                .threads3()
+                .z3str3()
+                .cmd
+        );
+    }
+
+    #[test]
+    fn CVC4_cmd_snap() {
+        assert_debug_snapshot!(
+            CVC4_Command_Builder::new()
+                .unconstrained_simp()
+                .strings_exp()
+                .dump_all()
+                .check_unsat_cores()
+                .cmd
+        );
+    }
     #[test]
     fn get_var_vals_snap() {
         let rstr = "sat

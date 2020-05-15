@@ -1,0 +1,19 @@
+---
+source: src/solver.rs
+expression: "CVC4_Command_Builder::new().unconstrained_simp().strings_exp().dump_all().check_unsat_cores().cmd"
+---
+[
+    "timeout",
+    "-v",
+    "6s",
+    "cvc4",
+    "--incremental",
+    "--produce-models",
+    "--check_models",
+    "--unconstrained-simp",
+    "--strings-exp",
+    "--dump-models",
+    "--dump-unsat-cores",
+    "--dump-unsat-cores-full",
+    "--check-unsat-cores",
+]
