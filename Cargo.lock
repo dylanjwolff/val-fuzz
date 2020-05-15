@@ -182,6 +182,7 @@ dependencies = [
  "crossbeam",
  "insta",
  "itertools",
+ "lazy_static",
  "nom",
  "quickcheck",
  "quickcheck_macros",

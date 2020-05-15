@@ -7,6 +7,8 @@ extern crate rand_xoshiro;
 extern crate serde;
 extern crate serde_lexpr;
 extern crate walkdir;
+#[macro_use]
+extern crate lazy_static;
 
 #[macro_use]
 pub mod ast;

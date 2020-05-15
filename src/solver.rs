@@ -34,6 +34,42 @@ const SIGTERM_TO: &str = "interrupted by SIGTERM";
 const UNIMPL: &str = "Unimplemented code";
 const NON_BUG_ERRORS: [&str; 2] = [SIGTERM_TO, UNIMPL];
 
+lazy_static! {
+    static ref Z3_PROFILES: [Z3_Command_Builder; 7] = [
+        Z3_Command_Builder::new(),
+        Z3_Command_Builder::new().z3str3(),
+        Z3_Command_Builder::new().threads3(),
+        Z3_Command_Builder::new().threads3().z3str3(),
+        Z3_Command_Builder::new().threads3().ematching(false),
+        Z3_Command_Builder::new()
+            .threads3()
+            .ematching(false)
+            .z3str3(),
+        Z3_Command_Builder::new()
+            .threads3()
+            .ematching(false)
+            .flat_rw(false)
+            .z3str3(),
+    ];
+    static ref CVC4_PROFILES: [CVC4_Command_Builder; 5] = [
+        CVC4_Command_Builder::new(),
+        CVC4_Command_Builder::new().strings_exp(),
+        CVC4_Command_Builder::new()
+            .strings_exp()
+            .unconstrained_simp(),
+        CVC4_Command_Builder::new()
+            .strings_exp()
+            .unconstrained_simp()
+            .check_unsat_cores(),
+        CVC4_Command_Builder::new()
+            .strings_exp()
+            .unconstrained_simp()
+            .check_unsat_cores()
+            .dump_all(),
+    ];
+}
+
+#[derive(Debug, Eq, PartialEq, Clone)]
 struct CVC4_Command_Builder {
     cmd: Vec<String>,
 }
@@ -55,42 +91,42 @@ impl CVC4_Command_Builder {
         }
     }
 
-    fn incremental(&mut self) -> &mut Self {
+    fn incremental(&mut self) -> Self {
         self.cmd.push("--incremental".to_owned());
-        self
+        self.clone()
     }
 
-    fn check_unsat_cores(&mut self) -> &mut Self {
+    fn check_unsat_cores(&mut self) -> Self {
         self.cmd.push("--check-unsat-cores".to_owned());
-        self
+        self.clone()
     }
 
-    fn unconstrained_simp(&mut self) -> &mut Self {
+    fn unconstrained_simp(&mut self) -> Self {
         self.cmd.push("--unconstrained-simp".to_owned());
-        self
+        self.clone()
     }
 
-    fn strings_exp(&mut self) -> &mut Self {
+    fn strings_exp(&mut self) -> Self {
         self.cmd.push("--strings-exp".to_owned());
-        self
+        self.clone()
     }
 
-    fn dump_models(&mut self) -> &mut Self {
+    fn dump_models(&mut self) -> Self {
         self.cmd.push("--dump-models".to_owned());
-        self
+        self.clone()
     }
 
-    fn dump_unsat_cores(&mut self) -> &mut Self {
+    fn dump_unsat_cores(&mut self) -> Self {
         self.cmd.push("--dump-unsat-cores".to_owned());
-        self
+        self.clone()
     }
 
-    fn dump_unsat_cores_full(&mut self) -> &mut Self {
+    fn dump_unsat_cores_full(&mut self) -> Self {
         self.cmd.push("--dump-unsat-cores-full".to_owned());
-        self
+        self.clone()
     }
 
-    fn dump_all(&mut self) -> &mut Self {
+    fn dump_all(&mut self) -> Self {
         self.dump_models()
             .dump_unsat_cores()
             .dump_unsat_cores_full()
@@ -103,6 +139,7 @@ impl CVC4_Command_Builder {
     }
 }
 
+#[derive(Debug, Eq, PartialEq, Clone)]
 struct Z3_Command_Builder {
     cmd: Vec<String>,
 }
@@ -117,32 +154,32 @@ impl Z3_Command_Builder {
         }
     }
 
-    fn ematching(&mut self, should_ematch: bool) -> &mut Self {
+    fn ematching(&mut self, should_ematch: bool) -> Self {
         if !should_ematch {
             self.cmd.push("smt.ematching=false".to_owned());
         } else {
             self.cmd.push("smt.ematching=true".to_owned());
         }
-        self
+        self.clone()
     }
 
-    fn flat_rw(&mut self, should_flat_rw: bool) -> &mut Self {
+    fn flat_rw(&mut self, should_flat_rw: bool) -> Self {
         if !should_flat_rw {
             self.cmd.push("rewriter.flat=false".to_owned());
         } else {
             self.cmd.push("rewriter.flat=true".to_owned());
         }
-        self
+        self.clone()
     }
 
-    fn z3str3(&mut self) -> &mut Self {
+    fn z3str3(&mut self) -> Self {
         self.cmd.push("smt.string_solver=z3str3".to_owned());
-        self
+        self.clone()
     }
 
-    fn threads3(&mut self) -> &mut Self {
+    fn threads3(&mut self) -> Self {
         self.cmd.push("smt.threads=3".to_owned());
-        self
+        self.clone()
     }
 
     fn run_on(&self, target: &Path) -> Result<std::process::Output, std::io::Error> {
@@ -362,10 +399,16 @@ fn solve_z3(z3_command: &Z3_Command_Builder, target: &Path) -> RSolve {
 }
 pub fn solve(filename: &str) -> Vec<RSolve> {
     let filepath = Path::new(filename);
-    vec![
-        solve_cvc4(&CVC4_Command_Builder::new(), &filepath),
-        solve_z3(&Z3_Command_Builder::new(), &filepath),
-    ]
+
+    let mr_cvc4 = CVC4_PROFILES
+        .iter()
+        .map(|profile| solve_cvc4(profile, &filepath));
+
+    let mr_z3 = Z3_PROFILES
+        .iter()
+        .map(|profile| solve_z3(profile, &filepath));
+
+    mr_cvc4.chain(mr_z3).collect()
 }
 
 #[cfg(test)]
