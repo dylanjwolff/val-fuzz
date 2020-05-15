@@ -1,0 +1,15 @@
+---
+source: src/solver.rs
+expression: "Z3_Command_Builder::new().ematching(false).flat_rw(false).threads3().z3str3().run_on(Path::new(\"test/strings20.smt2\"))"
+---
+Ok(
+    Output {
+        status: ExitStatus(
+            ExitStatus(
+                256,
+            ),
+        ),
+        stdout: "(error \"line 16 column 1: unexpected end of string\")\n",
+        stderr: "",
+    },
+)

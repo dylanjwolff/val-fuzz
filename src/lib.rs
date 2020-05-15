@@ -392,17 +392,21 @@ fn bav_assign_worker(
         // TODO below
         let empty_skel_name = &filepaths.0.file_name().and_then(|s| s.to_str()).unwrap();
 
-        let (resultA, resultB) = solve(empty_skel_name);
+        let results = solve(empty_skel_name);
 
-        if resultA.has_bug_error() || resultB.has_bug_error() {
+        if results.iter().any(|r| r.has_bug_error()) {
             report_bug(filepaths.0.as_path(), SolveResult::ErrorBug);
-        } else if RSolve::differential(&resultA, &resultB) {
+        }
+
+        if !RSolve::differential_test(&results).is_ok() {
             report_bug(filepaths.0.as_path(), SolveResult::SoundnessBug);
-        } else if resultA.was_timeout() || resultB.was_timeout() {
-            println!("Timeout on file {}", empty_skel_name);
-            fs::remove_file(filepaths.0).unwrap_or(());
-            fs::remove_file(filepaths.1).unwrap_or(());
-        } else if resultA.has_unrecoverable_error() || resultB.has_unrecoverable_error() {
+        }
+
+        if results
+            .iter()
+            .all(|r| r.was_timeout() || r.has_unrecoverable_error())
+        {
+            println!("All timeout or err on file {}", empty_skel_name);
             fs::remove_file(filepaths.0).unwrap_or(());
             fs::remove_file(filepaths.1).unwrap_or(());
         } else {
@@ -530,23 +534,21 @@ fn solver_worker(qin: BavAssingedQ, prev_stage: StageCompleteA) {
         };
 
         println!("Checking file {:?}", filepaths.0);
-        let (resultA, resultB) = solve(filepaths.0.to_str().unwrap_or("defaultname"));
-        if resultA.has_bug_error() || resultB.has_bug_error() {
+        let results = solve(filepaths.0.to_str().unwrap_or("defaultname"));
+
+        if results.iter().any(|r| r.has_bug_error()) {
             report_bug(filepaths.0.as_path(), SolveResult::ErrorBug);
-        } else if RSolve::differential(&resultA, &resultB) {
+        } else if !RSolve::differential_test(&results).is_ok() {
             report_bug(filepaths.0.as_path(), SolveResult::SoundnessBug);
-        } else if resultA.was_timeout() || resultB.was_timeout() {
-            println!("Timeout on file {:?}", filepaths.0);
-            fs::remove_file(&filepaths.0).unwrap_or(());
         } else {
-            if resultA.has_sat() {
-                resub_model(&resultA, &filepaths, &qin);
-            }
-            if resultB.has_sat() {
-                resub_model(&resultB, &filepaths, &qin);
-            }
+            results
+                .iter()
+                .filter(|r| r.has_sat())
+                .for_each(|r| resub_model(r, &filepaths, &qin));
+
             fs::remove_file(&filepaths.0).unwrap_or(());
         }
+
         println!("Done hecking file {:?}", &filepaths.0);
     }
 }
@@ -572,18 +574,17 @@ pub fn resub_model(result: &RSolve, filepaths: &(PathBuf, PathBuf), q: &BavAssin
         let resubbed_fs = serialize_to_f(Path::new(&new_name), &script, &md).unwrap();
         println!("RESUB~~~ {:?} ", resubbed_fs);
 
-        let (resultA, resultB) = solve(resubbed_fs.0.to_str().unwrap_or("defaultname"));
-        if resultA.has_bug_error() || resultB.has_bug_error() {
+        let results = solve(resubbed_fs.0.to_str().unwrap_or("defaultname"));
+
+        if results.iter().any(|r| r.has_bug_error()) {
             report_bug(resubbed_fs.0.as_path(), SolveResult::ErrorBug);
-        } else if RSolve::differential(&resultA, &resultB) {
+        } else if !RSolve::differential_test(&results).is_ok() {
             report_bug(resubbed_fs.0.as_path(), SolveResult::SoundnessBug);
-        } else if resultA.was_timeout() || resultB.was_timeout() {
-            println!("Timeout on file {:?}", resubbed_fs.0);
-            fs::remove_file(&resubbed_fs.0).unwrap_or(());
         } else {
             fs::remove_file(&resubbed_fs.0).unwrap_or(());
+            fs::remove_file(&resubbed_fs.1).unwrap_or(());
         }
-        fs::remove_file(&resubbed_fs.1).unwrap_or(());
+
         println!("Done hecking file {:?}", &resubbed_fs.0);
     }
 }

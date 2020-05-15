@@ -1,0 +1,15 @@
+---
+source: src/solver.rs
+expression: "CVC4_Command_Builder::new().strings_exp().dump_all().check_unsat_cores().run_on(Path::new(\"test/strings20.smt2\"))"
+---
+Ok(
+    Output {
+        status: ExitStatus(
+            ExitStatus(
+                0,
+            ),
+        ),
+        stdout: "sat\n(model\n(define-fun s () String \"\\\"\")\n)\n(model\n(define-fun s () String \"\\\"\")\n)\n",
+        stderr: "",
+    },
+)

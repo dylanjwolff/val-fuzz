@@ -1,5 +1,7 @@
 use crate::ast::*;
 use crate::parser::*;
+use std::path::Path;
+use std::path::PathBuf;
 use std::process;
 use std::str::from_utf8;
 
@@ -33,7 +35,7 @@ const UNIMPL: &str = "Unimplemented code";
 const NON_BUG_ERRORS: [&str; 2] = [SIGTERM_TO, UNIMPL];
 
 struct CVC4_Command_Builder {
-    cmd: Vec<&'static str>,
+    cmd: Vec<String>,
 }
 
 impl CVC4_Command_Builder {
@@ -44,40 +46,47 @@ impl CVC4_Command_Builder {
                 "-v",
                 "6s",
                 "cvc4",
-                "--incremental",
                 "--produce-models",
-                "--check_models",
-            ],
+                "--check-models",
+            ]
+            .into_iter()
+            .map(|s| s.to_owned())
+            .collect(),
         }
     }
 
+    fn incremental(&mut self) -> &mut Self {
+        self.cmd.push("--incremental".to_owned());
+        self
+    }
+
     fn check_unsat_cores(&mut self) -> &mut Self {
-        self.cmd.push("--check-unsat-cores");
+        self.cmd.push("--check-unsat-cores".to_owned());
         self
     }
 
     fn unconstrained_simp(&mut self) -> &mut Self {
-        self.cmd.push("--unconstrained-simp");
+        self.cmd.push("--unconstrained-simp".to_owned());
         self
     }
 
     fn strings_exp(&mut self) -> &mut Self {
-        self.cmd.push("--strings-exp");
+        self.cmd.push("--strings-exp".to_owned());
         self
     }
 
     fn dump_models(&mut self) -> &mut Self {
-        self.cmd.push("--dump-models");
+        self.cmd.push("--dump-models".to_owned());
         self
     }
 
     fn dump_unsat_cores(&mut self) -> &mut Self {
-        self.cmd.push("--dump-unsat-cores");
+        self.cmd.push("--dump-unsat-cores".to_owned());
         self
     }
 
     fn dump_unsat_cores_full(&mut self) -> &mut Self {
-        self.cmd.push("--dump-unsat-cores-full");
+        self.cmd.push("--dump-unsat-cores-full".to_owned());
         self
     }
 
@@ -86,45 +95,60 @@ impl CVC4_Command_Builder {
             .dump_unsat_cores()
             .dump_unsat_cores_full()
     }
+
+    fn run_on(&self, target: &Path) -> Result<std::process::Output, std::io::Error> {
+        let mut cmd = self.cmd.clone();
+        cmd.push(target.to_str().unwrap().to_owned());
+        process::Command::new(&self.cmd[0]).args(&cmd[1..]).output()
+    }
 }
 
 struct Z3_Command_Builder {
-    cmd: Vec<&'static str>,
+    cmd: Vec<String>,
 }
 
 impl Z3_Command_Builder {
     fn new() -> Self {
         Z3_Command_Builder {
-            cmd: vec!["timeout", "-v", "6s", "z3", "model_validate=true"],
+            cmd: vec!["timeout", "-v", "6s", "z3", "model_validate=true"]
+                .into_iter()
+                .map(|s| s.to_owned())
+                .collect(),
         }
     }
 
     fn ematching(&mut self, should_ematch: bool) -> &mut Self {
         if !should_ematch {
-            self.cmd.push("smt.ematching=false");
+            self.cmd.push("smt.ematching=false".to_owned());
         } else {
-            self.cmd.push("smt.ematching=true");
+            self.cmd.push("smt.ematching=true".to_owned());
         }
         self
     }
 
     fn flat_rw(&mut self, should_flat_rw: bool) -> &mut Self {
         if !should_flat_rw {
-            self.cmd.push("rewriter.flat=false");
+            self.cmd.push("rewriter.flat=false".to_owned());
         } else {
-            self.cmd.push("rewriter.flat=true");
+            self.cmd.push("rewriter.flat=true".to_owned());
         }
         self
     }
 
     fn z3str3(&mut self) -> &mut Self {
-        self.cmd.push("smt.string_solver=z3str3");
+        self.cmd.push("smt.string_solver=z3str3".to_owned());
         self
     }
 
     fn threads3(&mut self) -> &mut Self {
-        self.cmd.push("smt.threads=3");
+        self.cmd.push("smt.threads=3".to_owned());
         self
+    }
+
+    fn run_on(&self, target: &Path) -> Result<std::process::Output, std::io::Error> {
+        let mut cmd = self.cmd.clone();
+        cmd.push(target.to_str().unwrap().to_owned());
+        process::Command::new(&self.cmd[0]).args(&cmd[1..]).output()
     }
 }
 
@@ -225,27 +249,47 @@ impl RSolve {
         })
     }
 
-    pub fn differential(a: &Self, b: &Self) -> bool {
-        if a.has_unrecoverable_error()
-            || b.has_unrecoverable_error()
-            || a.was_timeout()
-            || b.was_timeout()
-        {
-            return false;
-        }
+    fn propogate_diff(a: &Vec<ResultLine>, b: &Vec<ResultLine>) -> Result<Vec<ResultLine>, ()> {
+        a.iter()
+            .zip(b.iter())
+            .map(|pair| match pair {
+                (ResultLine::Sat, ResultLine::Unsat) | (ResultLine::Unsat, ResultLine::Sat) => {
+                    Err(())
+                }
+                (ResultLine::Sat, _) | (_, ResultLine::Sat) => Ok(ResultLine::Sat),
+                (ResultLine::Unsat, _) | (_, ResultLine::Unsat) => Ok(ResultLine::Unsat),
+                _ => Ok(ResultLine::Unknown),
+            })
+            .collect()
+    }
 
+    pub fn differential_test(results: &Vec<Self>) -> Result<Vec<ResultLine>, ()> {
         let is_out_result = |l: &&ResultLine| match l {
             ResultLine::Sat | ResultLine::Unsat | ResultLine::Unknown => true,
             _ => false,
         };
-        a.lines
+
+        let propogated = results
             .iter()
-            .filter(|l| is_out_result(l))
-            .zip(b.lines.iter().filter(|l| is_out_result(l)))
-            .any(|r| match r {
-                (ResultLine::Sat, ResultLine::Unsat) | (ResultLine::Unsat, ResultLine::Sat) => true,
-                _ => false,
+            .filter(|r| !(r.has_unrecoverable_error() || r.was_timeout()))
+            .map(|r| {
+                r.lines
+                    .iter()
+                    .filter(|l| is_out_result(&l))
+                    .map(|l| l.clone()) // TODO
+                    .collect::<Vec<ResultLine>>()
             })
+            .fold(None, |acc, lines| match acc {
+                None => Some(Ok(lines)),
+                Some(r_acc_lines) => {
+                    Some(r_acc_lines.and_then(|acc_lines| Self::propogate_diff(&acc_lines, &lines)))
+                }
+            });
+
+        match propogated {
+            Some(r) => r,
+            None => Ok(vec![]),
+        }
     }
 
     pub fn has_sat(&self) -> bool {
@@ -286,18 +330,8 @@ impl RSolve {
     }
 }
 
-fn solve_cvc4(cvc4path: &str, filename: &str) -> RSolve {
-    let cvc4_res = process::Command::new("timeout")
-        .args(&[
-            "-v",
-            "6s",
-            cvc4path,
-            "--produce-models",
-            "--incremental",
-            filename,
-        ])
-        .output();
-
+fn solve_cvc4(cvc4_cmd: &CVC4_Command_Builder, target: &Path) -> RSolve {
+    let cvc4_res = cvc4_cmd.run_on(target);
     let cvc4mrs = cvc4_res.map(|out| {
         let stderr = from_utf8(&out.stderr[..]).unwrap_or("");
         let stdout = from_utf8(&out.stdout[..]).unwrap_or("");
@@ -311,17 +345,8 @@ fn solve_cvc4(cvc4path: &str, filename: &str) -> RSolve {
     }
 }
 
-fn solve_z3(z3path: &str, filename: &str) -> RSolve {
-    let z3_res = process::Command::new("timeout")
-        .args(&[
-            "-v",
-            "6s",
-            z3path,
-            "smt.string_solver=z3str3",
-            "model_validate=true",
-            filename,
-        ])
-        .output();
+fn solve_z3(z3_command: &Z3_Command_Builder, target: &Path) -> RSolve {
+    let z3_res = z3_command.run_on(target);
 
     let z3mrs = z3_res.map(|out| {
         let stderr = from_utf8(&out.stderr[..]).unwrap_or("");
@@ -335,8 +360,12 @@ fn solve_z3(z3path: &str, filename: &str) -> RSolve {
         Err(_) => RSolve::process_error(),
     }
 }
-pub fn solve(filename: &str) -> (RSolve, RSolve) {
-    (solve_cvc4("cvc4", filename), solve_z3("z3", filename))
+pub fn solve(filename: &str) -> Vec<RSolve> {
+    let filepath = Path::new(filename);
+    vec![
+        solve_cvc4(&CVC4_Command_Builder::new(), &filepath),
+        solve_z3(&Z3_Command_Builder::new(), &filepath),
+    ]
 }
 
 #[cfg(test)]
@@ -344,6 +373,34 @@ mod tests {
     use super::*;
     use insta::assert_debug_snapshot;
     use walkdir::WalkDir;
+
+    #[test]
+    fn propagate_snap() {
+        assert_debug_snapshot!(RSolve::propogate_diff(
+            &vec![ResultLine::Unsat],
+            &vec![ResultLine::Unsat]
+        ));
+    }
+
+    #[test]
+    fn run_real_cvc4_snap() {
+        assert_debug_snapshot!(CVC4_Command_Builder::new()
+            .strings_exp()
+            .incremental()
+            .dump_all()
+            .check_unsat_cores()
+            .run_on(Path::new("test/strings20.smt2")));
+    }
+
+    #[test]
+    fn run_real_z3_snap() {
+        assert_debug_snapshot!(Z3_Command_Builder::new()
+            .ematching(false)
+            .flat_rw(false)
+            .threads3()
+            .z3str3()
+            .run_on(Path::new("test/strings20.smt2")));
+    }
 
     #[test]
     fn Z3_cmd_snap() {
@@ -362,6 +419,7 @@ mod tests {
         assert_debug_snapshot!(
             CVC4_Command_Builder::new()
                 .unconstrained_simp()
+                .incremental()
                 .strings_exp()
                 .dump_all()
                 .check_unsat_cores()
@@ -415,7 +473,7 @@ mod tests {
         let rstring = "sat (model (define-fun b () Int 0) (define-fun a () Int 1))";
         let r1 = RSolve::new(Solver::Z3, "", rstring);
         let r2 = RSolve::new(Solver::Z3, rstring, "");
-        assert!(!RSolve::differential(&r1, &r2))
+        assert!(RSolve::differential_test(&vec![r1, r2]).is_ok());
     }
 
     #[test]
@@ -423,11 +481,11 @@ mod tests {
         let rstring = "sat (model (define-fun b () Int 0) (define-fun a () Int 1))";
         let r1 = RSolve::new(Solver::Z3, "", rstring);
         let r2 = RSolve::new(Solver::Z3, "unsat", "");
-        assert!(RSolve::differential(&r1, &r2))
+        assert!(!RSolve::differential_test(&vec![r1, r2]).is_ok());
     }
 
     #[test]
-    fn diff_difft_multiple() {
+    fn diff_difft_same_multiple() {
         let r1str = "unsupported
             samples/z3.11.smt2:6.14: No set-logic command was given before this point.
             samples/z3.11.smt2:6.14: CVC4 will make all theories available.
@@ -448,7 +506,7 @@ mod tests {
             unsat";
         let r1 = RSolve::new(Solver::Z3, r1str, "");
         let r2 = RSolve::new(Solver::Z3, r2str, "");
-        assert!(!RSolve::differential(&r1, &r2));
+        assert!(RSolve::differential_test(&vec![r1, r2]).is_ok());
     }
 
     #[test]
@@ -490,7 +548,7 @@ mod tests {
         let rstr2 = "unsat";
         let r1 = RSolve::new(Solver::Z3, rstr1, "");
         let r2 = RSolve::new(Solver::Z3, rstr2, "");
-        assert!(!RSolve::differential(&r1, &r2));
+        assert!(RSolve::differential_test(&vec![r1, r2]).is_ok());
     }
 
     #[test]
@@ -498,18 +556,5 @@ mod tests {
         let rstr = "unsat \n (error \"something went wrong\")";
         let r = RSolve::new(Solver::Z3, rstr, "");
         assert!(r.has_unrecoverable_error());
-    }
-
-    #[test]
-    fn solver_test() {
-        for entry in WalkDir::new("known/8")
-            .into_iter()
-            .filter_map(Result::ok)
-            .filter(|e| !e.file_type().is_dir())
-        {
-            let filepath = entry.path();
-            println!("starting file {:?}", filepath);
-            solve(filepath.to_str().unwrap());
-        }
     }
 }

@@ -1,16 +1,16 @@
 ---
 source: src/solver.rs
-expression: "CVC4_Command_Builder::new().unconstrained_simp().strings_exp().dump_all().check_unsat_cores().cmd"
+expression: "CVC4_Command_Builder::new().unconstrained_simp().incremental().strings_exp().dump_all().check_unsat_cores().cmd"
 ---
 [
     "timeout",
     "-v",
     "6s",
     "cvc4",
-    "--incremental",
     "--produce-models",
-    "--check_models",
+    "--check-models",
     "--unconstrained-simp",
+    "--incremental",
     "--strings-exp",
     "--dump-models",
     "--dump-unsat-cores",

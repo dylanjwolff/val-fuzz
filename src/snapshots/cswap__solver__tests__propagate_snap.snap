@@ -1,0 +1,9 @@
+---
+source: src/solver.rs
+expression: "RSolve::propogate_diff(&vec![ResultLine :: Unsat], &vec![ResultLine :: Unsat])"
+---
+Ok(
+    [
+        Unsat,
+    ],
+)
