@@ -56,6 +56,36 @@ type SkeletonQueue = Arc<SegQueue<(PathBuf, PathBuf)>>;
 type BavAssingedQ = Arc<ArrayQueue<(PathBuf, PathBuf)>>;
 type StageCompleteA = Arc<StageComplete>;
 
+struct MyBackoff {
+    current_wait: Duration,
+    max: Duration,
+    min: Duration,
+}
+
+impl MyBackoff {
+    fn new() -> Self {
+        let min = Duration::from_millis(5);
+        MyBackoff {
+            min: min,
+            max: Duration::from_secs(5),
+            current_wait: min,
+        }
+    }
+
+    fn snooze(&mut self) {
+        if self.max > self.current_wait {
+            thread::sleep(self.current_wait);
+            self.current_wait = 2 * self.current_wait;
+        } else {
+            thread::sleep(self.max);
+        }
+    }
+
+    fn reset(&mut self) {
+        self.current_wait = self.min;
+    }
+}
+
 #[derive(Serialize, Deserialize, Debug, Eq, PartialEq, Clone)]
 pub struct Metadata {
     bavns: Vec<String>,
@@ -298,7 +328,7 @@ pub fn exec() {
 }
 
 fn mutator_worker(qin: InputPPQ, qout: SkeletonQueue, stage: StageCompleteA) {
-    let backoff = Backoff::new();
+    let mut backoff = MyBackoff::new();
     let mut stage_finished = false;
     while !stage_finished {
         let filepath = match qin.pop() {
@@ -340,7 +370,7 @@ fn bav_assign_worker(
     qout: BavAssingedQ,
     stage: StageCompleteA,
 ) {
-    let backoff = Backoff::new();
+    let mut backoff = MyBackoff::new();
 
     while !prev_stage.is_complete() || qin.len() > 0 {
         let filepaths = match qin.pop() {
@@ -390,7 +420,7 @@ fn add_iterations_to_q(
     md_fp: &Path,
     qout: BavAssingedQ,
 ) -> Option<()> {
-    let backoff = Backoff::new();
+    let mut backoff = MyBackoff::new();
 
     let eip = end_insert_pt(&script);
     script.init(eip);
@@ -488,7 +518,7 @@ fn script_f_from_metadata_f(md_file: &PathBuf) -> Result<PathBuf, String> {
 pub struct PoisonPill {}
 
 fn solver_worker(qin: BavAssingedQ, prev_stage: StageCompleteA) {
-    let backoff = Backoff::new();
+    let mut backoff = MyBackoff::new();
 
     while !prev_stage.is_complete() || qin.len() > 0 {
         let filepaths = match qin.pop() {
@@ -522,7 +552,7 @@ fn solver_worker(qin: BavAssingedQ, prev_stage: StageCompleteA) {
 }
 
 pub fn resub_model(result: &RSolve, filepaths: &(PathBuf, PathBuf), q: &BavAssingedQ) {
-    let backoff = Backoff::new();
+    let mut backoff = MyBackoff::new();
     let (mut script, md) = match deserialize_from_f(&filepaths) {
         Ok(deserial) => deserial,
         Err(e) => {
@@ -555,7 +585,7 @@ pub fn resub_model(result: &RSolve, filepaths: &(PathBuf, PathBuf), q: &BavAssin
         }
         fs::remove_file(&resubbed_fs.1).unwrap_or(());
         println!("Done hecking file {:?}", &resubbed_fs.0);
-}
+    }
 }
 
 #[allow(unused)]
