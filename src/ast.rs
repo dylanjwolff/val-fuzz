@@ -285,7 +285,7 @@ impl SExp {
                         })
                         .collect::<Option<Vec<(String, String)>>>()?
                         .iter()
-                        .map(|(vs, ss)| Box::new(format!("({} {}", vs, ss)))
+                        .map(|(vs, ss)| Box::new(format!("({} {})", vs, ss)))
                         .map(|bs| *bs)
                         .collect::<String>(),
                 );
@@ -363,4 +363,18 @@ impl Logic {
             Logic::Other(s) => s.clone(),
         }
     }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::parser::*;
+    use insta::assert_debug_snapshot;
+    use walkdir::WalkDir;
+
+    #[test]
+    fn let_to_string_snap() {
+        assert_debug_snapshot!(script("(assert (let ((max (seq.nth A m))(n   (seq.len A))) (ite (or true false))))").unwrap().1.to_string_dfltto());
+    }
+
 }
