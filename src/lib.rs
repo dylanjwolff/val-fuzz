@@ -35,6 +35,7 @@ use nom::{bytes::complete::tag, IResult};
 use parser::{rmv_comments, script};
 use rand::Rng;
 use rand_xoshiro::rand_core::SeedableRng;
+use solver::check_valid_solve;
 use solver::solve;
 use solver::SolveResult;
 use std::collections::BTreeSet;
@@ -855,5 +856,51 @@ mod tests {
         set.insert(rng.sample().expect("Should hold value"));
         set.insert(rng.sample().expect("Should hold value"));
         assert_eq!(set.len(), 4);
+    }
+
+    #[ignore]
+    #[test]
+    fn pup_test() {
+        // Spawn thread with explicit stack size
+        let child = thread::Builder::new()
+            .stack_size(STACK_SIZE)
+            .spawn(pup)
+            .unwrap();
+
+        // Wait for thread to join
+        child.join().unwrap();
+    }
+
+    fn pup() {
+        for entry in WalkDir::new("test/parse_problems")
+            .into_iter()
+            .filter_map(Result::ok)
+            .filter(|e| !e.file_type().is_dir())
+        {
+            let filepath = entry.into_path();
+            let results = check_valid_solve(filepath.as_path().to_str().unwrap());
+
+            println!("Checking {:?}", filepath);
+            if results.iter().all(|r| r.has_unrecoverable_error()) {
+                println!("Bad seed {:?}", filepath);
+                continue;
+            }
+
+            let contents: String = fs::read_to_string(&filepath).unwrap();
+            let stripped_contents = &rmv_comments(&contents[..]).unwrap().1.join(" ")[..];
+            let script = script(&stripped_contents[..]).unwrap().1;
+
+            let new_file =
+                "temp_".to_owned() + filepath.as_path().file_name().unwrap().to_str().unwrap();
+
+            fs::write(&new_file, script.to_string_dfltto().unwrap()).unwrap();
+            let new_results = check_valid_solve(filepath.as_path().to_str().unwrap());
+
+            if new_results.iter().all(|r| r.has_unrecoverable_error()) {
+                println!("Bad parse {:?}", filepath);
+            } else {
+                fs::remove_file(&new_file);
+            }
+        }
     }
 }

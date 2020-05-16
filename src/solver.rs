@@ -411,6 +411,13 @@ pub fn solve(filename: &str) -> Vec<RSolve> {
     mr_cvc4.chain(mr_z3).collect()
 }
 
+pub fn check_valid_solve(filename: &str) -> Vec<RSolve> {
+    let filepath = Path::new(filename);
+    vec![
+        solve_z3(&Z3_Command_Builder::new(), filepath),
+        solve_cvc4(&CVC4_Command_Builder::new().incremental(), filepath),
+    ]
+}
 #[cfg(test)]
 mod tests {
     use super::*;
