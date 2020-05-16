@@ -14,10 +14,9 @@ def in_bin(commit):
 
 def z3(commit):
     def build(commit):
-        os.system("cd .solvers/z3; git checkout master; git pull;")
         if os.system("cd .solvers/z3; git checkout " + commit) != 0: raise "not a commit"
         os.system("cd .solvers/z3; rm -rf .solvers/z3/build")
-        os.system("cd .solvers/z3; python scripts/mk_make.py; ./configure -d; cd build; make -j 4")
+        os.system("cd .solvers/z3; ./configure -d; cd build; make -j 4")
         os.system("mv .solvers/z3/build/z3 "+"bin/z3-"+commit+";chmod +x" +" bin/z3-"+commit)
     if (not in_bin(commit)):
         build(commit)
@@ -26,7 +25,6 @@ def z3(commit):
 
 def cvc4(commit):
     def build(commit):
-        os.system("cd .solvers/cvc4; git checkout master; git pull;")
         if os.system("cd .solvers/cvc4; git checkout " + commit) != 0: raise "not a commit"
         os.system("cd .solvers/cvc4; rm -rf .solvers/cvc4/build")
         os.system("cd .solvers/cvc4; ./contrib/get-antlr-3.4; ./configure.sh --assertions; cd build; make -j 4")
@@ -37,6 +35,8 @@ def cvc4(commit):
         print("Using cached CVC4")
 
 try:
+    os.system("cd .solvers/z3; git checkout master; git pull;")
+    os.system("cd .solvers/cvc4; git checkout master; git pull;")
     if sys.argv[1] == "z3":
         if sys.argv[2] == "install":
             if sys.argv[3] == "tip":

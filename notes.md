@@ -39,7 +39,7 @@ why so many unsat
 1st draft of thesis proposal
 
 @TODO 15th May
-NSolv (flags)
+[x]NSolv (flags)
 pick at code coverage
 [x] remove false positives
 [x] fix exponential backoff
