@@ -5,6 +5,7 @@ use crate::parser::sexp;
 use crate::Metadata;
 use crate::Timer;
 use bit_vec::BitVec;
+use std::cell::RefCell;
 use std::collections::BTreeMap;
 use std::iter::once;
 use std::rc::Rc;
@@ -417,6 +418,61 @@ fn rc_se(sexp: &mut SExp, vng: &mut VarNameGenerator, md: &mut Metadata) {
     }
 }
 
+#[derive(Debug, Eq, PartialEq, Clone)]
+pub enum Rcse {
+    nb(Rc<RefCell<SExp>>),
+    b(Rc<RefCell<Box<SExp>>>),
+}
+
+pub fn choles(script: &mut Script) -> Vec<Rcse> {
+    match script {
+        Script::Commands(cmds) => {
+            let mut v = vec![];
+            for cmd in cmds.iter_mut() {
+                v.extend(choles_c(&mut *cmd.borrow_mut()));
+            }
+            v
+        }
+    }
+}
+
+fn choles_c(cmd: &mut Command) -> Vec<Rcse> {
+    match cmd {
+        Command::Assert(sexp) | Command::CheckSatAssuming(sexp) => {
+            choles_rcse(&Rcse::nb(Rc::clone(&sexp)))
+        }
+        _ => vec![],
+    }
+}
+
+fn choles_rcse(rcse: &Rcse) -> Vec<Rcse> {
+    let inner = |sexp: &SExp| match sexp {
+        SExp::Constant(_) => vec![rcse.clone()],
+        SExp::Compound(sexps) | SExp::BExp(_, sexps) => {
+            let mut v = vec![];
+            for sexp in sexps {
+                v.extend(choles_rcse(&Rcse::nb(Rc::clone(sexp))));
+            }
+            v
+        }
+        SExp::Let(vbs, rest) => {
+            let mut v = vec![];
+            for (_, sexp) in vbs {
+                v.extend(choles_rcse(&Rcse::nb(Rc::clone(sexp))));
+            }
+            v.extend(choles_rcse(&Rcse::b(Rc::clone(rest))));
+            v
+        }
+        SExp::QForAll(_, rest) => choles_rcse(&Rcse::b(Rc::clone(rest))),
+        _ => vec![],
+    };
+
+    match rcse {
+        Rcse::nb(s) => inner(&*s.borrow()),
+        Rcse::b(bs) => inner(&**bs.borrow()),
+    }
+}
+
 pub fn bav(
     script: &mut Script,
     vng: &mut VarNameGenerator,
@@ -589,6 +645,20 @@ mod tests {
     use super::*;
     use crate::parser::script;
     use insta::assert_debug_snapshot;
+
+    #[test]
+    fn choles_snap() {
+        let str_script = "(assert (= 3 4))";
+        let mut p = script(str_script).unwrap().1;
+        let choles = choles(&mut p);
+        match &choles[1] {
+            Rcse::nb(sexp) => {
+                *sexp.borrow_mut() = SExp::Constant(rccell!(Constant::UInt("1".to_owned())))
+            }
+            _ => (),
+        }
+        assert_debug_snapshot!(p.to_string_dfltto());
+    }
 
     #[test]
     fn add_get_model_already_snap() {

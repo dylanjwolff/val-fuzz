@@ -1,0 +1,39 @@
+---
+source: src/transforms.rs
+expression: p
+---
+Commands(
+    [
+        RefCell {
+            value: Assert(
+                RefCell {
+                    value: BExp(
+                        RefCell {
+                            value: Equals,
+                        },
+                        [
+                            RefCell {
+                                value: Symbol(
+                                    RefCell {
+                                        value: Var(
+                                            "GEN1",
+                                        ),
+                                    },
+                                ),
+                            },
+                            RefCell {
+                                value: Symbol(
+                                    RefCell {
+                                        value: Var(
+                                            "GEN2",
+                                        ),
+                                    },
+                                ),
+                            },
+                        ],
+                    ),
+                },
+            ),
+        },
+    ],
+)

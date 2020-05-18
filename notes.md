@@ -43,3 +43,14 @@ why so many unsat
 pick at code coverage
 [x] remove false positives
 [x] fix exponential backoff
+
+@TODO 17th May
+[] 50% Replacement Errors
+or
+[] Code Coverage
+
+@TODO 18th May
+[x] Check bugs from run
+[] 50% Replacement Errors
+or
+[] error logging specifics
