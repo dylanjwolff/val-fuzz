@@ -33,15 +33,22 @@ fn main() {
         let infile_name = matches.value_of(INFILE).unwrap();
         let results = solve(infile_name);
 
+        if log_level > 1 {
+            println!("RESULTS for {}:\n {:?}", infile_name, results);
+        }
+
         if results.iter().any(|r| r.has_bug_error()) {
-            if log_level > 0 {
+            if log_level == 1 {
                 results
                     .iter()
                     .find(|r| r.has_bug_error())
-                    .map(|r| println!("BUG ERROR in {}: {:?}", infile_name, r));
+                    .map(|r| println!("BUG ERROR in {}: {}", infile_name, r));
             }
             0
         } else if !RSolve::differential_test(&results).is_ok() {
+            if log_level == 1 {
+                println!("SOUNDNESS ERROR in {}", infile_name);
+            }
             0
         } else {
             1

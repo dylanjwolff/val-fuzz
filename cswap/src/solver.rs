@@ -1,5 +1,6 @@
 use crate::ast::*;
 use crate::parser::*;
+use std::fmt;
 use std::io::Write;
 use std::path::Path;
 use std::path::PathBuf;
@@ -56,43 +57,47 @@ lazy_static! {
             .z3str3(),
     ];
     static ref CVC4_PROFILES: [CVC4_Command_Builder; 5] = [
-        CVC4_Command_Builder::new(),
-        CVC4_Command_Builder::new().strings_exp(),
+        CVC4_Command_Builder::new().models(),
+        CVC4_Command_Builder::new()
+            .models()
+            .incremental()
+            .strings_exp(),
         CVC4_Command_Builder::new()
             .strings_exp()
             .unconstrained_simp(),
         CVC4_Command_Builder::new()
+            .models()
+            .incremental()
             .strings_exp()
-            .unconstrained_simp()
             .check_unsat_cores(),
         CVC4_Command_Builder::new()
+            .models()
+            .incremental()
             .strings_exp()
-            .unconstrained_simp()
             .check_unsat_cores()
             .dump_all(),
     ];
 }
 
 #[derive(Debug, Eq, PartialEq, Clone)]
-struct CVC4_Command_Builder {
+pub struct CVC4_Command_Builder {
     cmd: Vec<String>,
 }
 
 impl CVC4_Command_Builder {
     fn new() -> Self {
         CVC4_Command_Builder {
-            cmd: vec![
-                "timeout",
-                "-v",
-                "6s",
-                "cvc4",
-                "--produce-models",
-                "--check-models",
-            ]
-            .into_iter()
-            .map(|s| s.to_owned())
-            .collect(),
+            cmd: vec!["timeout", "-v", "6s", "cvc4"]
+                .into_iter()
+                .map(|s| s.to_owned())
+                .collect(),
         }
+    }
+
+    fn models(&mut self) -> Self {
+        self.cmd.push("--produce-models".to_owned());
+        self.cmd.push("--check-models".to_owned());
+        self.clone()
     }
 
     fn incremental(&mut self) -> Self {
@@ -144,7 +149,7 @@ impl CVC4_Command_Builder {
 }
 
 #[derive(Debug, Eq, PartialEq, Clone)]
-struct Z3_Command_Builder {
+pub struct Z3_Command_Builder {
     cmd: Vec<String>,
 }
 
@@ -195,9 +200,19 @@ impl Z3_Command_Builder {
 
 #[derive(Debug, Eq, PartialEq, Clone)]
 pub enum Solver {
-    Z3,
-    CVC4,
+    Z3(Z3_Command_Builder),
+    CVC4(CVC4_Command_Builder),
     NONE,
+}
+
+impl fmt::Display for Solver {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        match self {
+            Solver::Z3(z3c) => write!(f, "{}", z3c.cmd.join(" ")),
+            Solver::CVC4(cvc4c) => write!(f, "{}", cvc4c.cmd.join(" ")),
+            _ => write!(f, "No Solver Used"),
+        }
+    }
 }
 
 #[derive(Debug, Eq, PartialEq, Clone)]
@@ -206,6 +221,16 @@ pub struct RSolve {
     stderr: String,
     lines: Vec<ResultLine>,
     pub solver: Solver,
+}
+
+impl fmt::Display for RSolve {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        write!(
+            f,
+            "{}: \n\tstdout:\n {} \n\t stderr:\n {}",
+            self.solver, self.stdout, self.stderr
+        )
+    }
 }
 
 impl RSolve {
@@ -381,7 +406,9 @@ fn solve_cvc4(cvc4_cmd: &CVC4_Command_Builder, target: &Path) -> RSolve {
     });
 
     match cvc4mrs {
-        Ok((cvc4_succ, cvc4_out, cvc4_err)) => RSolve::move_new(Solver::CVC4, cvc4_out, cvc4_err),
+        Ok((cvc4_succ, cvc4_out, cvc4_err)) => {
+            RSolve::move_new(Solver::CVC4(cvc4_cmd.clone()), cvc4_out, cvc4_err)
+        }
         Err(_) => RSolve::process_error(),
     }
 }
@@ -397,7 +424,9 @@ fn solve_z3(z3_command: &Z3_Command_Builder, target: &Path) -> RSolve {
     });
 
     match z3mrs {
-        Ok((z3_succ, z3_out, z3_err)) => RSolve::move_new(Solver::Z3, z3_out, z3_err),
+        Ok((z3_succ, z3_out, z3_err)) => {
+            RSolve::move_new(Solver::Z3(z3_command.clone()), z3_out, z3_err)
+        }
         Err(_) => RSolve::process_error(),
     }
 }
@@ -503,6 +532,7 @@ mod tests {
     fn CVC4_cmd_snap() {
         assert_debug_snapshot!(
             CVC4_Command_Builder::new()
+                .models()
                 .unconstrained_simp()
                 .incremental()
                 .strings_exp()
@@ -536,7 +566,7 @@ mod tests {
                           (define-fun d () Real
                             0.0)
                         )";
-        let r = RSolve::new(Solver::Z3, rstr, "");
+        let r = RSolve::new(Solver::NONE, rstr, "");
         assert_debug_snapshot!(r.extract_const_var_vals(&vec![
             "GEN1".to_owned(),
             "GEN2".to_owned(),
@@ -547,7 +577,7 @@ mod tests {
     #[test]
     fn z3_new() {
         let rstring = "sat (model (define-fun b () Int 0) (define-fun a () Int 1))";
-        let r = RSolve::new(Solver::Z3, "", rstring);
+        let r = RSolve::new(Solver::NONE, "", rstring);
         assert!(r.has_sat());
         assert!(!r.has_unrecoverable_error());
         assert!(!r.has_bug_error());
@@ -556,16 +586,16 @@ mod tests {
     #[test]
     fn diff_self() {
         let rstring = "sat (model (define-fun b () Int 0) (define-fun a () Int 1))";
-        let r1 = RSolve::new(Solver::Z3, "", rstring);
-        let r2 = RSolve::new(Solver::Z3, rstring, "");
+        let r1 = RSolve::new(Solver::NONE, "", rstring);
+        let r2 = RSolve::new(Solver::NONE, rstring, "");
         assert!(RSolve::differential_test(&vec![r1, r2]).is_ok());
     }
 
     #[test]
     fn diff_difft() {
         let rstring = "sat (model (define-fun b () Int 0) (define-fun a () Int 1))";
-        let r1 = RSolve::new(Solver::Z3, "", rstring);
-        let r2 = RSolve::new(Solver::Z3, "unsat", "");
+        let r1 = RSolve::new(Solver::NONE, "", rstring);
+        let r2 = RSolve::new(Solver::NONE, "unsat", "");
         assert!(!RSolve::differential_test(&vec![r1, r2]).is_ok());
     }
 
@@ -589,8 +619,8 @@ mod tests {
                 10.0)
             )
             unsat";
-        let r1 = RSolve::new(Solver::Z3, r1str, "");
-        let r2 = RSolve::new(Solver::Z3, r2str, "");
+        let r1 = RSolve::new(Solver::NONE, r1str, "");
+        let r2 = RSolve::new(Solver::NONE, r2str, "");
         assert!(RSolve::differential_test(&vec![r1, r2]).is_ok());
     }
 
@@ -605,14 +635,14 @@ mod tests {
                 testfile.smt2:8.12: To suppress this warning in the future use (set-logic ALL).
                 unsat
                 (error \"Cannot get model unless immediately preceded by SAT/NOT_ENTAILED or UNKNOWN response.\")";
-        let r = RSolve::new(Solver::Z3, rstr, "");
+        let r = RSolve::new(Solver::NONE, rstr, "");
         assert!(!r.has_unrecoverable_error());
     }
 
     #[test]
     fn cvc4_timeout() {
         let rstr = "timeout: sending signal TERM to command ‘cvc4’\nCVC4 interrupted by SIGTERM.\n timeout: the monitored command dumped core";
-        let r = RSolve::new(Solver::Z3, rstr, "");
+        let r = RSolve::new(Solver::NONE, rstr, "");
         assert!(!r.has_bug_error());
     }
 
@@ -621,7 +651,7 @@ mod tests {
         let rstr = "Fatal failure within CVC4::Node CVC4::theory::fp::FpConverter::convert(CVC4::TNode) at /home/dylan/git/constant-swap/scripts/.solvers/cvc4/src/theory/fp/fp_converter.cpp:1700
         Unimplemented code encounteredConversion is dependent on SymFPU
         timeout: the monitored command dumped core";
-        let r = RSolve::new(Solver::Z3, rstr, "");
+        let r = RSolve::new(Solver::NONE, rstr, "");
         assert!(!r.has_bug_error());
     }
 
@@ -631,15 +661,15 @@ mod tests {
             "(error \"line 11 column 79: Sort mismatch between first argument and argument 2\")
                 sat";
         let rstr2 = "unsat";
-        let r1 = RSolve::new(Solver::Z3, rstr1, "");
-        let r2 = RSolve::new(Solver::Z3, rstr2, "");
+        let r1 = RSolve::new(Solver::NONE, rstr1, "");
+        let r2 = RSolve::new(Solver::NONE, rstr2, "");
         assert!(RSolve::differential_test(&vec![r1, r2]).is_ok());
     }
 
     #[test]
     fn fatal_error() {
         let rstr = "unsat \n (error \"something went wrong\")";
-        let r = RSolve::new(Solver::Z3, rstr, "");
+        let r = RSolve::new(Solver::NONE, rstr, "");
         assert!(r.has_unrecoverable_error());
     }
 }

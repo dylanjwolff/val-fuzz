@@ -398,19 +398,10 @@ fn bav_assign_worker(
 
         let results = solve(empty_skel_name);
 
-        if results.iter().any(|r| r.has_bug_error()) {
-            report_bug(filepaths.0.as_path(), SolveResult::ErrorBug);
-        }
+        report_any_bugs(&filepaths.0, &results);
 
-        if !RSolve::differential_test(&results).is_ok() {
-            report_bug(filepaths.0.as_path(), SolveResult::SoundnessBug);
-        }
-
-        if results
-            .iter()
-            .all(|r| r.was_timeout() || r.has_unrecoverable_error())
-        {
-            println!("All timeout or err on file {}", empty_skel_name);
+        if results.iter().all(|r| r.has_unrecoverable_error()) {
+            println!("All err on file {}", empty_skel_name);
             fs::remove_file(filepaths.0).unwrap_or(());
             fs::remove_file(filepaths.1).unwrap_or(());
         } else {
@@ -454,12 +445,21 @@ fn add_iterations_to_q(
     Some(())
 }
 
-fn report_bug(file: &Path, kind: SolveResult) {
-    println!(
-        "{:?} bug in {} !!!",
-        kind,
-        file.to_str().unwrap_or("defaultname")
-    );
+fn report_any_bugs(file: &Path, results: &Vec<RSolve>) -> bool {
+    results
+        .iter()
+        .find(|r| r.has_bug_error())
+        .map(|r| {
+            println!("Error bug in {:?} !!! {:?}", file, r);
+            println!("{}", r);
+        })
+        .is_some()
+        || if !RSolve::differential_test(&results).is_ok() {
+            println!("Soundness bug in {:?} !!!", file);
+            true
+        } else {
+            false
+        }
 }
 
 fn get_new_name(source_file: &Path, prefix: &str) -> String {
@@ -540,16 +540,12 @@ fn solver_worker(qin: BavAssingedQ, prev_stage: StageCompleteA) {
         println!("Checking file {:?}", filepaths.0);
         let results = solve(filepaths.0.to_str().unwrap_or("defaultname"));
 
-        if results.iter().any(|r| r.has_bug_error()) {
-            report_bug(filepaths.0.as_path(), SolveResult::ErrorBug);
-        } else if !RSolve::differential_test(&results).is_ok() {
-            report_bug(filepaths.0.as_path(), SolveResult::SoundnessBug);
-        } else {
-            results
-                .iter()
-                .filter(|r| r.has_sat())
-                .for_each(|r| resub_model(r, &filepaths, &qin));
+        results
+            .iter()
+            .filter(|r| r.has_sat())
+            .for_each(|r| resub_model(r, &filepaths, &qin));
 
+        if !report_any_bugs(filepaths.0.as_path(), &results) {
             fs::remove_file(&filepaths.0).unwrap_or(());
         }
 
@@ -580,11 +576,7 @@ pub fn resub_model(result: &RSolve, filepaths: &(PathBuf, PathBuf), q: &BavAssin
 
         let results = solve(resubbed_fs.0.to_str().unwrap_or("defaultname"));
 
-        if results.iter().any(|r| r.has_bug_error()) {
-            report_bug(resubbed_fs.0.as_path(), SolveResult::ErrorBug);
-        } else if !RSolve::differential_test(&results).is_ok() {
-            report_bug(resubbed_fs.0.as_path(), SolveResult::SoundnessBug);
-        } else {
+        if !report_any_bugs(resubbed_fs.0.as_path(), &results) {
             fs::remove_file(&resubbed_fs.0).unwrap_or(());
             fs::remove_file(&resubbed_fs.1).unwrap_or(());
         }
