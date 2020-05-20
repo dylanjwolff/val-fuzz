@@ -770,6 +770,7 @@ mod tests {
         );
     }
 
+    #[ignore]
     #[test]
     fn parse_unparse_test() {
         // Spawn thread with explicit stack size

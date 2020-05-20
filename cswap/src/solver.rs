@@ -456,7 +456,7 @@ mod tests {
         let s = script("(assert (exists ((ah Real)) (= ah 4)))(check-sat)")
             .unwrap()
             .1;
-        assert_debug_snapshot!(check_valid_solve_as_temp(&s));
+        assert!(check_valid_solve_as_temp(&s).is_ok());
     }
 
     #[test]
