@@ -2,6 +2,7 @@
 
 members = [
     "cswap",
-"solver-cli",
+    "solver-cli",
+    "cswap-cli",
 ]
 
