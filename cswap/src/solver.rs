@@ -542,6 +542,23 @@ mod tests {
         );
     }
     #[test]
+    fn unsupp_snap() {
+        let stdout="script_skel_segfaults2_minimal.smt2:2.14: No set-logic command was given before this point.
+            script_skel_segfaults2_minimal.smt2:2.14: CVC4 will make all theories available.
+            script_skel_segfaults2_minimal.smt2:2.14: Consider setting a stricter logic for (likely) better performance.
+            script_skel_segfaults2_minimal.smt2:2.14: To suppress this warning in the future use (set-logic ALL).";
+        let  stderr= "unsupported
+                unsupported
+            (error \"Parse Error: script_skel_segfaults2_minimal.smt2:6.65: Symbol = is not declared.
+
+              ...(Array Int Int))) (! (= s (ff s)) :pattern (= s (ff s)))))
+                                                 ^
+            \")";
+        let r = RSolve::new(Solver::NONE, stdout, stderr);
+        assert!(!r.has_bug_error());
+    }
+
+    #[test]
     fn get_var_vals_snap() {
         let rstr = "sat
                         (model 
