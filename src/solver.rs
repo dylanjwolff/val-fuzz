@@ -1,9 +1,13 @@
 use crate::ast::*;
 use crate::parser::*;
+use std::io::Write;
 use std::path::Path;
 use std::path::PathBuf;
 use std::process;
 use std::str::from_utf8;
+use tempfile::tempfile;
+use tempfile::Builder;
+use tempfile::NamedTempFile;
 
 #[derive(Debug, Eq, PartialEq, Clone)]
 pub enum SolveResult {
@@ -419,14 +423,26 @@ pub fn check_valid_solve(filename: &str) -> Vec<RSolve> {
     ]
 }
 
-pub fn check_valid_solve_as_temp(script: &Script) -> bool {
-    let s = script.to_string_dfltto();
+pub fn check_valid_solve_as_temp(script: &Script) -> Result<Vec<RSolve>, String> {
+    let s = script
+        .to_string_dfltto()
+        .ok_or("File Print Timeout".to_owned())?;
+    let mut tfile = Builder::new()
+        .suffix(".smt2")
+        .tempfile()
+        .map_err(|e| format!("Temp File Error: {}", e))?;
+    tfile
+        .as_file_mut()
+        .write_all(s.as_bytes())
+        .map_err(|e| format!("Temp File Write Error: {}", e))?;
+    let filepath = tfile.path();
 
-    let filepath = Path::new(filename);
-    vec![
+    let results = vec![
         solve_z3(&Z3_Command_Builder::new(), filepath),
         solve_cvc4(&CVC4_Command_Builder::new().incremental(), filepath),
-    ]
+    ];
+
+    Ok(results)
 }
 
 #[cfg(test)]
@@ -434,6 +450,14 @@ mod tests {
     use super::*;
     use insta::assert_debug_snapshot;
     use walkdir::WalkDir;
+
+    #[test]
+    fn tempfile_solve_snap() {
+        let s = script("(assert (exists ((ah Real)) (= ah 4)))(check-sat)")
+            .unwrap()
+            .1;
+        assert_debug_snapshot!(check_valid_solve_as_temp(&s));
+    }
 
     #[test]
     fn propagate_snap() {

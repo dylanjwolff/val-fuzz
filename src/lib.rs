@@ -6,6 +6,7 @@ extern crate rand_core;
 extern crate rand_xoshiro;
 extern crate serde;
 extern crate serde_lexpr;
+extern crate tempfile;
 extern crate walkdir;
 #[macro_use]
 extern crate lazy_static;
