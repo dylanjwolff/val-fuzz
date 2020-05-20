@@ -418,6 +418,17 @@ pub fn check_valid_solve(filename: &str) -> Vec<RSolve> {
         solve_cvc4(&CVC4_Command_Builder::new().incremental(), filepath),
     ]
 }
+
+pub fn check_valid_solve_as_temp(script: &Script) -> bool {
+    let s = script.to_string_dfltto();
+
+    let filepath = Path::new(filename);
+    vec![
+        solve_z3(&Z3_Command_Builder::new(), filepath),
+        solve_cvc4(&CVC4_Command_Builder::new().incremental(), filepath),
+    ]
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;

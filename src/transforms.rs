@@ -424,6 +424,41 @@ pub enum Rcse {
     b(Rc<RefCell<Box<SExp>>>),
 }
 
+impl Rcse {
+    fn swap(&self, new_sexp: SExp) {
+        match self {
+            Rcse::nb(sexp) => *sexp.borrow_mut() = new_sexp,
+            Rcse::b(bsexp) => **bsexp.borrow_mut() = new_sexp,
+        }
+    }
+
+    fn clone_v(&self) -> SExp {
+        match self {
+            Rcse::nb(sexp) => sexp.borrow_mut().clone(),
+            Rcse::b(bsexp) => (**bsexp.borrow_mut()).clone(),
+        }
+    }
+}
+
+pub fn rcholes(
+    script: &mut Script,
+    choles: Vec<Rcse>,
+    vng: &mut VarNameGenerator,
+    md: &mut Metadata,
+    validator: fn(&Script) -> bool,
+) {
+    for chole in choles {
+        let o = chole.clone_v();
+        let name = vng.get_name(Sort::UInt()); // TODO
+        chole.swap(SExp::Symbol(rccell!(Symbol::Var(name.clone()))));
+        if validator(script) {
+            md.constvns.push(name.clone())
+        } else {
+            chole.swap(o);
+        }
+    }
+}
+
 pub fn choles(script: &mut Script) -> Vec<Rcse> {
     match script {
         Script::Commands(cmds) => {
@@ -650,13 +685,10 @@ mod tests {
     fn choles_snap() {
         let str_script = "(assert (= 3 4))";
         let mut p = script(str_script).unwrap().1;
+        let mut md = Metadata::new_empty();
+        let mut vng = VarNameGenerator::new("GEN");
         let choles = choles(&mut p);
-        match &choles[1] {
-            Rcse::nb(sexp) => {
-                *sexp.borrow_mut() = SExp::Constant(rccell!(Constant::UInt("1".to_owned())))
-            }
-            _ => (),
-        }
+        rcholes(&mut p, choles, &mut vng, &mut md, |_| true);
         assert_debug_snapshot!(p.to_string_dfltto());
     }
 

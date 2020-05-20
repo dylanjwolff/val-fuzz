@@ -3,5 +3,5 @@ source: src/transforms.rs
 expression: p.to_string_dfltto()
 ---
 Some(
-    "(assert (= 3 1))",
+    "(assert (= GEN1 GEN2))",
 )
