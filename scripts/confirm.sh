@@ -1,4 +1,3 @@
-# xargs -n 1 ./solver-cli -v <filenames.txt
 solver-cli -v $1
 if [ 0 == $? ]; then
     mkdir -p confirmed

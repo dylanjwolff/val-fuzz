@@ -1,0 +1,1 @@
+solver-cli -p 0 bug.smt2

@@ -1,1 +1,2 @@
-xargs -n 1 ./confirm.sh <filenames.txt | tee o.confirmations.log
+#!/bin/bash
+parallel -n 1 ./confirm.sh <$1 | tee o.confirmations.log
