@@ -19,6 +19,7 @@ def z3(commit):
         os.system("cd .solvers/z3; ./configure -d; cd build; make -j 4")
         os.system("mv .solvers/z3/build/z3 "+"bin/z3-"+commit+";chmod +x" +" bin/z3-"+commit)
     if (not in_bin(commit)):
+        print("Building Z3")
         build(commit)
     else:
         print("Using cached Z3")
@@ -30,6 +31,7 @@ def cvc4(commit):
         os.system("cd .solvers/cvc4; ./contrib/get-antlr-3.4; ./configure.sh --assertions; cd build; make -j 4")
         os.system("mv .solvers/cvc4/build/bin/cvc4"+" bin/cvc4-"+commit+ ";chmod +x" +" bin/cvc4-"+commit)
     if (not in_bin(commit)):
+        print("Building CVC4")
         build(commit)
     else:
         print("Using cached CVC4")
@@ -64,12 +66,16 @@ try:
             cvc4(sys.argv[2])
 
     elif sys.argv[1] == "tip":
+        print("Getting tips")
         z3(tip("z3"))
         cvc4(tip("cvc4"))
     elif sys.argv[1] == "install":
         z3(tip("z3"))
         cvc4(tip("cvc4"))
+        commit = tip("z3")
         os.system("cp bin/z3-" + commit + " /usr/local/bin/z3")
+        commit = tip("cvc4")
         os.system("cp bin/cvc4-" + commit + " /usr/local/bin/cvc4")
-except:
+except Exception as e:
+    print(e)
     sys.exit(1)

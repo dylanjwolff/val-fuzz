@@ -40,7 +40,7 @@ const UNIMPL: &str = "Unimplemented code";
 const NON_BUG_ERRORS: [&str; 2] = [SIGTERM_TO, UNIMPL];
 
 lazy_static! {
-    static ref Z3_PROFILES: [Z3_Command_Builder; 7] = [
+    pub static ref Z3_PROFILES: [Z3_Command_Builder; 7] = [
         Z3_Command_Builder::new(),
         Z3_Command_Builder::new().z3str3(),
         Z3_Command_Builder::new().threads3(),
@@ -56,7 +56,7 @@ lazy_static! {
             .flat_rw(false)
             .z3str3(),
     ];
-    static ref CVC4_PROFILES: [CVC4_Command_Builder; 5] = [
+    pub static ref CVC4_PROFILES: [CVC4_Command_Builder; 5] = [
         CVC4_Command_Builder::new().models(),
         CVC4_Command_Builder::new()
             .models()
@@ -396,7 +396,7 @@ impl RSolve {
     }
 }
 
-fn solve_cvc4(cvc4_cmd: &CVC4_Command_Builder, target: &Path) -> RSolve {
+pub fn solve_cvc4(cvc4_cmd: &CVC4_Command_Builder, target: &Path) -> RSolve {
     let cvc4_res = cvc4_cmd.run_on(target);
     let cvc4mrs = cvc4_res.map(|out| {
         let stderr = from_utf8(&out.stderr[..]).unwrap_or("");
@@ -413,7 +413,7 @@ fn solve_cvc4(cvc4_cmd: &CVC4_Command_Builder, target: &Path) -> RSolve {
     }
 }
 
-fn solve_z3(z3_command: &Z3_Command_Builder, target: &Path) -> RSolve {
+pub fn solve_z3(z3_command: &Z3_Command_Builder, target: &Path) -> RSolve {
     let z3_res = z3_command.run_on(target);
 
     let z3mrs = z3_res.map(|out| {
