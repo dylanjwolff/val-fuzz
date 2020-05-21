@@ -13,20 +13,20 @@ Ok(
             solver: Z3,
         },
         RSolve {
-            stdout: "/tmp/.tmpJkHGBN.smt2:1.6: No set-logic command was given before this point.\n/tmp/.tmpJkHGBN.smt2:1.6: CVC4 will make all theories available.\n/tmp/.tmpJkHGBN.smt2:1.6: Consider setting a stricter logic for (likely) better performance.\n/tmp/.tmpJkHGBN.smt2:1.6: To suppress this warning in the future use (set-logic ALL).\n",
+            stdout: "/tmp/.tmpmkSZur.smt2:1.6: No set-logic command was given before this point.\n/tmp/.tmpmkSZur.smt2:1.6: CVC4 will make all theories available.\n/tmp/.tmpmkSZur.smt2:1.6: Consider setting a stricter logic for (likely) better performance.\n/tmp/.tmpmkSZur.smt2:1.6: To suppress this warning in the future use (set-logic ALL).\n",
             stderr: "sat\n",
             lines: [
                 Generic(
-                    "/tmp/.tmpJkHGBN.smt2:1.6: No set-logic command was given before this point.",
+                    "/tmp/.tmpmkSZur.smt2:1.6: No set-logic command was given before this point.",
                 ),
                 Generic(
-                    "/tmp/.tmpJkHGBN.smt2:1.6: CVC4 will make all theories available.",
+                    "/tmp/.tmpmkSZur.smt2:1.6: CVC4 will make all theories available.",
                 ),
                 Generic(
-                    "/tmp/.tmpJkHGBN.smt2:1.6: Consider setting a stricter logic for (likely) better performance.",
+                    "/tmp/.tmpmkSZur.smt2:1.6: Consider setting a stricter logic for (likely) better performance.",
                 ),
                 Generic(
-                    "/tmp/.tmpJkHGBN.smt2:1.6: To suppress this warning in the future use (set-logic ALL).",
+                    "/tmp/.tmpmkSZur.smt2:1.6: To suppress this warning in the future use (set-logic ALL).",
                 ),
                 Sat,
             ],

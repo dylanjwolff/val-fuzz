@@ -2,6 +2,7 @@ use crate::ast::{AstNode, BoolOp, Command, Constant, Logic, SExp, Script, Sort, 
 use crate::ast::{CommandRc, SExpRc, SortRc, SymbolRc};
 
 use crate::parser::sexp;
+use crate::solver::check_valid_solve_as_temp;
 use crate::Metadata;
 use crate::Timer;
 use bit_vec::BitVec;
@@ -50,12 +51,12 @@ fn init_vars(script: &mut Script, vars: Vec<(String, Sort)>) {
 
     let maybe_log_pos = cmds.iter().position(|cmd| cmd.borrow().is_logic());
 
-    let log_pos = match maybe_log_pos {
-        Some(pos) => pos,
+    let after_log_pos = match maybe_log_pos {
+        Some(pos) => pos + 1,
         None => 0,
     };
 
-    let mut end = cmds.split_off(log_pos + 1);
+    let mut end = cmds.split_off(after_log_pos);
 
     let mut decls = vars
         .into_iter()
@@ -177,7 +178,8 @@ pub fn get_bav_assign_fmt_str(bavns: &Vec<String>) -> Command {
 
 pub fn to_skel(script: &mut Script, md: &mut Metadata) -> Result<(), ()> {
     let mut vng = VarNameGenerator::new("GEN");
-    rc(script, &mut vng, md);
+    let choles = choles(script);
+    rcholes(script, choles, md, is_valid);
     set_logic_all(script);
 
     let mut scopes = BTreeMap::new();
@@ -442,15 +444,16 @@ impl Rcse {
 
 pub fn rcholes(
     script: &mut Script,
-    choles: Vec<Rcse>,
-    vng: &mut VarNameGenerator,
+    choles: Vec<(Rcse, Sort)>,
     md: &mut Metadata,
     validator: fn(&Script) -> bool,
 ) {
-    for chole in choles {
+    let mut vng = VarNameGenerator::new("GEN");
+    for (chole, sort) in choles {
         let o = chole.clone_v();
-        let name = vng.get_name(Sort::UInt()); // TODO
+        let name = vng.get_name(sort);
         chole.swap(SExp::Symbol(rccell!(Symbol::Var(name.clone()))));
+        init_vars(script, vec![vng.vars_generated.pop().unwrap()]);
         if validator(script) {
             md.constvns.push(name.clone())
         } else {
@@ -459,7 +462,7 @@ pub fn rcholes(
     }
 }
 
-pub fn choles(script: &mut Script) -> Vec<Rcse> {
+pub fn choles(script: &mut Script) -> Vec<(Rcse, Sort)> {
     match script {
         Script::Commands(cmds) => {
             let mut v = vec![];
@@ -471,7 +474,7 @@ pub fn choles(script: &mut Script) -> Vec<Rcse> {
     }
 }
 
-fn choles_c(cmd: &mut Command) -> Vec<Rcse> {
+fn choles_c(cmd: &mut Command) -> Vec<(Rcse, Sort)> {
     match cmd {
         Command::Assert(sexp) | Command::CheckSatAssuming(sexp) => {
             choles_rcse(&Rcse::nb(Rc::clone(&sexp)))
@@ -480,9 +483,19 @@ fn choles_c(cmd: &mut Command) -> Vec<Rcse> {
     }
 }
 
-fn choles_rcse(rcse: &Rcse) -> Vec<Rcse> {
+fn choles_rcse(rcse: &Rcse) -> Vec<(Rcse, Sort)> {
     let inner = |sexp: &SExp| match sexp {
-        SExp::Constant(_) => vec![rcse.clone()],
+        SExp::Constant(c) => {
+            let sort = match &*c.borrow_mut() {
+                Constant::UInt(_) => Sort::UInt(),
+                Constant::Dec(_) => Sort::Dec(),
+                Constant::Str(_) => Sort::Str(),
+                Constant::Bool(_) => Sort::Bool(),
+                Constant::Bin(bit_s) => Sort::BitVec(bit_s.len() as u32),
+                Constant::Hex(hit_s) => Sort::BitVec((hit_s.len() as u32) * 4),
+            };
+            vec![(rcse.clone(), sort)]
+        }
         SExp::Compound(sexps) | SExp::BExp(_, sexps) => {
             let mut v = vec![];
             for sexp in sexps {
@@ -670,6 +683,14 @@ pub fn traverse(node: AstNode, mut visitors: Vec<&mut dyn Visitor>) {
     }
 }
 
+fn is_valid(s: &Script) -> bool {
+    println!("out! {:?}", check_valid_solve_as_temp(s));
+    match check_valid_solve_as_temp(s) {
+        Ok(responses) => responses.iter().any(|r| !r.has_unrecoverable_error()),
+        Err(_) => false,
+    }
+}
+
 pub trait Visitor {
     fn entry(&mut self, node: &AstNode);
     fn exit(&mut self, node: &AstNode);
@@ -686,9 +707,10 @@ mod tests {
         let str_script = "(assert (= 3 4))";
         let mut p = script(str_script).unwrap().1;
         let mut md = Metadata::new_empty();
-        let mut vng = VarNameGenerator::new("GEN");
         let choles = choles(&mut p);
-        rcholes(&mut p, choles, &mut vng, &mut md, |_| true);
+
+        rcholes(&mut p, choles, &mut md, is_valid);
+
         assert_debug_snapshot!(p.to_string_dfltto());
     }
 
