@@ -177,10 +177,11 @@ pub fn get_bav_assign_fmt_str(bavns: &Vec<String>) -> Command {
 }
 
 pub fn to_skel(script: &mut Script, md: &mut Metadata) -> Result<(), ()> {
+    set_logic_all(script);
+
     let mut vng = VarNameGenerator::new("GEN");
     let choles = choles(script);
     rcholes(script, choles, md, is_valid);
-    set_logic_all(script);
 
     let mut scopes = BTreeMap::new();
     rl(script, &mut scopes)?;
@@ -367,55 +368,6 @@ fn rv_se(sexp: &mut SExp, to_replace: &Vec<(String, SExp)>) {
                 }
             }
         }
-        _ => (),
-    }
-}
-pub fn rc(script: &mut Script, vng: &mut VarNameGenerator, md: &mut Metadata) {
-    match script {
-        Script::Commands(cmds) => {
-            for cmd in cmds.iter_mut() {
-                rc_c(&mut *cmd.borrow_mut(), vng, md);
-            }
-        }
-    }
-}
-
-fn rc_c(cmd: &mut Command, vng: &mut VarNameGenerator, md: &mut Metadata) {
-    match cmd {
-        Command::Assert(sexp) | Command::CheckSatAssuming(sexp) => {
-            rc_se(&mut *sexp.borrow_mut(), vng, md)
-        }
-        _ => (),
-    }
-}
-
-fn rc_se(sexp: &mut SExp, vng: &mut VarNameGenerator, md: &mut Metadata) {
-    match sexp {
-        SExp::Constant(c) => {
-            let sort = match &*c.borrow_mut() {
-                Constant::UInt(_) => Sort::UInt(),
-                Constant::Dec(_) => Sort::Dec(),
-                Constant::Str(_) => Sort::Str(),
-                Constant::Bool(_) => Sort::Bool(),
-                Constant::Bin(bit_s) => Sort::BitVec(bit_s.len() as u32),
-                Constant::Hex(hit_s) => Sort::BitVec((hit_s.len() as u32) * 4),
-            };
-            let name = vng.get_name(sort);
-            md.constvns.push(name.clone());
-            *sexp = SExp::Symbol(rccell!(Symbol::Var(name)));
-        }
-        SExp::Compound(sexps) | SExp::BExp(_, sexps) => {
-            for sexp in sexps {
-                rc_se(&mut *sexp.borrow_mut(), vng, md)
-            }
-        }
-        SExp::Let(vbs, rest) => {
-            for (_, sexp) in vbs {
-                rc_se(&mut *sexp.borrow_mut(), vng, md)
-            }
-            rc_se(&mut *rest.borrow_mut(), vng, md);
-        }
-        SExp::QForAll(_, rest) => rc_se(&mut *rest.borrow_mut(), vng, md),
         _ => (),
     }
 }
@@ -684,7 +636,6 @@ pub fn traverse(node: AstNode, mut visitors: Vec<&mut dyn Visitor>) {
 }
 
 fn is_valid(s: &Script) -> bool {
-    println!("out! {:?}", check_valid_solve_as_temp(s));
     match check_valid_solve_as_temp(s) {
         Ok(responses) => responses.iter().any(|r| !r.has_unrecoverable_error()),
         Err(_) => false,

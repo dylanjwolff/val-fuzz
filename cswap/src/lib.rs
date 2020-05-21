@@ -181,11 +181,11 @@ impl StageComplete {
     }
 }
 
-pub fn from_skels() {
+pub fn from_skels(dirname: &str) {
     let stage1 = Arc::new(StageComplete::finished());
 
     let q2 = SegQueue::new();
-    for entry in WalkDir::new(".")
+    for entry in WalkDir::new(dirname)
         .into_iter()
         .filter_map(Result::ok)
         .filter(|e| !e.file_type().is_dir())
@@ -253,9 +253,9 @@ pub fn from_skels() {
     println!("Queue lengths {} {}", aq2.len(), a_baq.len());
 }
 
-pub fn exec() {
+pub fn exec(dirname: &str) {
     let q = SegQueue::new();
-    for entry in WalkDir::new("samples")
+    for entry in WalkDir::new(dirname)
         .into_iter()
         .filter_map(Result::ok)
         .filter(|e| !e.file_type().is_dir())
@@ -570,7 +570,7 @@ pub fn resub_model(result: &RSolve, filepaths: &(PathBuf, PathBuf), q: &BavAssin
     if to_replace.len() > 0 {
         rv(&mut script, &mut to_replace);
 
-        let new_name = get_new_name(&filepaths.0, &format!("resub_{:?}", result.solver));
+        let new_name = get_new_name(&filepaths.0, &format!("resub_{}", result.solver.name()));
         let resubbed_fs = serialize_to_f(Path::new(&new_name), &script, &md).unwrap();
         println!("RESUB~~~ {:?} ", resubbed_fs);
 

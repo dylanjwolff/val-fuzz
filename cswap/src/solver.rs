@@ -205,6 +205,15 @@ pub enum Solver {
     NONE,
 }
 
+impl Solver {
+    pub fn name(&self) -> String {
+        match self {
+            Self::Z3(_) => "Z3".to_owned(),
+            Self::CVC4(_) => "CVC4".to_owned(),
+            Self::NONE => "NONE".to_owned(),
+        }
+    }
+}
 impl fmt::Display for Solver {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         match self {

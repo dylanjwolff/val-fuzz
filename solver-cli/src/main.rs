@@ -5,17 +5,17 @@ extern crate cswap;
 use clap::App;
 use clap::Arg;
 use clap::ArgMatches;
-use std::path::Path;
-use std::collections::HashSet;
 use cswap::solver::solve;
 use cswap::solver::solve_cvc4;
 use cswap::solver::solve_z3;
-use cswap::solver::RSolve;
 use cswap::solver::CVC4_Command_Builder;
+use cswap::solver::RSolve;
 use cswap::solver::Z3_Command_Builder;
 use cswap::solver::CVC4_PROFILES;
 use cswap::solver::Z3_PROFILES;
+use std::collections::HashSet;
 use std::fs;
+use std::path::Path;
 
 const INFILE: &'static str = "File to Solve";
 const CREDUCE_SCRIPT: &'static str = "creduce-script";
@@ -26,28 +26,28 @@ fn main() {
         let matches: ArgMatches = App::new("Multi SMT Solver CLI")
             .arg(
                 Arg::with_name(INFILE)
-                .help("Sets the input file to solve")
-                .required(true)
-                .index(1),
-                )
+                    .help("Sets the input file to solve")
+                    .required(true)
+                    .index(1),
+            )
             .arg(
                 Arg::with_name("verbosity")
-                .short("v")
-                .multiple(true)
-                .help("Sets the level of verbosity"),
-                )
+                    .short("v")
+                    .multiple(true)
+                    .help("Sets the level of verbosity"),
+            )
             .arg(
                 Arg::with_name(CREDUCE_SCRIPT)
-                .short("s")
-                .help("Sets the level of verbosity")
-                .takes_value(true),
-                )
+                    .short("s")
+                    .help("Outputs a script for use with CReduce to the file named")
+                    .takes_value(true),
+            )
             .arg(
                 Arg::with_name(PROFILES)
-                .short("p")
-                .help("Set the solver profiles to use")
-                .takes_value(true),
-                )
+                    .short("p")
+                    .help("Set the solver profiles to use")
+                    .takes_value(true),
+            )
             .get_matches();
         let log_level = matches.occurrences_of("verbosity");
         let maybe_cr_script = matches.value_of(CREDUCE_SCRIPT);
@@ -63,11 +63,11 @@ fn main() {
                 "RESULTS for {}: {}",
                 infile_name,
                 results
-                .iter()
-                .map(|r| format!("{}", r))
-                .collect::<Vec<String>>()
-                .join("\n\n---------------\n\n")
-                );
+                    .iter()
+                    .map(|r| format!("{}", r))
+                    .collect::<Vec<String>>()
+                    .join("\n\n---------------\n\n")
+            );
         }
 
         if results.iter().any(|r| r.has_bug_error()) {
@@ -100,8 +100,8 @@ pub enum ProfileIndex {
 }
 
 impl ProfileIndex {
-    fn new(ind : usize) -> Self {
-        let num_cvc4_profiles = CVC4_PROFILES.len() ;
+    fn new(ind: usize) -> Self {
+        let num_cvc4_profiles = CVC4_PROFILES.len();
         if ind < num_cvc4_profiles {
             Self::CVC4(ind)
         } else {
@@ -110,7 +110,7 @@ impl ProfileIndex {
     }
 }
 
-fn print_creduce(results : &Vec<RSolve>, crs : &str, infile_name : &str) {
+fn print_creduce(results: &Vec<RSolve>, crs: &str, infile_name: &str) {
     let eb = results
         .iter()
         .position(|r| r.has_bug_error())
@@ -120,28 +120,29 @@ fn print_creduce(results : &Vec<RSolve>, crs : &str, infile_name : &str) {
     }
 }
 
-fn parse_profiles(profiles_str : &str) -> HashSet<ProfileIndex> {
-    profiles_str.split(',')
+fn parse_profiles(profiles_str: &str) -> HashSet<ProfileIndex> {
+    profiles_str
+        .split(',')
         .map(|strind| strind.parse::<usize>().unwrap())
         .map(|ind| ProfileIndex::new(ind))
         .collect()
 }
 
-pub fn profiles_solve(filename: &str, pis : &HashSet<ProfileIndex>) -> Vec<RSolve> {
+pub fn profiles_solve(filename: &str, pis: &HashSet<ProfileIndex>) -> Vec<RSolve> {
     let filepath = Path::new(filename);
 
     let mr_cvc4 = CVC4_PROFILES
         .iter()
-        .zip(0..CVC4_PROFILES.len()-1)
+        .zip(0..CVC4_PROFILES.len() - 1)
         .filter(|(_, i)| pis.contains(&ProfileIndex::CVC4(*i)))
-        .map(|(p, _ )| p)
+        .map(|(p, _)| p)
         .map(|profile| solve_cvc4(profile, &filepath));
 
     let mr_z3 = Z3_PROFILES
         .iter()
-        .zip(0..Z3_PROFILES.len()-1)
+        .zip(0..Z3_PROFILES.len() - 1)
         .filter(|(_, i)| pis.contains(&ProfileIndex::Z3(*i)))
-        .map(|(p, _ )| p)
+        .map(|(p, _)| p)
         .map(|profile| solve_z3(profile, &filepath));
 
     mr_cvc4.chain(mr_z3).collect()
