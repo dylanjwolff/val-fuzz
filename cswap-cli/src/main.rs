@@ -40,9 +40,9 @@ fn main() {
         None => (2, 2, 9),
     };
 
-    match matches.value_of(FROM_SKELS) {
-        Some(_) => from_skels(dir_name, (workers.0, workers.1)),
-        None => exec(dir_name, workers),
+    match matches.is_present(FROM_SKELS) {
+        true => from_skels(dir_name, (workers.0, workers.1)),
+        false => exec(dir_name, workers),
     }
 }
 

@@ -1,4 +1,3 @@
-extern crate itertools;
 #[allow(unused)]
 extern crate nom;
 extern crate rand;
