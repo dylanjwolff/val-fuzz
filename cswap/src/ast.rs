@@ -113,7 +113,7 @@ pub enum AstNode {
 
 impl Script {
     pub fn to_string_dfltto(&self) -> Option<String> {
-        self.to_string(Timer::new_started(Duration::from_secs(30)))
+        self.to_string(Timer::new_started(Duration::from_secs(5)))
     }
 
     pub fn to_string(&self, timer: Timer) -> Option<String> {
@@ -374,7 +374,11 @@ mod tests {
 
     #[test]
     fn let_to_string_snap() {
-        assert_debug_snapshot!(script("(assert (let ((max (seq.nth A m))(n   (seq.len A))) (ite (or true false))))").unwrap().1.to_string_dfltto());
+        assert_debug_snapshot!(script(
+            "(assert (let ((max (seq.nth A m))(n   (seq.len A))) (ite (or true false))))"
+        )
+        .unwrap()
+        .1
+        .to_string_dfltto());
     }
-
 }

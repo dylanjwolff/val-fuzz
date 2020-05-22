@@ -212,7 +212,7 @@ pub fn add_get_model(script: &mut Script) {
 
 pub fn rl(script: &mut Script, scoped_vars: &mut BTreeMap<String, Vec<SExp>>) -> Result<(), ()> {
     let timer = Timer::new();
-    timer.start(Duration::from_secs(30));
+    timer.start(Duration::from_secs(5));
     match script {
         Script::Commands(cmds) => {
             for cmd in cmds.iter_mut() {
