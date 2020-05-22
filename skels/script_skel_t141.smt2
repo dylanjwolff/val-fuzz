@@ -1,5 +1,5 @@
-(set-option :produce-models true)
 (declare-const BAV1 Bool)
+(set-option :produce-models true)
 (declare-const p1 Bool)
 (declare-const p2 Bool)
 (declare-const p3 Bool)

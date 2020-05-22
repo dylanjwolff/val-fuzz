@@ -1,0 +1,7 @@
+(set-logic ALL)
+(declare-const BAV1 Bool)
+(declare-funs ((f Int) (g Int)))
+(assert (= f g))
+(assert (= BAV1 (= f g)))
+(check-sat)
+(get-model)

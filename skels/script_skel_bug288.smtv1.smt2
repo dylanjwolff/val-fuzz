@@ -1,0 +1,8 @@
+(set-option :incremental false)
+(set-logic ALL)
+(declare-const BAV1 Bool)
+(declare-fun x () Int)
+(declare-fun y () Int)
+(assert (= BAV1 (<= x y)))
+(check-sat-assuming ((not (<= x y))))
+(get-model)

@@ -1,0 +1,8 @@
+(set-logic ALL)
+(declare-const BAV1 Bool)
+(declare-fun rm () (RoundingMode))
+(assert (distinct rm roundNearestTiesToEven))
+(assert (= BAV1 (distinct rm roundNearestTiesToEven)))
+(check-sat)
+(get-model)
+(check-sat-using smt)

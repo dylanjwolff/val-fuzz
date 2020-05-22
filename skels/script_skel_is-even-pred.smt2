@@ -1,0 +1,6 @@
+(set-logic ALL)
+(declare-const GEN1 Int)
+(define-funs-rec ((is-even ((x Int)) Bool) (is-odd ((x Int)) Bool)) ((or (= x 0) (is-odd (- x 1))) (and (not (= x 0)) (is-even (- x 1)))))
+(assert (is-even GEN1))
+(check-sat)
+(get-model)

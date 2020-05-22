@@ -1,4 +1,3 @@
-(set-info :source "Handcrafted by C.M. Wintersteiger")
 (declare-const BAV1 Bool)
 (declare-const BAV2 Bool)
 (declare-const BAV3 Bool)
@@ -11,6 +10,7 @@
 (declare-const BAV10 Bool)
 (declare-const BAV11 Bool)
 (declare-const BAV12 Bool)
+(set-info :source "Handcrafted by C.M. Wintersteiger")
 (declare-fun RM () RoundingMode)
 (assert (or (= RM roundNearestTiesToEven) (= RM roundNearestTiesToAway) (= RM roundTowardPositive) (= RM roundTowardNegative) (= RM roundTowardZero)))
 (assert (or (= RM RNE) (= RM RNA) (= RM RTP) (= RM RTN) (= RM RTZ)))

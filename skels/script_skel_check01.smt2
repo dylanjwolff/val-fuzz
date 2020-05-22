@@ -1,6 +1,6 @@
 (set-logic ALL)
-(declare-const GEN1 Int)
 (declare-const GEN2 Int)
+(declare-const GEN1 Int)
 (set-info :smt-lib-version 2.0)
 (declare-fun f (Int) Bool)
 (assert (f GEN1))

@@ -1,1 +1,1 @@
-#(((bavns "BAV7" "BAV8") (constvns "GEN1" "GEN2" "GEN3" "GEN4" "GEN5" "GEN6") (seed_file . "") (skeleton_file . "") (metadata_file . "")) "script_skel_bidir_star.smt2")
+#(((bavns "BAV1" "BAV2") (constvns "GEN1" "GEN2" "GEN3" "GEN4" "GEN5" "GEN6") (seed_file . "") (skeleton_file . "") (metadata_file . "")) "script_skel_bidir_star.smt2")

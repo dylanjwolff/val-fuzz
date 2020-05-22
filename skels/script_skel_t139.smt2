@@ -1,7 +1,7 @@
-(set-option :smt.macro-finder true)
 (declare-const BAV1 Bool)
 (declare-const BAV2 Bool)
 (declare-const BAV3 Bool)
+(set-option :smt.macro-finder true)
 (set-option :auto-config true)
 (declare-fun f ((_ BitVec 1)) (_ BitVec 1))
 (declare-fun P ((_ BitVec 1)) Bool)

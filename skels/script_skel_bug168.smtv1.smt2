@@ -1,0 +1,8 @@
+(set-option :incremental false)
+(set-logic ALL)
+(declare-const BAV1 Bool)
+(declare-const GEN1 Real)
+(declare-fun v0 () Real)
+(assert (= BAV1 (distinct GEN1 v0)))
+(check-sat-assuming ((distinct GEN1 v0)))
+(get-model)

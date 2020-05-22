@@ -1,5 +1,5 @@
-(declare-fun |toto| () Bool)
 (declare-const BAV1 Bool)
+(declare-fun |toto| () Bool)
 (declare-fun |to to| () Bool)
 (assert (and toto |to to|))
 (assert (= BAV1 (and toto |to to|)))

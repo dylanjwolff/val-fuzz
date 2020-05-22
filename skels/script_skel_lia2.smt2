@@ -1,5 +1,5 @@
-(set-info :smt-lib-version 2.0)
 (declare-const BAV1 Bool)
+(set-info :smt-lib-version 2.0)
 (assert (forall ((x Int)) (forall ((y Int)) (= y x))))
 (assert (= BAV1 (forall ((x Int)(y Int)) (= y x))))
 (check-sat)

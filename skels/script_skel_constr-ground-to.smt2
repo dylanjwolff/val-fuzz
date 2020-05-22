@@ -1,0 +1,18 @@
+(set-logic ALL)
+(declare-const BAV1 Bool)
+(declare-datatypes () (
+	(
+		Term
+		(str (sv IntList))
+	)
+	(
+		IntList
+		(sn)
+		(sc (sh Int) (st IntList))
+	)
+))
+(declare-const t Term)
+(assert (and (is-str t) (is-sc (sv t)) (is-sc (st (sv t))) (is-sc (st (st (sv t)))) (is-sc (st (st (st (sv t))))) (is-sc (st (st (st (st (sv t)))))) (is-sc (st (st (st (st (st (sv t))))))) (is-sc (st (st (st (st (st (st (sv t)))))))) (is-sc (st (st (st (st (st (st (st (sv t))))))))) (is-sc (st (st (st (st (st (st (st (st (sv t)))))))))) (is-sc (st (st (st (st (st (st (st (st (st (sv t))))))))))) (is-sc (st (st (st (st (st (st (st (st (st (st (sv t)))))))))))) (is-sc (st (st (st (st (st (st (st (st (st (st (st (sv t))))))))))))) (is-sc (st (st (st (st (st (st (st (st (st (st (st (st (sv t)))))))))))))) (is-sc (st (st (st (st (st (st (st (st (st (st (st (st (st (sv t))))))))))))))) (is-sc (st (st (st (st (st (st (st (st (st (st (st (st (st (st (sv t)))))))))))))))) (is-sc (st (st (st (st (st (st (st (st (st (st (st (st (st (st (st (sv t))))))))))))))))) (is-sc (st (st (st (st (st (st (st (st (st (st (st (st (st (st (st (st (sv t)))))))))))))))))) (is-sc (st (st (st (st (st (st (st (st (st (st (st (st (st (st (st (st (st (sv t))))))))))))))))))) (is-sc (st (st (st (st (st (st (st (st (st (st (st (st (st (st (st (st (st (st (sv t)))))))))))))))))))) (is-sc (st (st (st (st (st (st (st (st (st (st (st (st (st (st (st (st (st (st (st (sv t))))))))))))))))))))) (is-sc (st (st (st (st (st (st (st (st (st (st (st (st (st (st (st (st (st (st (st (st (sv t)))))))))))))))))))))) (is-sc (st (st (st (st (st (st (st (st (st (st (st (st (st (st (st (st (st (st (st (st (st (sv t))))))))))))))))))))))) (is-sc (st (st (st (st (st (st (st (st (st (st (st (st (st (st (st (st (st (st (st (st (st (st (sv t))))))))))))))))))))))))))
+(assert (= BAV1 (and (is-str t) (is-sc (sv t)) (is-sc (st (sv t))) (is-sc (st (st (sv t)))) (is-sc (st (st (st (sv t))))) (is-sc (st (st (st (st (sv t)))))) (is-sc (st (st (st (st (st (sv t))))))) (is-sc (st (st (st (st (st (st (sv t)))))))) (is-sc (st (st (st (st (st (st (st (sv t))))))))) (is-sc (st (st (st (st (st (st (st (st (sv t)))))))))) (is-sc (st (st (st (st (st (st (st (st (st (sv t))))))))))) (is-sc (st (st (st (st (st (st (st (st (st (st (sv t)))))))))))) (is-sc (st (st (st (st (st (st (st (st (st (st (st (sv t))))))))))))) (is-sc (st (st (st (st (st (st (st (st (st (st (st (st (sv t)))))))))))))) (is-sc (st (st (st (st (st (st (st (st (st (st (st (st (st (sv t))))))))))))))) (is-sc (st (st (st (st (st (st (st (st (st (st (st (st (st (st (sv t)))))))))))))))) (is-sc (st (st (st (st (st (st (st (st (st (st (st (st (st (st (st (sv t))))))))))))))))) (is-sc (st (st (st (st (st (st (st (st (st (st (st (st (st (st (st (st (sv t)))))))))))))))))) (is-sc (st (st (st (st (st (st (st (st (st (st (st (st (st (st (st (st (st (sv t))))))))))))))))))) (is-sc (st (st (st (st (st (st (st (st (st (st (st (st (st (st (st (st (st (st (sv t)))))))))))))))))))) (is-sc (st (st (st (st (st (st (st (st (st (st (st (st (st (st (st (st (st (st (st (sv t))))))))))))))))))))) (is-sc (st (st (st (st (st (st (st (st (st (st (st (st (st (st (st (st (st (st (st (st (sv t)))))))))))))))))))))) (is-sc (st (st (st (st (st (st (st (st (st (st (st (st (st (st (st (st (st (st (st (st (st (sv t))))))))))))))))))))))) (is-sc (st (st (st (st (st (st (st (st (st (st (st (st (st (st (st (st (st (st (st (st (st (st (sv t)))))))))))))))))))))))))))
+(check-sat)
+(get-model)

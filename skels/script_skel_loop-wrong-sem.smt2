@@ -1,0 +1,8 @@
+(set-logic ALL)
+(declare-const GEN4 String)
+(declare-const GEN3 Int)
+(declare-const GEN2 Int)
+(declare-const GEN1 String)
+(assert (str.in.re GEN1 ((_ re.loop GEN2 GEN3) (str.to.re ""))))
+(check-sat)
+(get-model)

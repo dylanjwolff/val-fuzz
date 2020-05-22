@@ -1,0 +1,8 @@
+(set-logic ALL)
+(declare-const BAV1 Bool)
+(declare-const GEN1 Int)
+(declare-fun t () (_ BitVec 16))
+(assert (not (= t ((_ int2bv 16) (bv2nat t)))))
+(assert (= BAV1 (= t ((_ int2bv 16) (bv2nat t)))))
+(check-sat)
+(get-model)

@@ -1,7 +1,7 @@
-(set-option :auto-config true)
 (declare-const BAV1 Bool)
 (declare-const BAV2 Bool)
 (declare-const BAV3 Bool)
+(set-option :auto-config true)
 (set-option :produce-models true)
 (declare-const x Int)
 (declare-const y Int)

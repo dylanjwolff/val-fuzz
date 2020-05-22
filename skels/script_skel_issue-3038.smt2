@@ -1,0 +1,7 @@
+(declare-const BAV1 Bool)
+(declare-const GEN2 Real)
+(declare-const GEN1 Real)
+(declare-fun a () Real)
+(assert (distinct (^ a GEN1) GEN2))
+(check-sat-using nlqsat)
+(assert (= BAV1 (distinct (^ a GEN1) GEN2)))

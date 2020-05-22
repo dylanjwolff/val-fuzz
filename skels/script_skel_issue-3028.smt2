@@ -1,0 +1,6 @@
+(declare-const BAV1 Bool)
+(declare-const GEN1 Int)
+(declare-fun t () Int)
+(assert (> t (bv2nat ((_ int2bv 1) t))))
+(check-sat-using (then qfidl smt))
+(assert (= BAV1 (> t (bv2nat ((_ int2bv 1) t)))))

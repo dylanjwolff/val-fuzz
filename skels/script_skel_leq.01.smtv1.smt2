@@ -1,0 +1,8 @@
+(set-option :incremental false)
+(set-logic ALL)
+(declare-const BAV1 Bool)
+(declare-const GEN2 Int)
+(declare-const GEN1 Int)
+(assert (= BAV1 (<= GEN1 (- GEN2))))
+(check-sat-assuming ((<= GEN1 (- GEN2))))
+(get-model)

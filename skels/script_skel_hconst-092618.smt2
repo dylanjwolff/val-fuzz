@@ -1,0 +1,8 @@
+(set-logic ALL)
+(declare-const GEN3 String)
+(declare-const GEN2 String)
+(declare-const GEN1 String)
+(declare-fun x () String)
+(assert (str.contains GEN1 (str.++ x GEN2 x GEN3)))
+(check-sat)
+(get-model)

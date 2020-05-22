@@ -1,0 +1,8 @@
+(set-info :smt-lib-version 2.5)
+(set-logic ALL)
+(declare-const GEN2 String)
+(declare-const GEN1 String)
+(assert (not (str.< GEN1 GEN2)))
+(check-sat)
+(get-model)
+(exit)

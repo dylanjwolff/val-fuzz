@@ -1,0 +1,1 @@
+#(((bavns "BAV1" "BAV2") (constvns "GEN1" "GEN2" "GEN3" "GEN4") (seed_file . "") (skeleton_file . "") (metadata_file . "")) "script_skel_idof-nconst-index.smt2")

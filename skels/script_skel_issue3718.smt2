@@ -1,0 +1,8 @@
+(set-logic ALL)
+(declare-const BAV1 Bool)
+(declare-const GEN2 Int)
+(declare-const GEN1 Int)
+(assert (= (sqrt GEN1) GEN2))
+(assert (= BAV1 (= (sqrt GEN1) GEN2)))
+(check-sat)
+(get-model)

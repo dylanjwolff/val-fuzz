@@ -1,0 +1,5 @@
+(set-option :incremental false)
+(set-logic ALL)
+(declare-fun v0 () (_ BitVec 1))
+(check-sat-assuming ((bvsgt v0 v0)))
+(get-model)

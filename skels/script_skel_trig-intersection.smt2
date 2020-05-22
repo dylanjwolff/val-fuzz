@@ -1,0 +1,7 @@
+(declare-const BAV1 Bool)
+(set-info :source |Written by D. B. Staple for GitHub issue #680.|)
+(declare-fun theta () Real)
+(assert (= (sin theta) (cos theta)))
+(check-sat-using qfnra-nlsat)
+(get-model)
+(assert (= BAV1 (= (sin theta) (cos theta))))

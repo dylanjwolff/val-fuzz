@@ -1,0 +1,6 @@
+(set-logic ALL)
+(declare-const GEN1 String)
+(declare-fun x () String)
+(assert (str.in.re x (re.comp (str.to.re GEN1))))
+(check-sat)
+(get-model)

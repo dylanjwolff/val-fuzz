@@ -1,0 +1,8 @@
+(set-logic ALL)
+(declare-const GEN2 Int)
+(declare-const GEN1 Int)
+(declare-fun x () Int)
+(assert (wand (pto x 1) (pto x 3)))
+(assert (_ emp Int Int))
+(check-sat)
+(get-model)

@@ -1,0 +1,1 @@
+#(((bavns "BAV1" "BAV2" "BAV3" "BAV4") (constvns "GEN1" "GEN2" "GEN3") (seed_file . "") (skeleton_file . "") (metadata_file . "")) "script_skel_sets-card-datatype-1.smt2")

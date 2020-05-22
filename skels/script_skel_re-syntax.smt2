@@ -1,0 +1,7 @@
+(set-logic ALL)
+(declare-const BAV1 Bool)
+(declare-fun x () String)
+(assert (or (str.in_re x re.none) (not (str.in_re x re.all))))
+(assert (= BAV1 (or (str.in_re x re.none) (not (str.in_re x re.all)))))
+(check-sat)
+(get-model)

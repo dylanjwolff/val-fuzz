@@ -1,4 +1,3 @@
-(set-option :smt.mbqi true)
 (declare-const BAV1 Bool)
 (declare-const BAV2 Bool)
 (declare-const BAV3 Bool)
@@ -164,6 +163,7 @@
 (declare-const BAV163 Bool)
 (declare-const BAV164 Bool)
 (declare-const BAV165 Bool)
+(set-option :smt.mbqi true)
 (set-option :smt.ematching false)
 (set-option :produce-models true)
 (declare-sort Q 0)

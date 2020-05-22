@@ -1,0 +1,1 @@
+#(((bavns "BAV1" "BAV2") (constvns) (seed_file . "") (skeleton_file . "") (metadata_file . "")) "script_skel_sym1.smt2")

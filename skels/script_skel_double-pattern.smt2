@@ -1,0 +1,7 @@
+(set-logic ALL)
+(declare-const GEN1 Int)
+(declare-fun P (Int) Bool)
+(assert (forall ((x Int)) (! (! (P x) :pattern ((P x))) :pattern ((P x)))))
+(assert (not (P GEN1)))
+(check-sat)
+(get-model)

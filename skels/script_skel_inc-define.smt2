@@ -1,0 +1,7 @@
+(set-logic ALL)
+(declare-fun x () Int)
+(check-sat)
+(get-model)
+(define t (not (= x 0)))
+(assert t)
+(check-sat)

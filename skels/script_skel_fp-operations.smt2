@@ -1,4 +1,3 @@
-(set-info :source "Handcrafted by C.M. Wintersteiger")
 (declare-const BAV1 Bool)
 (declare-const BAV2 Bool)
 (declare-const BAV3 Bool)
@@ -9,6 +8,7 @@
 (declare-const BAV8 Bool)
 (declare-const BAV9 Bool)
 (declare-const BAV10 Bool)
+(set-info :source "Handcrafted by C.M. Wintersteiger")
 (declare-fun X () (_ FloatingPoint 2 6))
 (declare-fun Y () (_ FloatingPoint 2 6))
 (declare-fun Z () (_ FloatingPoint 2 6))

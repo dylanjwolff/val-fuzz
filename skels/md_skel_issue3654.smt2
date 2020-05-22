@@ -1,0 +1,1 @@
+#(((bavns "BAV1" "BAV2" "BAV3") (constvns "GEN3" "GEN4" "GEN5" "GEN6" "GEN8" "GEN10" "GEN11" "GEN12" "GEN17" "GEN18" "GEN19" "GEN20" "GEN21" "GEN22" "GEN25" "GEN26" "GEN29" "GEN31") (seed_file . "") (skeleton_file . "") (metadata_file . "")) "script_skel_issue3654.smt2")

@@ -1,0 +1,5 @@
+(set-info :smt-lib-version 2.5)
+(set-logic ALL)
+(set-option :strings-exp true)
+(declare-fun s () String)
+(declare-fun joined () String)

@@ -1,0 +1,5 @@
+(declare-const BAV1 Bool)
+(declare-const x Int)
+(assert (= x x))
+(apply simplify)
+(assert (= BAV1 (= x x)))

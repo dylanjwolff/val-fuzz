@@ -1,0 +1,5 @@
+(declare-const BAV1 Bool)
+(declare-const GEN1 (_ BitVec 4))
+(assert (forall ((x (_ BitVec 4))) (forall ((y (_ BitVec 4))) (= (bvadd x y) GEN1))))
+(apply (using-params bit-blast :blast-quant true))
+(assert (= BAV1 (forall ((x (_ BitVec 4))(y (_ BitVec 4))) (= (bvadd x y) GEN1))))

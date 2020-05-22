@@ -1,0 +1,7 @@
+(declare-const BAV1 Bool)
+(declare-const GEN1 Int)
+(set-option :diagnostic-output-channel "stdout")
+(declare-const x Int)
+(assert (= x GEN1))
+(check-sat-using smt)
+(assert (= BAV1 (= x GEN1)))

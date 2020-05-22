@@ -1,6 +1,6 @@
-(declare-const x Int)
 (declare-const BAV1 Bool)
 (declare-const BAV2 Bool)
+(declare-const x Int)
 (declare-const y Int)
 (assert (forall ((Q (Array Int Bool))) (=> (select Q x) (select Q y))))
 (assert (not (= x y)))

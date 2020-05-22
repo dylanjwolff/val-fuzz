@@ -1,0 +1,7 @@
+(set-logic ALL)
+(declare-const GEN1 Int)
+(declare-fun x () Int)
+(assert ((_ divisible 3) x))
+(check-sat)
+(get-model)
+(get-value (x (div x 3) (mod x 3) ((_ divisible 3) x)))

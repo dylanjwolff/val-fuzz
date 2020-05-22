@@ -1,0 +1,5 @@
+(declare-const x Int)
+(maximize x)
+(check-sat)
+(get-model)
+(get-objectives)

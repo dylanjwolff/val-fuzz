@@ -1,5 +1,5 @@
-(set-option :auto-config true)
 (declare-const BAV1 Bool)
+(set-option :auto-config true)
 (set-option :produce-models true)
 (declare-const a (_ BitVec 4))
 (declare-const b (_ BitVec 4))

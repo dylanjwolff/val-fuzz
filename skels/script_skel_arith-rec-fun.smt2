@@ -1,10 +1,10 @@
 (set-logic ALL)
-(declare-const GEN1 Int)
+(declare-const BAV1 Bool)
 (declare-const GEN2 Int)
-(declare-const BAV3 Bool)
+(declare-const GEN1 Int)
 (define-fun-rec sumr ((x Int)) Int 
     (+ x (ite (> x 0) (sumr (- x 1)) 0)))
 (assert (= (sumr GEN1) GEN2))
-(assert (= BAV3 (= (sumr GEN1) GEN2)))
+(assert (= BAV1 (= (sumr GEN1) GEN2)))
 (check-sat)
 (get-model)

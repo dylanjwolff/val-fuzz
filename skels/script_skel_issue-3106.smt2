@@ -1,0 +1,7 @@
+(declare-const BAV1 Bool)
+(declare-const GEN1 Int)
+(declare-fun a () Real)
+(declare-fun b () Real)
+(assert (not (<= (* (- a b) (- a b) (* a a b b)) GEN1)))
+(check-sat-using nlsat)
+(assert (= BAV1 (<= (* (- a b) (- a b) (* a a b b)) GEN1)))

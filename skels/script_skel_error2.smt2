@@ -1,0 +1,7 @@
+(set-logic ALL)
+(declare-const BAV1 Bool)
+(declare-const GEN1 Int)
+(assert (= (as emptyset (Set Int)) (singleton GEN1)))
+(assert (= BAV1 (= (as emptyset (Set Int)) (singleton GEN1))))
+(check-sat)
+(get-model)

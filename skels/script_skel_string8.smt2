@@ -1,6 +1,6 @@
-(exit)
 (declare-const BAV1 Bool)
 (declare-const BAV2 Bool)
+(exit)
 (set-option :produce-models true)
 (set-info :smt-lib-version 2.5)
 (set-option :smt.string_solver z3str3)

@@ -1,6 +1,6 @@
-(declare-fun a () Int)
 (declare-const BAV1 Bool)
 (declare-const BAV2 Bool)
+(declare-fun a () Int)
 (declare-fun b () Int)
 (declare-fun z () Int)
 (assert (= a z))

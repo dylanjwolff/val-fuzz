@@ -1,7 +1,7 @@
-(declare-sort A 0)
 (declare-const BAV1 Bool)
 (declare-const BAV2 Bool)
 (declare-const BAV3 Bool)
+(declare-sort A 0)
 (declare-fun e (A) A)
 (declare-fun c (A A) A)
 (declare-fun h (A A) A)

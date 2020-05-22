@@ -1,6 +1,6 @@
 (set-logic ALL)
-(declare-const GEN1 Int)
 (declare-const GEN2 Int)
+(declare-const GEN1 Int)
 (declare-fun P (Int) Bool)
 (assert (forall ((x Int)) (P (* GEN1 x))))
 (assert (not (P GEN2)))

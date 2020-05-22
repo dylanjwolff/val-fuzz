@@ -1,0 +1,1 @@
+#(((bavns "BAV1" "BAV2" "BAV3" "BAV4" "BAV5" "BAV6" "BAV7") (constvns "GEN3" "GEN6" "GEN7" "GEN10" "GEN11" "GEN14" "GEN17" "GEN18" "GEN21" "GEN22" "GEN25" "GEN26") (seed_file . "") (skeleton_file . "") (metadata_file . "")) "script_skel_fp-fma-17.smt2")

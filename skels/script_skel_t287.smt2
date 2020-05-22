@@ -1,0 +1,6 @@
+(declare-const BAV1 Bool)
+(declare-const GEN1 Int)
+(declare-const x Int)
+(assert (> x GEN1))
+(check-sat-using (and-then (or-else fail fail) simplify))
+(assert (= BAV1 (> x GEN1)))

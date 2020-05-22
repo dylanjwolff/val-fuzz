@@ -1,0 +1,13 @@
+(set-logic ALL)
+(declare-const BAV1 Bool)
+(declare-const GEN1 Int)
+(set-option :arith-no-partial-fun true)
+(declare-fun lat1 () Real)
+(declare-fun lat2 () Real)
+(declare-fun arctan2u () Real)
+(define-fun arctan2 ((x Real) (y Real)) Real
+  (arctan (/ y x)))
+(assert (= (arctan2 lat1 lat2) GEN1))
+(assert (= BAV1 (= (arctan2 lat1 lat2) GEN1)))
+(check-sat)
+(get-model)
