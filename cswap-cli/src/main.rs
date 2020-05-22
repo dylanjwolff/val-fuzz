@@ -29,7 +29,7 @@ fn main() {
         .arg(
             Arg::with_name(WORKERS)
                 .short("w")
-                .help("Worker threads for each stage (e.g. 0,1,2)")
+                .help("Worker threads for each stage of three stages (e.g. 0,1,2)")
                 .takes_value(true),
         )
         .get_matches();
