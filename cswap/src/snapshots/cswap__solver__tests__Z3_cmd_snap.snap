@@ -1,11 +1,11 @@
 ---
-source: src/solver.rs
-expression: "Z3_Command_Builder::new().ematching(false).flat_rw(false).threads3().z3str3().cmd"
+source: cswap/src/solver.rs
+expression: "Z3_Command_Builder::new().timeout(Duration::from_secs(3)).ematching(false).flat_rw(false).threads3().z3str3().cmd"
 ---
 [
     "timeout",
     "-v",
-    "6s",
+    "3s",
     "z3",
     "model_validate=true",
     "smt.ematching=false",

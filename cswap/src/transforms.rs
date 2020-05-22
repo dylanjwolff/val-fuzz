@@ -400,12 +400,20 @@ pub fn rcholes(
     md: &mut Metadata,
     validator: fn(&Script) -> bool,
 ) {
+    let timer = Timer::new();
+    timer.start(Duration::from_secs(60));
     let mut vng = VarNameGenerator::new("GEN");
     for (chole, sort) in choles {
+        if timer.is_done() {
+            println!("Timeout filling Constant Holes");
+            break;
+        }
+
         let o = chole.clone_v();
         let name = vng.get_name(sort);
         chole.swap(SExp::Symbol(rccell!(Symbol::Var(name.clone()))));
         init_vars(script, vec![vng.vars_generated.pop().unwrap()]);
+
         if validator(script) {
             md.constvns.push(name.clone())
         } else {
@@ -638,7 +646,10 @@ pub fn traverse(node: AstNode, mut visitors: Vec<&mut dyn Visitor>) {
 fn is_valid(s: &Script) -> bool {
     match check_valid_solve_as_temp(s) {
         Ok(responses) => responses.iter().any(|r| !r.has_unrecoverable_error()),
-        Err(_) => false,
+        Err(e) => {
+            println!("validator error!: {}", e);
+            false
+        }
     }
 }
 

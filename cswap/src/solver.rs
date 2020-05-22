@@ -6,6 +6,7 @@ use std::path::Path;
 use std::path::PathBuf;
 use std::process;
 use std::str::from_utf8;
+use std::time::Duration;
 use tempfile::tempfile;
 use tempfile::Builder;
 use tempfile::NamedTempFile;
@@ -94,6 +95,11 @@ impl CVC4_Command_Builder {
         }
     }
 
+    fn timeout(&mut self, duration: Duration) -> Self {
+        self.cmd[2] = format!("{}s", duration.as_secs());
+        self.clone()
+    }
+
     fn models(&mut self) -> Self {
         self.cmd.push("--produce-models".to_owned());
         self.cmd.push("--check-models".to_owned());
@@ -161,6 +167,11 @@ impl Z3_Command_Builder {
                 .map(|s| s.to_owned())
                 .collect(),
         }
+    }
+
+    fn timeout(&mut self, duration: Duration) -> Self {
+        self.cmd[2] = format!("{}s", duration.as_secs());
+        self.clone()
     }
 
     fn ematching(&mut self, should_ematch: bool) -> Self {
@@ -456,8 +467,16 @@ pub fn solve(filename: &str) -> Vec<RSolve> {
 pub fn check_valid_solve(filename: &str) -> Vec<RSolve> {
     let filepath = Path::new(filename);
     vec![
-        solve_z3(&Z3_Command_Builder::new(), filepath),
-        solve_cvc4(&CVC4_Command_Builder::new().incremental(), filepath),
+        solve_z3(
+            &Z3_Command_Builder::new().timeout(Duration::from_secs(1)),
+            filepath,
+        ),
+        solve_cvc4(
+            &CVC4_Command_Builder::new()
+                .timeout(Duration::from_secs(1))
+                .incremental(),
+            filepath,
+        ),
     ]
 }
 
@@ -476,8 +495,16 @@ pub fn check_valid_solve_as_temp(script: &Script) -> Result<Vec<RSolve>, String>
     let filepath = tfile.path();
 
     let results = vec![
-        solve_z3(&Z3_Command_Builder::new(), filepath),
-        solve_cvc4(&CVC4_Command_Builder::new().incremental(), filepath),
+        solve_z3(
+            &Z3_Command_Builder::new().timeout(Duration::from_secs(1)),
+            filepath,
+        ),
+        solve_cvc4(
+            &CVC4_Command_Builder::new()
+                .timeout(Duration::from_secs(1))
+                .incremental(),
+            filepath,
+        ),
     ];
 
     Ok(results)
@@ -508,6 +535,7 @@ mod tests {
     #[test]
     fn run_real_cvc4_snap() {
         assert_debug_snapshot!(CVC4_Command_Builder::new()
+            .timeout(Duration::from_secs(3))
             .strings_exp()
             .incremental()
             .dump_all()
@@ -518,6 +546,7 @@ mod tests {
     #[test]
     fn run_real_z3_snap() {
         assert_debug_snapshot!(Z3_Command_Builder::new()
+            .timeout(Duration::from_secs(3))
             .ematching(false)
             .flat_rw(false)
             .threads3()
@@ -529,6 +558,7 @@ mod tests {
     fn Z3_cmd_snap() {
         assert_debug_snapshot!(
             Z3_Command_Builder::new()
+                .timeout(Duration::from_secs(3))
                 .ematching(false)
                 .flat_rw(false)
                 .threads3()
@@ -541,6 +571,7 @@ mod tests {
     fn CVC4_cmd_snap() {
         assert_debug_snapshot!(
             CVC4_Command_Builder::new()
+                .timeout(Duration::from_secs(3))
                 .models()
                 .unconstrained_simp()
                 .incremental()

@@ -357,7 +357,10 @@ fn mutator_worker(qin: InputPPQ, qout: SkeletonQueue, stage: StageCompleteA) {
                 let skel_file = Path::new(&skel_name).to_path_buf();
                 match serialize_to_f(&skel_file.as_path(), &script, &md) {
                     Ok(to_push) => qout.push(to_push),
-                    Err(_) => continue,
+                    Err(e) => {
+                        println!("Error serializing skel {}", e);
+                        continue;
+                    }
                 }
             }
             None => continue,
@@ -474,23 +477,18 @@ fn serialize_to_f(
     based_off_of: &Path,
     script: &Script,
     md: &Metadata,
-) -> Result<(PathBuf, PathBuf), ()> {
+) -> Result<(PathBuf, PathBuf), String> {
     let md_name = get_new_name(based_off_of, "md");
     let script_name = get_new_name(based_off_of, "script");
     let md_file = Path::new(&md_name);
     let script_file = Path::new(&script_name);
 
-    match {
-        let md_serial = serde_lexpr::to_string(&(&md, &script_name)).map_err(|_| ())?;
-        let script_serial = script.to_string_dfltto().ok_or(())?;
+    let md_serial = serde_lexpr::to_string(&(&md, &script_name)).map_err(|e| format!("{:?}", e))?;
+    let script_serial = script.to_string_dfltto().ok_or("Timeout on to_string()")?;
 
-        fs::write(md_file, md_serial).map_err(|_| ())?;
-        fs::write(script_file, script_serial).map_err(|_| ())?;
-        Ok((script_file.to_path_buf(), md_file.to_path_buf()))
-    } {
-        Ok(r) => Ok(r),
-        Err(()) => Err(println!("serial error file {:?}", based_off_of)),
-    }
+    fs::write(md_file, md_serial).map_err(|e| format!("{:?}", e))?;
+    fs::write(script_file, script_serial).map_err(|e| format!("{:?}", e))?;
+    Ok((script_file.to_path_buf(), md_file.to_path_buf()))
 }
 
 fn deserialize_from_f(

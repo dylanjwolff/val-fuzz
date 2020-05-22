@@ -1,11 +1,11 @@
 ---
-source: src/solver.rs
-expression: "CVC4_Command_Builder::new().unconstrained_simp().incremental().strings_exp().dump_all().check_unsat_cores().cmd"
+source: cswap/src/solver.rs
+expression: "CVC4_Command_Builder::new().timeout(Duration::from_secs(3)).models().unconstrained_simp().incremental().strings_exp().dump_all().check_unsat_cores().cmd"
 ---
 [
     "timeout",
     "-v",
-    "6s",
+    "3s",
     "cvc4",
     "--produce-models",
     "--check-models",
