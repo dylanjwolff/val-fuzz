@@ -181,7 +181,80 @@ impl StageComplete {
     }
 }
 
-pub fn from_skels(dirname: &str) {
+fn launch(qs: (InputPPQ, SkeletonQueue), worker_counts: (u8, u8, u8)) {
+    const STACK_SIZE: usize = 500 * 1024 * 1024; // 100mb
+    let baq = ArrayQueue::new(100);
+    let a_baq = Arc::new(baq);
+
+    let stage0 = match worker_counts.0 {
+        0 => Arc::new(StageComplete::finished()),
+        _ => Arc::new(StageComplete::new(worker_counts.0)),
+    };
+    let stage1 = Arc::new(StageComplete::new(worker_counts.1));
+
+    let handles = (0..worker_counts.0)
+        .map(|_| {
+            let t_q = Arc::clone(&qs.0);
+            let t_q2 = Arc::clone(&qs.1);
+            let t_s1 = Arc::clone(&stage0);
+
+            thread::Builder::new()
+                .stack_size(STACK_SIZE)
+                .spawn(|| mutator_worker(t_q, t_q2, t_s1))
+        })
+        .collect::<Vec<std::io::Result<JoinHandle<()>>>>();
+
+    let bav_handles = (0..worker_counts.1)
+        .map(|_| {
+            let t_q2 = Arc::clone(&qs.1);
+            let t_baq = Arc::clone(&a_baq);
+            let t_s1 = Arc::clone(&stage0);
+            let t_s2 = Arc::clone(&stage1);
+
+            thread::Builder::new()
+                .stack_size(STACK_SIZE)
+                .spawn(|| bav_assign_worker(t_q2, t_s1, t_baq, t_s2))
+        })
+        .collect::<Vec<std::io::Result<JoinHandle<()>>>>();
+
+    let solver_handles = (0..worker_counts.2)
+        .map(|_| {
+            let t_baq = Arc::clone(&a_baq);
+            let t_s2 = Arc::clone(&stage1);
+
+            thread::Builder::new()
+                .stack_size(STACK_SIZE)
+                .spawn(|| solver_worker(t_baq, t_s2))
+        })
+        .collect::<Vec<std::io::Result<JoinHandle<()>>>>();
+
+    let mut backoff = MyBackoff::new();
+    for h in handles {
+        h.unwrap().join().unwrap();
+        backoff.snooze();
+    }
+
+    backoff.reset();
+    for h in bav_handles {
+        h.unwrap().join().unwrap();
+        backoff.snooze();
+    }
+
+    backoff.reset();
+    for h in solver_handles {
+        h.unwrap().join().unwrap();
+        backoff.snooze();
+    }
+
+    println!(
+        "Queue lengths {} {} {}",
+        qs.0.len(),
+        qs.1.len(),
+        a_baq.len()
+    );
+}
+
+pub fn from_skels(dirname: &str, worker_counts: (u8, u8)) {
     let stage1 = Arc::new(StageComplete::finished());
 
     let q2 = SegQueue::new();
@@ -209,51 +282,13 @@ pub fn from_skels(dirname: &str) {
         q2.push((script_path, metad_path));
     }
 
+    let q = SegQueue::new();
+    let aq = Arc::new(q);
     let aq2 = Arc::new(q2);
-    let num_stage2_workers = 2;
-    let stage2 = Arc::new(StageComplete::new(num_stage2_workers));
-
-    let baq = ArrayQueue::new(100);
-    let a_baq = Arc::new(baq);
-
-    const STACK_SIZE: usize = 500 * 1024 * 1024; // 100mb
-
-    let bav_handles = (0..2)
-        .map(|_| {
-            let t_q2 = Arc::clone(&aq2);
-            let t_baq = Arc::clone(&a_baq);
-            let t_s1 = Arc::clone(&stage1);
-            let t_s2 = Arc::clone(&stage2);
-
-            thread::Builder::new()
-                .stack_size(STACK_SIZE)
-                .spawn(|| bav_assign_worker(t_q2, t_s1, t_baq, t_s2))
-        })
-        .collect::<Vec<std::io::Result<JoinHandle<()>>>>();
-
-    let solver_handles = (0..2)
-        .map(|_| {
-            let t_baq = Arc::clone(&a_baq);
-            let t_s2 = Arc::clone(&stage2);
-
-            thread::Builder::new()
-                .stack_size(STACK_SIZE)
-                .spawn(|| solver_worker(t_baq, t_s2))
-        })
-        .collect::<Vec<std::io::Result<JoinHandle<()>>>>();
-
-    for h in bav_handles {
-        h.unwrap().join().unwrap();
-    }
-
-    for h in solver_handles {
-        h.unwrap().join().unwrap();
-    }
-
-    println!("Queue lengths {} {}", aq2.len(), a_baq.len());
+    launch((aq, aq2), (0, worker_counts.0, worker_counts.1));
 }
 
-pub fn exec(dirname: &str) {
+pub fn exec(dirname: &str, worker_counts: (u8, u8, u8)) {
     let q = SegQueue::new();
     for entry in WalkDir::new(dirname)
         .into_iter()
@@ -268,67 +303,10 @@ pub fn exec(dirname: &str) {
 
     //stage 0
     let aq = Arc::new(q);
-    let num_stage1_workers = 2;
-    let stage1 = Arc::new(StageComplete::new(num_stage1_workers));
-
     let q2 = SegQueue::new();
     let aq2 = Arc::new(q2);
-    let num_stage2_workers = 2;
-    let stage2 = Arc::new(StageComplete::new(num_stage2_workers));
 
-    let baq = ArrayQueue::new(100);
-    let a_baq = Arc::new(baq);
-
-    const STACK_SIZE: usize = 500 * 1024 * 1024; // 100mb
-    let handles = (0..2)
-        .map(|_| {
-            let t_q = Arc::clone(&aq);
-            let t_q2 = Arc::clone(&aq2);
-            let t_s1 = Arc::clone(&stage1);
-
-            thread::Builder::new()
-                .stack_size(STACK_SIZE)
-                .spawn(|| mutator_worker(t_q, t_q2, t_s1))
-        })
-        .collect::<Vec<std::io::Result<JoinHandle<()>>>>();
-
-    let bav_handles = (0..2)
-        .map(|_| {
-            let t_q2 = Arc::clone(&aq2);
-            let t_baq = Arc::clone(&a_baq);
-            let t_s1 = Arc::clone(&stage1);
-            let t_s2 = Arc::clone(&stage2);
-
-            thread::Builder::new()
-                .stack_size(STACK_SIZE)
-                .spawn(|| bav_assign_worker(t_q2, t_s1, t_baq, t_s2))
-        })
-        .collect::<Vec<std::io::Result<JoinHandle<()>>>>();
-
-    let solver_handles = (0..8)
-        .map(|_| {
-            let t_baq = Arc::clone(&a_baq);
-            let t_s2 = Arc::clone(&stage2);
-
-            thread::Builder::new()
-                .stack_size(STACK_SIZE)
-                .spawn(|| solver_worker(t_baq, t_s2))
-        })
-        .collect::<Vec<std::io::Result<JoinHandle<()>>>>();
-
-    for h in handles {
-        h.unwrap().join().unwrap();
-    }
-
-    for h in bav_handles {
-        h.unwrap().join().unwrap();
-    }
-
-    for h in solver_handles {
-        h.unwrap().join().unwrap();
-    }
-
-    println!("Queue lengths {} {} {}", aq.len(), aq2.len(), a_baq.len());
+    launch((aq, aq2), (2, 2, 2));
 }
 
 fn mutator_worker(qin: InputPPQ, qout: SkeletonQueue, stage: StageCompleteA) {
