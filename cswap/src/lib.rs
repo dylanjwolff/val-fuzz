@@ -373,15 +373,14 @@ fn bav_assign_worker(
             }
         };
 
-        // TODO below
-        let empty_skel_name = &filepaths.0.file_name().and_then(|s| s.to_str()).unwrap();
+        let empty_skel_fstr = &filepaths.0.to_str().unwrap();
 
-        let results = solve(empty_skel_name);
+        let results = solve(empty_skel_fstr);
 
         report_any_bugs(&filepaths.0, &results);
 
         if results.iter().all(|r| r.has_unrecoverable_error()) {
-            println!("All err on file {}", empty_skel_name);
+            println!("All err on file {}", empty_skel_fstr);
             fs::remove_file(filepaths.0).unwrap_or(());
             fs::remove_file(filepaths.1).unwrap_or(());
         } else {
@@ -495,7 +494,14 @@ fn script_f_from_metadata_f(md_file: &PathBuf) -> Result<PathBuf, String> {
     let (_, script_file): (Metadata, PathBuf) =
         serde_lexpr::from_str(&md_contents).map_err(|e| e.to_string() + " from serde")?;
 
-    Ok(script_file)
+    match md_file.parent() {
+        Some(dir) => {
+            let mut f = dir.clone().to_path_buf();
+            f.push(script_file);
+            Ok(f)
+        }
+        None => Ok(script_file),
+    }
 }
 
 pub struct PoisonPill {}

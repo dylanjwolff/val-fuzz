@@ -41,7 +41,7 @@ fn main() {
     };
 
     match matches.is_present(FROM_SKELS) {
-        true => from_skels(dir_name, (workers.0, workers.1)),
+        true => from_skels(dir_name, (workers.1, workers.2)),
         false => exec(dir_name, workers),
     }
 }
