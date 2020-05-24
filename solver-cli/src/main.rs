@@ -85,6 +85,9 @@ fn main() {
             if log_level == 1 {
                 println!("SOUNDNESS ERROR in {}", infile_name);
             }
+            if let Some(crs) = maybe_cr_script {
+                print_creduce(&results, crs, infile_name);
+            }
             0
         } else {
             1
