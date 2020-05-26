@@ -1,4 +1,3 @@
-#[allow(unused)]
 extern crate nom;
 extern crate rand;
 extern crate rand_core;
@@ -9,7 +8,6 @@ extern crate tempfile;
 extern crate walkdir;
 #[macro_use]
 extern crate lazy_static;
-
 #[macro_use]
 pub mod ast;
 
