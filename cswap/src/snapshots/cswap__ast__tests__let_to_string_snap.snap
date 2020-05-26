@@ -1,7 +1,7 @@
 ---
-source: src/ast.rs
+source: cswap/src/ast.rs
 expression: "script(\"(assert (let ((max (seq.nth A m))(n   (seq.len A))) (ite (or true false))))\").unwrap().1.to_string_dfltto()"
 ---
 Some(
-    "(assert (let ((max (seq.nth A m))(n (seq.len A))) (ite (or true false))))",
+    "(assert (let ((max ( seq.nth  A  m ))(n ( seq.len  A )) ( ite  (or  true  false ) )))\n",
 )

@@ -404,7 +404,7 @@ fn add_iterations_to_q(
     let script_str = script.to_string_dfltto()?;
 
     let num_bavs = md.bavns.len();
-    const MAX_ITER: u32 = 2000;
+    const MAX_ITER: u32 = 0;
     println!("starting max(2^{}, {}) iterations", num_bavs, MAX_ITER);
     let mut urng = RandUniqPermGen::new_definite(num_bavs, MAX_ITER);
     while let Some(truth_values) = urng.sample() {
@@ -722,9 +722,7 @@ mod tests {
 
     #[test]
     fn bv_replace() {
-        let fmt_str = get_bav_assign_fmt_str(&vec!["BAV1".to_owned()])
-            .to_string(Timer::new())
-            .unwrap();
+        let fmt_str = get_bav_assign_fmt_str(&vec!["BAV1".to_owned()]).to_string();
         println!("{}", fmt_str);
         let bv = BitVec::from_elem(1, true);
         assert_eq!(

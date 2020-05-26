@@ -39,6 +39,7 @@ fn main() {
         Some(workerstr) => parse_workers(workerstr),
         None => (2, 2, 9),
     };
+    println!("Starting with workers {:?}", workers);
 
     match matches.is_present(FROM_SKELS) {
         true => from_skels(dir_name, (workers.1, workers.2)),

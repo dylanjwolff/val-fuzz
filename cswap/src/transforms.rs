@@ -734,10 +734,9 @@ mod tests {
 
     #[test]
     fn bav_fmt_str() {
-        println!(
+        assert_debug_snapshot!(
             "{:?}",
-            get_bav_assign_fmt_str(&vec!["BAV1".to_owned(), "BAV2".to_owned()])
-                .to_string(Timer::new())
+            get_bav_assign_fmt_str(&vec!["BAV1".to_owned(), "BAV2".to_owned()]).to_string()
         );
     }
 

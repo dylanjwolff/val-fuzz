@@ -3,5 +3,5 @@ source: cswap/src/transforms.rs
 expression: p.to_string_dfltto()
 ---
 Some(
-    "(declare-const GEN2 Int)\n(declare-const GEN1 Int)\n(assert (= GEN1 GEN2))",
+    "(declare-const GEN2 Int)\n(declare-const GEN1 Int)\n(assert (=  GEN1  GEN2 ))\n",
 )

@@ -1,5 +1,6 @@
 use crate::Timer;
 use std::cell::RefCell;
+use std::fmt;
 use std::rc::Rc;
 use std::time::Duration;
 #[macro_use]
@@ -113,22 +114,7 @@ pub enum AstNode {
 
 impl Script {
     pub fn to_string_dfltto(&self) -> Option<String> {
-        self.to_string(Timer::new_started(Duration::from_secs(5)))
-    }
-
-    pub fn to_string(&self, timer: Timer) -> Option<String> {
-        if timer.is_done() {
-            return None;
-        }
-
-        match self {
-            Script::Commands(cmds) => Some(
-                cmds.iter()
-                    .map(|cmd| cmd.borrow().to_string(timer.clone()))
-                    .collect::<Option<Vec<String>>>()?
-                    .join("\n"),
-            ),
-        }
+        Some(self.to_string())
     }
 
     pub fn insert(&mut self, i: usize, cmd: Command) {
@@ -177,27 +163,38 @@ impl Script {
     }
 }
 
+impl fmt::Display for Script {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        match self {
+            Script::Commands(cmds) => cmds
+                .iter()
+                .map(|cmd| write!(f, "{}\n", cmd.borrow()))
+                .fold(Ok(()), acc_result),
+        }
+    }
+}
+
 impl Command {
-    pub fn to_string(&self, timer: Timer) -> Option<String> {
+    pub fn to_string_t(&self, timer: Timer) -> Option<String> {
         if timer.is_done() {
             return None;
         }
 
         Some(match self {
-            Command::Logic(l) => format!("(set-logic {})", l.borrow().to_string()),
+            Command::Logic(l) => format!("(set-logic {})", l.borrow().to_string_t()),
             Command::CheckSat() => "(check-sat)".to_string(),
             Command::CheckSatAssuming(sexp) => format!(
                 "(check-sat-assuming {})",
-                sexp.borrow().to_string(timer.clone())?
+                sexp.borrow().to_string_t(timer.clone())?
             ),
             Command::GetModel() => "(get-model)".to_string(),
             Command::DeclConst(v, s) => format!(
                 "(declare-const {} {})",
                 v,
-                s.borrow().to_string(timer.clone())?
+                s.borrow().to_string_t(timer.clone())?
             ),
             Command::Generic(s) => s.clone(),
-            Command::Assert(s) => format!("(assert {})", s.borrow().to_string(timer.clone())?),
+            Command::Assert(s) => format!("(assert {})", s.borrow().to_string_t(timer.clone())?),
         })
     }
 
@@ -220,8 +217,22 @@ impl Command {
     }
 }
 
+impl fmt::Display for Command {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        match self {
+            Command::Logic(l) => write!(f, "(set-logic {})", l.borrow()),
+            Command::CheckSat() => write!(f, "(check-sat)"),
+            Command::CheckSatAssuming(sexp) => write!(f, "(check-sat-assuming {})", sexp.borrow()),
+            Command::GetModel() => write!(f, "(get-model)"),
+            Command::DeclConst(v, s) => write!(f, "(declare-const {} {})", v, s.borrow()),
+            Command::Generic(s) => write!(f, "{}", s),
+            Command::Assert(s) => write!(f, "(assert {})", s.borrow()),
+        }
+    }
+}
+
 impl Constant {
-    pub fn to_string(&self) -> String {
+    pub fn to_string_t(&self) -> String {
         match self {
             Constant::UInt(s) => s.to_string(),
             Constant::Dec(d) => d.to_string(),
@@ -233,8 +244,21 @@ impl Constant {
     }
 }
 
+impl fmt::Display for Constant {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        match self {
+            Constant::UInt(s) => write!(f, "{}", s),
+            Constant::Dec(d) => write!(f, "{}", d),
+            Constant::Hex(s) => write!(f, "#x{}", s),
+            Constant::Str(s) => write!(f, "\"{}\"", s),
+            Constant::Bool(b) => write!(f, "{}", b),
+            Constant::Bin(bv) => write!(f, "#b{}", bv.into_iter().collect::<String>()),
+        }
+    }
+}
+
 impl Sort {
-    pub fn to_string(&self, timer: Timer) -> Option<String> {
+    pub fn to_string_t(&self, timer: Timer) -> Option<String> {
         if timer.is_done() {
             return None;
         }
@@ -250,13 +274,41 @@ impl Sort {
             Sort::Compound(v) => {
                 let rec_s = v
                     .iter()
-                    .map(|sort| Box::new(sort.borrow().to_string(timer.clone())))
+                    .map(|sort| Box::new(sort.borrow().to_string_t(timer.clone())))
                     .map(|bs| *bs)
                     .collect::<Option<Vec<String>>>()?
                     .join(" ");
                 format!("({})", rec_s)
             }
         })
+    }
+}
+
+fn acc_result(acc: fmt::Result, curr: fmt::Result) -> fmt::Result {
+    match curr {
+        Ok(_) => acc,
+        Err(e) => Err(e),
+    }
+}
+
+impl fmt::Display for Sort {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        match self {
+            Sort::UInt() => write!(f, "Int"),
+            Sort::Dec() => write!(f, "Real"),
+            Sort::Bool() => write!(f, "Bool"),
+            Sort::Str() => write!(f, "String"),
+            Sort::BitVec(len) => write!(f, "(_ BitVec {})", len),
+            Sort::Array() => write!(f, "Array"),
+            Sort::UserDef(s) => write!(f, "{}", s),
+            Sort::Compound(v) => {
+                write!(f, "(")?;
+                v.iter()
+                    .map(|sort| write!(f, " {} ", sort.borrow()))
+                    .fold(Ok(()), acc_result)?;
+                write!(f, ")")
+            }
+        }
     }
 }
 
@@ -269,19 +321,22 @@ impl SExp {
         SExp::Symbol(rccell!(Symbol::Token("false".to_owned())))
     }
 
-    pub fn to_string(&self, timer: Timer) -> Option<String> {
+    pub fn to_string_t(&self, timer: Timer) -> Option<String> {
         if timer.is_done() {
             return None;
         }
 
         Some(match self {
-            SExp::Constant(c) => c.borrow().to_string(),
-            SExp::Symbol(s) => s.borrow().to_string(),
+            SExp::Constant(c) => c.borrow().to_string_t(),
+            SExp::Symbol(s) => s.borrow().to_string_t(),
             SExp::Let(vbs, s) => {
                 let vbss = Box::new(
                     vbs.iter()
                         .map(|(v, s)| {
-                            Some((v.borrow().to_string(), s.borrow().to_string(timer.clone())?))
+                            Some((
+                                v.borrow().to_string_t(),
+                                s.borrow().to_string_t(timer.clone())?,
+                            ))
                         })
                         .collect::<Option<Vec<(String, String)>>>()?
                         .iter()
@@ -289,12 +344,16 @@ impl SExp {
                         .map(|bs| *bs)
                         .collect::<String>(),
                 );
-                format!("(let ({}) {})", vbss, s.borrow().to_string(timer.clone())?)
+                format!(
+                    "(let ({}) {})",
+                    vbss,
+                    s.borrow().to_string_t(timer.clone())?
+                )
             }
             SExp::Compound(v) => {
                 let rec_s = v
                     .iter()
-                    .map(|sexp| Box::new(sexp.borrow().to_string(timer.clone())))
+                    .map(|sexp| Box::new(sexp.borrow().to_string_t(timer.clone())))
                     .map(|bs| *bs)
                     .collect::<Option<Vec<String>>>()?
                     .join(" ");
@@ -303,11 +362,11 @@ impl SExp {
             SExp::BExp(o, v) => {
                 let rec_s = v
                     .iter()
-                    .map(|sexp| Box::new(sexp.borrow().to_string(timer.clone())))
+                    .map(|sexp| Box::new(sexp.borrow().to_string_t(timer.clone())))
                     .map(|bs| *bs)
                     .collect::<Option<Vec<String>>>()?
                     .join(" ");
-                format!("({} {})", o.borrow().to_string(), rec_s)
+                format!("({} {})", o.borrow().to_string_t(), rec_s)
             }
             SExp::QForAll(v, s) => {
                 let vbss = v
@@ -315,8 +374,8 @@ impl SExp {
                     .map(|(va, vl)| {
                         Some(format!(
                             "({} {})",
-                            va.borrow().to_string(),
-                            vl.borrow().to_string(timer.clone())?
+                            va.borrow().to_string_t(),
+                            vl.borrow().to_string_t(timer.clone())?
                         ))
                     })
                     .collect::<Option<Vec<String>>>()?
@@ -324,23 +383,68 @@ impl SExp {
                 format!(
                     "(forall ({}) {})",
                     vbss,
-                    s.borrow().to_string(timer.clone())?
+                    s.borrow().to_string_t(timer.clone())?
                 )
             }
         })
     }
 }
 
+impl fmt::Display for SExp {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        match self {
+            SExp::Constant(c) => write!(f, "{}", c.borrow()),
+            SExp::Symbol(s) => write!(f, "{}", s.borrow()),
+            SExp::Let(vbs, s) => {
+                write!(f, "(let (")?;
+                vbs.iter()
+                    .map(|(v, s)| write!(f, "({} {})", v.borrow(), s.borrow()))
+                    .fold(Ok(()), acc_result)?;
+                write!(f, " {})", s.borrow())
+            }
+            SExp::Compound(v) => {
+                write!(f, "(")?;
+                v.iter()
+                    .map(|sexp| write!(f, " {} ", sexp.borrow()))
+                    .fold(Ok(()), acc_result)?;
+                write!(f, ")")
+            }
+            SExp::BExp(o, v) => {
+                write!(f, "({} ", o.borrow())?;
+                v.iter()
+                    .map(|sexp| write!(f, " {} ", sexp.borrow()))
+                    .fold(Ok(()), acc_result)?;
+                write!(f, ")")
+            }
+            SExp::QForAll(v, s) => {
+                write!(f, "(forall (")?;
+                v.iter()
+                    .map(|(va, vl)| write!(f, "({} {})", va.borrow(), vl.borrow()))
+                    .fold(Ok(()), acc_result)?;
+                write!(f, ") {})", s.borrow())
+            }
+        }
+    }
+}
+
 impl Symbol {
-    pub fn to_string(&self) -> String {
+    pub fn to_string_t(&self) -> String {
         match self {
             Symbol::Var(s) | Symbol::Token(s) => s.clone(),
         }
     }
 }
 
+impl fmt::Display for Symbol {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        match self {
+            Symbol::Var(s) | Symbol::Token(s) => write!(f, "{}", s),
+        }
+    }
+}
+
 impl BoolOp {
-    pub fn to_string(&self) -> String {
+    pub fn to_string_t(&self) -> String {
         match self {
             BoolOp::And() => "and".to_owned(),
             BoolOp::Or() => "or".to_owned(),
@@ -356,11 +460,37 @@ impl BoolOp {
     }
 }
 
+impl fmt::Display for BoolOp {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        match self {
+            BoolOp::And() => write!(f, "and"),
+            BoolOp::Or() => write!(f, "or"),
+            BoolOp::Xor() => write!(f, "xor"),
+            BoolOp::Implies() => write!(f, "=>"),
+            BoolOp::Distinct() => write!(f, "distinct"),
+            BoolOp::Equals() => write!(f, "="),
+            BoolOp::Gt() => write!(f, ">"),
+            BoolOp::Lt() => write!(f, "<"),
+            BoolOp::Gte() => write!(f, ">="),
+            BoolOp::Lte() => write!(f, "<="),
+        }
+    }
+}
+
 impl Logic {
-    pub fn to_string(&self) -> String {
+    pub fn to_string_t(&self) -> String {
         match self {
             Logic::QF_SLIA() => "QF_SLIA".to_owned(),
             Logic::Other(s) => s.clone(),
+        }
+    }
+}
+
+impl fmt::Display for Logic {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        match self {
+            Logic::QF_SLIA() => write!(f, "QF_SLIA"),
+            Logic::Other(s) => write!(f, "{}", s),
         }
     }
 }
@@ -371,6 +501,12 @@ mod tests {
     use crate::parser::*;
     use insta::assert_debug_snapshot;
     use walkdir::WalkDir;
+
+    #[test]
+    fn sort_display_snap() {
+        let sort = Sort::Compound(vec![rccell!(Sort::UInt()), rccell!(Sort::Bool())]);
+        assert_debug_snapshot!(format!("{}", sort));
+    }
 
     #[test]
     fn let_to_string_snap() {

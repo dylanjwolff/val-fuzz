@@ -1,0 +1,5 @@
+---
+source: cswap/src/transforms.rs
+expression: "get_bav_assign_fmt_str(&vec![\"BAV1\" . to_owned (), \"BAV2\" . to_owned\n                             ()]).to_string()"
+---
+"(assert (and  (=  BAV1  {} )  (=  BAV2  {} ) ))"
