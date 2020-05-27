@@ -468,22 +468,14 @@ fn serialize_to_f(
 fn deserialize_from_f(
     (script_file, md_file): &(PathBuf, PathBuf),
 ) -> Result<(Script, Metadata), String> {
-    let script_contents =
-        fs::read_to_string(&script_file).map_err(|e| e.to_string() + " from IO")?;
-    let presult = script(&script_contents).map_err(|e| e.to_string() + " from parsing")?;
+    let script = parser::script_from_f_unsanitized(script_file)?;
 
-    if presult.0 != "" {
-        Err("Incomplete Parse!".to_owned())
-    } else {
-        let script = presult.1;
+    let md_contents =
+        fs::read_to_string(&md_file).map_err(|e| e.to_string() + " from metadata IO")?;
+    let (md, _): (Metadata, PathBuf) =
+        serde_lexpr::from_str(&md_contents).map_err(|e| e.to_string() + " from serde")?;
 
-        let md_contents =
-            fs::read_to_string(&md_file).map_err(|e| e.to_string() + " from metadata IO")?;
-        let (md, _): (Metadata, PathBuf) =
-            serde_lexpr::from_str(&md_contents).map_err(|e| e.to_string() + " from serde")?;
-
-        Ok((script, md))
-    }
+    Ok((script, md))
 }
 
 fn script_f_from_metadata_f(md_file: &PathBuf) -> Result<PathBuf, String> {
@@ -628,9 +620,7 @@ impl RandUniqPermGen {
 }
 
 pub fn strip_and_transform(source_file: &Path) -> Option<(Script, Metadata)> {
-    let contents: String = fs::read_to_string(source_file).ok()?;
-    let stripped_contents = &rmv_comments(&contents[..]).ok()?.1.join(" ")[..];
-    let mut script = script(&stripped_contents[..]).ok()?.1;
+    let mut script = parser::script_from_f(source_file).ok()?;
     // TODO error handling here on prev 3 lines
     println!("Done parsing");
 
@@ -752,16 +742,6 @@ mod tests {
         child.join().unwrap();
     }
 
-    fn parse_file(f: &str) -> Script {
-        let contents = &fs::read_to_string(f).expect("error reading file")[..];
-        let contents_sans_comments = &rmv_comments(contents)
-            .expect("failed to rmv comments")
-            .1
-            .join(" ")[..];
-
-        script(contents_sans_comments).expect("parser error").1
-    }
-
     fn parse_unparse() {
         let files = fs::read_dir("samples").expect("error with sample dir");
 
@@ -769,13 +749,8 @@ mod tests {
             let file = file_res.expect("problem with file");
             println!("Starting {:?}", file);
             let filepath = file.path();
-            let contents = &fs::read_to_string(filepath).expect("error reading file")[..];
-            let contents_sans_comments = &rmv_comments(contents)
-                .expect("failed to rmv comments")
-                .1
-                .join(" ")[..];
 
-            let p = script(contents_sans_comments).expect("parser error").1;
+            let p = parser::script_from_f(&filepath).expect("parser error");
 
             let up = p.to_string();
 
@@ -854,9 +829,7 @@ mod tests {
                 continue;
             }
 
-            let contents: String = fs::read_to_string(&filepath).unwrap();
-            let stripped_contents = &rmv_comments(&contents[..]).unwrap().1.join(" ")[..];
-            let script = script(&stripped_contents[..]).unwrap().1;
+            let script = parser::script_from_f(&filepath).unwrap();
 
             let new_file =
                 "temp_".to_owned() + filepath.as_path().file_name().unwrap().to_str().unwrap();

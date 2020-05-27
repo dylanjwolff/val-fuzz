@@ -21,6 +21,8 @@ use nom::sequence::delimited;
 use nom::sequence::preceded;
 use nom::sequence::terminated;
 use nom::{bytes::complete::tag, combinator::map, sequence::tuple, IResult};
+use std::fs;
+use std::path::Path;
 
 macro_rules! ws {
     ($x:expr) => {
@@ -374,6 +376,30 @@ fn av(s: &str) -> IResult<&str, &str> {
 
 fn generic(s: &str) -> IResult<&str, &str> {
     terminated(not_line_ending, line_ending)(s)
+}
+
+pub fn script_from_f_unsanitized(filepath: &Path) -> Result<Script, String> {
+    let contents: String = fs::read_to_string(&filepath).map_err(|e| e.to_string())?;
+    let presult = script(&contents[..]).map_err(|e| e.to_string())?;
+    if presult.0 != "" {
+        Err("Incomplete Parse!".to_owned())
+    } else {
+        Ok(presult.1)
+    }
+}
+
+pub fn script_from_f(filepath: &Path) -> Result<Script, String> {
+    let contents: String = fs::read_to_string(&filepath).map_err(|e| e.to_string())?;
+    let stripped_contents = &rmv_comments(&contents[..])
+        .map_err(|e| e.to_string())?
+        .1
+        .join(" ")[..];
+    let presult = script(&stripped_contents[..]).map_err(|e| e.to_string())?;
+    if presult.0 != "" {
+        Err("Incomplete Parse!".to_owned())
+    } else {
+        Ok(presult.1)
+    }
 }
 
 #[cfg(test)]

@@ -1,6 +1,8 @@
 use crate::Timer;
 use std::cell::RefCell;
 use std::fmt;
+use std::fs;
+use std::path::Path;
 use std::rc::Rc;
 use std::time::Duration;
 #[macro_use]
@@ -113,6 +115,10 @@ pub enum AstNode {
 }
 
 impl Script {
+    pub fn to_f(&mut self, filepath: &Path) {
+        fs::write(filepath, self.to_string());
+    }
+
     pub fn insert(&mut self, i: usize, cmd: Command) {
         let Script::Commands(cmds) = self;
         if i > cmds.len() {
