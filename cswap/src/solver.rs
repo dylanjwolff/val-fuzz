@@ -481,9 +481,7 @@ pub fn check_valid_solve(filename: &str) -> Vec<RSolve> {
 }
 
 pub fn check_valid_solve_as_temp(script: &Script) -> Result<Vec<RSolve>, String> {
-    let s = script
-        .to_string_dfltto()
-        .ok_or("File Print Timeout".to_owned())?;
+    let s = script.to_string();
     let mut tfile = Builder::new()
         .suffix(".smt2")
         .tempfile()

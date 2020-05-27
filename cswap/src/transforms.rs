@@ -681,7 +681,7 @@ mod tests {
 
         rcholes(&mut p, choles, &mut md, is_valid);
 
-        assert_debug_snapshot!(p.to_string_dfltto());
+        assert_debug_snapshot!(p.to_string());
     }
 
     #[test]
@@ -689,7 +689,7 @@ mod tests {
         let str_script = "(declare-const x Int)(assert (= x 4))(check-sat)(get-model)";
         let mut p = script(str_script).unwrap().1;
         add_get_model(&mut p);
-        assert_debug_snapshot!(p.to_string_dfltto().unwrap());
+        assert_debug_snapshot!(p.to_string());
     }
 
     #[test]
@@ -697,7 +697,7 @@ mod tests {
         let str_script = "(declare-const x Int)(assert (= x 4))(check-sat)";
         let mut p = script(str_script).unwrap().1;
         add_get_model(&mut p);
-        assert_debug_snapshot!(p.to_string_dfltto().unwrap());
+        assert_debug_snapshot!(p.to_string());
     }
 
     #[test]
@@ -729,7 +729,7 @@ mod tests {
         let str_script = "(declare-const x Int)(assert (forall ((x Real)) (= x 4)))";
         let mut p = script(str_script).unwrap().1;
         rv(&mut p, &vec![("x".to_owned(), sexp("7").unwrap().1)]);
-        assert_debug_snapshot!(p.to_string_dfltto().unwrap());
+        assert_debug_snapshot!(p.to_string());
     }
 
     #[test]

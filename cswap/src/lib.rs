@@ -401,7 +401,7 @@ fn add_iterations_to_q(
     let eip = end_insert_pt(&script);
     script.init(eip);
     script.replace(eip, get_bav_assign_fmt_str(&md.bavns));
-    let script_str = script.to_string_dfltto()?;
+    let script_str = script.to_string();
 
     let num_bavs = md.bavns.len();
     const MAX_ITER: u32 = 0;
@@ -458,7 +458,7 @@ fn serialize_to_f(
     let script_file = Path::new(&script_name);
 
     let md_serial = serde_lexpr::to_string(&(&md, &script_name)).map_err(|e| format!("{:?}", e))?;
-    let script_serial = script.to_string_dfltto().ok_or("Timeout on to_string()")?;
+    let script_serial = script.to_string();
 
     fs::write(md_file, md_serial).map_err(|e| format!("{:?}", e))?;
     fs::write(script_file, script_serial).map_err(|e| format!("{:?}", e))?;
@@ -777,10 +777,7 @@ mod tests {
 
             let p = script(contents_sans_comments).expect("parser error").1;
 
-            let up = match p.to_string_dfltto() {
-                Some(contents) => contents,
-                None => continue,
-            };
+            let up = p.to_string();
 
             let pup = script(&up[..]).expect("reparse error").1;
             assert_eq!(p, pup);
@@ -864,7 +861,7 @@ mod tests {
             let new_file =
                 "temp_".to_owned() + filepath.as_path().file_name().unwrap().to_str().unwrap();
 
-            fs::write(&new_file, script.to_string_dfltto().unwrap()).unwrap();
+            fs::write(&new_file, script.to_string()).unwrap();
             let new_results = check_valid_solve(filepath.as_path().to_str().unwrap());
 
             if new_results.iter().all(|r| r.has_unrecoverable_error()) {
