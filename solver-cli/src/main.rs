@@ -5,6 +5,8 @@ extern crate cswap;
 use clap::App;
 use clap::Arg;
 use clap::ArgMatches;
+use cswap::parser::rmv_comments;
+use cswap::parser::script;
 use cswap::solver::solve;
 use cswap::solver::solve_cvc4;
 use cswap::solver::solve_z3;
@@ -20,6 +22,7 @@ use std::path::Path;
 const INFILE: &'static str = "File to Solve";
 const CREDUCE_SCRIPT: &'static str = "creduce-script";
 const PROFILES: &'static str = "profiles";
+const FORMAT: &'static str = "format";
 
 fn main() {
     let ecode = {
@@ -48,10 +51,20 @@ fn main() {
                     .help("Set the solver profiles to use")
                     .takes_value(true),
             )
+            .arg(
+                Arg::with_name(FORMAT)
+                    .short("f")
+                    .help("Format the SMTLIB2 file to stdout. Removes all comments"),
+            )
             .get_matches();
         let log_level = matches.occurrences_of("verbosity");
         let maybe_cr_script = matches.value_of(CREDUCE_SCRIPT);
         let infile_name = matches.value_of(INFILE).unwrap();
+
+        match matches.is_present(FORMAT) {
+            true => format(Path::new(infile_name)),
+            _ => (),
+        };
 
         let results = match matches.value_of(PROFILES) {
             Some(pstr) => profiles_solve(infile_name, &parse_profiles(pstr)),
@@ -149,4 +162,11 @@ pub fn profiles_solve(filename: &str, pis: &HashSet<ProfileIndex>) -> Vec<RSolve
         .map(|profile| solve_z3(profile, &filepath));
 
     mr_cvc4.chain(mr_z3).collect()
+}
+
+fn format(file: &Path) {
+    let contents: String = fs::read_to_string(file).unwrap();
+    let stripped_contents = &rmv_comments(&contents[..]).unwrap().1.join(" ")[..];
+    let script = script(&stripped_contents[..]).unwrap().1;
+    println!("{}", script);
 }
