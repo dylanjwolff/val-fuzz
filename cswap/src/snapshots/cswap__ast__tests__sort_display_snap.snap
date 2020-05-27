@@ -2,4 +2,4 @@
 source: cswap/src/ast.rs
 expression: "format!(\"{}\", sort)"
 ---
-"( Int  Bool )"
+"(Int Bool)"

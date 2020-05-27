@@ -237,7 +237,11 @@ impl fmt::Display for Sort {
             Sort::Compound(v) => {
                 write!(f, "(")?;
                 v.iter()
-                    .map(|sort| write!(f, " {} ", sort.borrow()))
+                    .enumerate()
+                    .map(|(i, sort)| match i == 0 {
+                        true => write!(f, "{}", sort.borrow()),
+                        false => write!(f, " {}", sort.borrow()),
+                    })
                     .fold(Ok(()), acc_result)?;
                 write!(f, ")")
             }
@@ -270,14 +274,22 @@ impl fmt::Display for SExp {
             SExp::Compound(v) => {
                 write!(f, "(")?;
                 v.iter()
-                    .map(|sexp| write!(f, " {} ", sexp.borrow()))
+                    .enumerate()
+                    .map(|(i, sexp)| match i == 0 {
+                        true => write!(f, "{}", sexp.borrow()),
+                        false => write!(f, " {}", sexp.borrow()),
+                    })
                     .fold(Ok(()), acc_result)?;
                 write!(f, ")")
             }
             SExp::BExp(o, v) => {
                 write!(f, "({} ", o.borrow())?;
                 v.iter()
-                    .map(|sexp| write!(f, " {} ", sexp.borrow()))
+                    .enumerate()
+                    .map(|(i, sexp)| match i == 0 {
+                        true => write!(f, "{}", sexp.borrow()),
+                        false => write!(f, " {}", sexp.borrow()),
+                    })
                     .fold(Ok(()), acc_result)?;
                 write!(f, ")")
             }

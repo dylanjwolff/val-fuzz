@@ -2,4 +2,4 @@
 source: cswap/src/ast.rs
 expression: "script(\"(assert (let ((max (seq.nth A m))(n   (seq.len A))) (ite (or true false))))\").unwrap().1.to_string()"
 ---
-"(assert (let ((max ( seq.nth  A  m ))(n ( seq.len  A )) ( ite  (or  true  false ) )))\n"
+"(assert (let ((max (seq.nth A m))(n (seq.len A)) (ite (or true false))))\n"

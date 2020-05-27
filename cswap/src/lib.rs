@@ -25,6 +25,8 @@ use crossbeam::queue::SegQueue;
 use crossbeam::utils::Backoff;
 use nom::branch::alt;
 use nom::bytes::complete::take_until;
+use nom::error::ErrorKind;
+use nom::error_position;
 use nom::multi::many1;
 
 use crate::ast::SExp;
@@ -252,8 +254,6 @@ fn launch(qs: (InputPPQ, SkeletonQueue), worker_counts: (u8, u8, u8)) {
 }
 
 pub fn from_skels(dirname: &str, worker_counts: (u8, u8)) {
-    let stage1 = Arc::new(StageComplete::finished());
-
     let q2 = SegQueue::new();
     for entry in WalkDir::new(dirname)
         .into_iter()
@@ -303,7 +303,7 @@ pub fn exec(dirname: &str, worker_counts: (u8, u8, u8)) {
     let q2 = SegQueue::new();
     let aq2 = Arc::new(q2);
 
-    launch((aq, aq2), (2, 2, 2));
+    launch((aq, aq2), worker_counts);
 }
 
 fn mutator_worker(qin: InputPPQ, qout: SkeletonQueue, stage: StageCompleteA) {
@@ -532,8 +532,7 @@ fn solver_worker(qin: BavAssingedQ, prev_stage: StageCompleteA) {
     }
 }
 
-pub fn resub_model(result: &RSolve, filepaths: &(PathBuf, PathBuf), q: &BavAssingedQ) {
-    let mut backoff = MyBackoff::new();
+pub fn resub_model(result: &RSolve, filepaths: &(PathBuf, PathBuf), _q: &BavAssingedQ) {
     let (mut script, md) = match deserialize_from_f(&filepaths) {
         Ok(deserial) => deserial,
         Err(e) => {
@@ -652,8 +651,7 @@ fn get_iter_fileout_name(source_file: &Path, iter: u32) -> String {
     };
     (iter).to_string() + "_" + source_filename
 }
-use nom::error::ErrorKind;
-use nom::error_position;
+
 fn dynamic_format_parser<'a, 'b>(
     (s, vs): (&'a str, Vec<&'a str>),
 ) -> IResult<(&'a str, Vec<&'a str>), Vec<&'a str>> {
@@ -693,7 +691,9 @@ fn eof_str<'a>(s: &'a str) -> IResult<&'a str, &'a str> {
         Err(nom::Err::Error(error_position!(s, ErrorKind::Eof)))
     }
 }
+
 type DFormatParseError<'a> = nom::Err<((&'a str, std::vec::Vec<&'a str>), nom::error::ErrorKind)>;
+
 fn dyn_fmt<'a>(s: &'a str, mut vs: Vec<&'a str>) -> Result<String, DFormatParseError<'a>> {
     vs.reverse();
     let (_rem, ss) = dynamic_format_parser((s, vs))?;

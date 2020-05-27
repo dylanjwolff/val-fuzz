@@ -1,5 +1,5 @@
 ---
 source: cswap/src/transforms.rs
-expression: p.to_string_dfltto().unwrap()
+expression: p.to_string()
 ---
-"(declare-const x Int)\n(assert (=  x  4 ))\n(check-sat)\n(get-model)\n"
+"(declare-const x Int)\n(assert (= x 4))\n(check-sat)\n(get-model)\n"

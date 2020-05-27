@@ -1,5 +1,5 @@
 ---
 source: cswap/src/transforms.rs
-expression: p.to_string_dfltto().unwrap()
+expression: p.to_string()
 ---
-"\n(assert (forall ((x Real)) (=  7  4 )))\n"
+"\n(assert (forall ((x Real)) (= 7 4)))\n"
