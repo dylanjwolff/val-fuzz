@@ -234,18 +234,26 @@ fn rl_c(
 
     match cmd {
         Command::Assert(s) | Command::CheckSatAssuming(s) => {
-            rl_s(&mut *s.borrow_mut(), scoped_vars, timer)
+            rl_s(&mut *s.borrow_mut(), scoped_vars, timer, 0)
         }
         _ => Ok(()),
     }
 }
 
+static RECUR_LIMIT: u8 = 10;
 fn rl_s(
     sexp: &mut SExp,
     scoped_vars: &mut BTreeMap<String, Vec<SExp>>,
     timer: &Timer,
+    mut recur_count: u8,
 ) -> Result<(), ()> {
     if timer.is_done() {
+        return Err(());
+    }
+
+    println!("RECURSION CT: {}", recur_count);
+    recur_count = recur_count + 1;
+    if recur_count > RECUR_LIMIT {
         return Err(());
     }
 
@@ -260,7 +268,7 @@ fn rl_s(
 
             let mut new_vars: Vec<(&SymbolRc, &SExpRc)> = vec![];
             for (var, val) in v {
-                rl_s(&mut *val.borrow_mut(), scoped_vars, timer)?; // first make sure the val is "let-free"
+                rl_s(&mut *val.borrow_mut(), scoped_vars, timer, recur_count)?; // first make sure the val is "let-free"
                 new_vars.push((var, val)); // make note of the mapping to add to the rest
             }
 
@@ -276,7 +284,7 @@ fn rl_s(
             }
 
             // Recurse on the rest of the SExp
-            rl_s(&mut *rest.borrow_mut(), scoped_vars, timer)?;
+            rl_s(&mut *rest.borrow_mut(), scoped_vars, timer, recur_count)?;
 
             // Pop our variables off of the stack
             for (var, _) in new_vars {
@@ -306,11 +314,11 @@ fn rl_s(
 
         SExp::Compound(v) | SExp::BExp(_, v) => {
             for e in v {
-                rl_s(&mut *e.borrow_mut(), scoped_vars, timer)?
+                rl_s(&mut *e.borrow_mut(), scoped_vars, timer, recur_count)?
             }
             Ok(())
         }
-        SExp::QForAll(_, s) => rl_s(&mut s.borrow_mut(), scoped_vars, timer),
+        SExp::QForAll(_, s) => rl_s(&mut s.borrow_mut(), scoped_vars, timer, recur_count),
         SExp::Constant(_) => Ok(()),
     }
 }
@@ -775,7 +783,7 @@ mod tests {
             rccell!(Box::new(SExp::Symbol(rccell!(v)))),
         );
         let timer = Timer::new();
-        rl_s(&mut sexp, &mut BTreeMap::new(), &timer);
+        rl_s(&mut sexp, &mut BTreeMap::new(), &timer, 0);
         assert_eq!(sexp, expected);
     }
 }
