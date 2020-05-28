@@ -251,7 +251,6 @@ fn rl_s(
         return Err(());
     }
 
-    println!("RECURSION CT: {}", recur_count);
     recur_count = recur_count + 1;
     if recur_count > RECUR_LIMIT {
         return Err(());

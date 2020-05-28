@@ -8,6 +8,7 @@ use clap::Arg;
 use clap::ArgMatches;
 use cswap::exec;
 use cswap::from_skels;
+use cswap::FileProvider;
 
 const DIR: &'static str = "Seed/Skeleton Directory";
 const FROM_SKELS: &'static str = "from-skels";
@@ -41,9 +42,10 @@ fn main() {
     };
     println!("Starting with workers {:?}", workers);
 
+    let fp = FileProvider::new("cswap-fuzz-run-out");
     match matches.is_present(FROM_SKELS) {
-        true => from_skels(dir_name, (workers.1, workers.2)),
-        false => exec(dir_name, workers),
+        true => from_skels(dir_name, (workers.1, workers.2), fp),
+        false => exec(dir_name, workers, fp),
     }
 }
 

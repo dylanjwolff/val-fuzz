@@ -28,6 +28,7 @@ use nom::bytes::complete::take_until;
 use nom::error::ErrorKind;
 use nom::error_position;
 use nom::multi::many1;
+use std::io;
 
 use crate::ast::SExp;
 use crate::ast::Symbol;
@@ -53,11 +54,174 @@ use transforms::{end_insert_pt, get_bav_assign_fmt_str, to_skel};
 use walkdir::WalkDir;
 #[macro_use]
 use serde::{Serialize, Deserialize};
+use tempfile::tempfile;
+use tempfile::Builder;
+use tempfile::NamedTempFile;
 
 type InputPPQ = Arc<SegQueue<Result<PathBuf, PoisonPill>>>;
 type SkeletonQueue = Arc<SegQueue<(PathBuf, PathBuf)>>;
 type BavAssingedQ = Arc<ArrayQueue<(PathBuf, PathBuf)>>;
 type StageCompleteA = Arc<StageComplete>;
+
+#[derive(Debug, Eq, PartialEq, Clone)]
+pub struct FileProvider {
+    basedir: PathBuf,
+    skeldir: PathBuf,
+    mddir: PathBuf,
+    scratchdir: PathBuf,
+    bugdir: PathBuf,
+}
+
+impl FileProvider {
+    pub fn new(dirname: &str) -> FileProvider {
+        let dirpath = Path::new(dirname).to_path_buf();
+        let skeldir = Self::get_subdir(&dirpath, "skel");
+        let mddir = Self::get_subdir(&dirpath, "md");
+        let scratchdir = Self::get_subdir(&dirpath, "scratch");
+        let bugdir = Self::get_subdir(&dirpath, "bugs");
+        fs::create_dir(&dirpath).unwrap();
+        fs::create_dir(&skeldir).unwrap();
+        fs::create_dir(&mddir).unwrap();
+        fs::create_dir(&scratchdir).unwrap();
+        fs::create_dir(&bugdir).unwrap();
+        FileProvider {
+            basedir: dirpath,
+            skeldir: skeldir,
+            mddir: mddir,
+            scratchdir: scratchdir,
+            bugdir: bugdir,
+        }
+    }
+
+    fn skelfile<'a>(&self, md: &'a mut Metadata) -> io::Result<&'a Path> {
+        let tfile = Builder::new()
+            .prefix("skel_")
+            .rand_bytes(0)
+            .suffix(
+                md.seed_file
+                    .file_name()
+                    .and_then(|n| n.to_str())
+                    .unwrap_or("default_name"),
+            )
+            .tempfile_in(&self.skeldir)?;
+        //  tfile.keep();
+        md.skeleton_file = tfile.path().to_path_buf();
+        Ok(&md.skeleton_file)
+    }
+
+    fn mdfile<'a>(&self, md: &'a mut Metadata) -> io::Result<&'a Path> {
+        let tfile = Builder::new()
+            .prefix("md_")
+            .rand_bytes(0)
+            .suffix(
+                md.seed_file
+                    .file_stem()
+                    .and_then(|n| n.to_str())
+                    .unwrap_or("default_name"),
+            )
+            .tempfile_in(&self.mddir)?;
+        //  tfile.keep();
+        md.metadata_file = tfile.path().to_path_buf();
+        Ok(&md.skeleton_file)
+    }
+
+    fn iterfile(&self, md: &Metadata) -> io::Result<PathBuf> {
+        let tfile = Builder::new()
+            .prefix("iter_")
+            .rand_bytes(10)
+            .suffix(
+                md.seed_file
+                    .file_name()
+                    .and_then(|n| n.to_str())
+                    .unwrap_or("default_name"),
+            )
+            .tempfile_in(&self.bugdir)?;
+        //  tfile.keep();
+        Ok(tfile.path().to_path_buf())
+    }
+
+    fn resubfile(&self, md: &Metadata) -> io::Result<PathBuf> {
+        let tfile = Builder::new()
+            .prefix("resub_")
+            .rand_bytes(10)
+            .suffix(
+                md.seed_file
+                    .file_name()
+                    .and_then(|n| n.to_str())
+                    .unwrap_or("default_name"),
+            )
+            .tempfile_in(&self.bugdir)?;
+        //  tfile.keep();
+        Ok(tfile.path().to_path_buf())
+    }
+
+    fn bug_report(&self, buggy_file: &Path, report: &str) {
+        let r = Builder::new()
+            .prefix("bug_report_")
+            .rand_bytes(0)
+            .suffix(
+                buggy_file
+                    .file_stem()
+                    .and_then(|n| n.to_str())
+                    .unwrap_or("default_name"),
+            )
+            .tempfile_in(&self.bugdir)
+            .and_then(|tf| fs::write(tf.path(), report));
+        match r {
+            Err(e) => println!("Error writing bug report for {:?}: {}", buggy_file, e),
+            _ => (),
+        }
+    }
+
+    fn cleanup_all(&self) {
+        match fs::remove_dir_all(&self.basedir) {
+            Err(e) => match e.kind() {
+                std::io::ErrorKind::NotFound => (),
+                _ => panic!(e),
+            },
+            _ => (),
+        }
+    }
+
+    fn serialize_skel<'a, 'b>(
+        &self,
+        script: &'a Script,
+        md: &'b mut Metadata,
+    ) -> Result<&'b Path, io::Error> {
+        self.skelfile(md)
+            .and_then(|f| fs::write(f, script.to_string()));
+        Ok(&md.skeleton_file)
+    }
+
+    fn serialize_md<'a>(&self, md: &'a mut Metadata) -> Result<&'a Path, io::Error> {
+        self.mdfile(md)?;
+        let mdstr = serde_lexpr::to_string(&md)?;
+        fs::write(&md.metadata_file, mdstr)?;
+        Ok(&md.metadata_file)
+    }
+
+    fn serialize_skel_and_md<'a, 'b>(
+        &self,
+        script: &'a Script,
+        md: &'b mut Metadata,
+    ) -> Result<(&'b Path, &'b Path), io::Error> {
+        self.serialize_skel(script, md)?;
+        self.serialize_md(md)?;
+        Ok((&md.skeleton_file, &md.metadata_file))
+    }
+
+    fn serialize_resub(&self, script: &Script, md: &Metadata) -> Result<PathBuf, io::Error> {
+        let f = self.resubfile(md)?;
+        fs::write(&f, script.to_string())?;
+        Ok(f)
+    }
+
+    fn get_subdir(base: &Path, subname: &str) -> PathBuf {
+        let mut skeldir = base.to_path_buf();
+        skeldir.push(subname);
+        skeldir
+    }
+}
 
 struct MyBackoff {
     current_wait: Duration,
@@ -104,6 +268,15 @@ impl Metadata {
             bavns: vec![],
             constvns: vec![],
             seed_file: Path::new("").to_path_buf(),
+            skeleton_file: Path::new("").to_path_buf(),
+            metadata_file: Path::new("").to_path_buf(),
+        }
+    }
+    pub fn new(seed: &Path) -> Self {
+        Metadata {
+            bavns: vec![],
+            constvns: vec![],
+            seed_file: seed.to_path_buf(),
             skeleton_file: Path::new("").to_path_buf(),
             metadata_file: Path::new("").to_path_buf(),
         }
@@ -180,7 +353,7 @@ impl StageComplete {
     }
 }
 
-fn launch(qs: (InputPPQ, SkeletonQueue), worker_counts: (u8, u8, u8)) {
+fn launch(qs: (InputPPQ, SkeletonQueue), worker_counts: (u8, u8, u8), fp: FileProvider) {
     const STACK_SIZE: usize = 500 * 1024 * 1024; // 100mb
     let baq = ArrayQueue::new(100);
     let a_baq = Arc::new(baq);
@@ -196,10 +369,11 @@ fn launch(qs: (InputPPQ, SkeletonQueue), worker_counts: (u8, u8, u8)) {
             let t_q = Arc::clone(&qs.0);
             let t_q2 = Arc::clone(&qs.1);
             let t_s1 = Arc::clone(&stage0);
+            let t_fp = fp.clone();
 
             thread::Builder::new()
                 .stack_size(STACK_SIZE)
-                .spawn(|| mutator_worker(t_q, t_q2, t_s1))
+                .spawn(move || mutator_worker(t_q, t_q2, t_s1, t_fp))
         })
         .collect::<Vec<std::io::Result<JoinHandle<()>>>>();
 
@@ -209,10 +383,11 @@ fn launch(qs: (InputPPQ, SkeletonQueue), worker_counts: (u8, u8, u8)) {
             let t_baq = Arc::clone(&a_baq);
             let t_s1 = Arc::clone(&stage0);
             let t_s2 = Arc::clone(&stage1);
+            let t_fp = fp.clone();
 
             thread::Builder::new()
                 .stack_size(STACK_SIZE)
-                .spawn(|| bav_assign_worker(t_q2, t_s1, t_baq, t_s2))
+                .spawn(move || bav_assign_worker(t_q2, t_s1, t_baq, t_s2, t_fp))
         })
         .collect::<Vec<std::io::Result<JoinHandle<()>>>>();
 
@@ -220,10 +395,11 @@ fn launch(qs: (InputPPQ, SkeletonQueue), worker_counts: (u8, u8, u8)) {
         .map(|_| {
             let t_baq = Arc::clone(&a_baq);
             let t_s2 = Arc::clone(&stage1);
+            let t_fp = fp.clone();
 
             thread::Builder::new()
                 .stack_size(STACK_SIZE)
-                .spawn(|| solver_worker(t_baq, t_s2))
+                .spawn(move || solver_worker(t_baq, t_s2, t_fp))
         })
         .collect::<Vec<std::io::Result<JoinHandle<()>>>>();
 
@@ -253,7 +429,7 @@ fn launch(qs: (InputPPQ, SkeletonQueue), worker_counts: (u8, u8, u8)) {
     );
 }
 
-pub fn from_skels(dirname: &str, worker_counts: (u8, u8)) {
+pub fn from_skels(dirname: &str, worker_counts: (u8, u8), fp: FileProvider) {
     let q2 = SegQueue::new();
     for entry in WalkDir::new(dirname)
         .into_iter()
@@ -282,10 +458,10 @@ pub fn from_skels(dirname: &str, worker_counts: (u8, u8)) {
     let q = SegQueue::new();
     let aq = Arc::new(q);
     let aq2 = Arc::new(q2);
-    launch((aq, aq2), (0, worker_counts.0, worker_counts.1));
+    launch((aq, aq2), (0, worker_counts.0, worker_counts.1), fp);
 }
 
-pub fn exec(dirname: &str, worker_counts: (u8, u8, u8)) {
+pub fn exec(dirname: &str, worker_counts: (u8, u8, u8), fp: FileProvider) {
     let q = SegQueue::new();
     for entry in WalkDir::new(dirname)
         .into_iter()
@@ -303,10 +479,15 @@ pub fn exec(dirname: &str, worker_counts: (u8, u8, u8)) {
     let q2 = SegQueue::new();
     let aq2 = Arc::new(q2);
 
-    launch((aq, aq2), worker_counts);
+    launch((aq, aq2), worker_counts, fp);
 }
 
-fn mutator_worker(qin: InputPPQ, qout: SkeletonQueue, stage: StageCompleteA) {
+fn mutator_worker(
+    qin: InputPPQ,
+    qout: SkeletonQueue,
+    stage: StageCompleteA,
+    file_provider: FileProvider,
+) {
     let mut backoff = MyBackoff::new();
     let mut stage_finished = false;
     while !stage_finished {
@@ -326,17 +507,11 @@ fn mutator_worker(qin: InputPPQ, qout: SkeletonQueue, stage: StageCompleteA) {
         println!("Begin file {:?}", filepath);
         backoff.reset();
         match strip_and_transform(&filepath) {
-            Some((script, md)) => {
-                let skel_name = get_new_name(&filepath, "skel");
-
-                let skel_file = Path::new(&skel_name).to_path_buf();
-                match serialize_to_f(&skel_file.as_path(), &script, &md) {
-                    Ok(to_push) => qout.push(to_push),
-                    Err(e) => {
-                        println!("Error serializing skel {}", e);
-                        continue;
-                    }
-                }
+            Some((script, mut md)) => {
+                match file_provider.serialize_skel_and_md(&script, &mut md) {
+                    Ok(_) => qout.push((md.skeleton_file, md.metadata_file)),
+                    Err(e) => println!("Skel/Md Serial Err: {}", e),
+                };
             }
             None => continue,
         }
@@ -351,6 +526,7 @@ fn bav_assign_worker(
     prev_stage: StageCompleteA,
     qout: BavAssingedQ,
     stage: StageCompleteA,
+    file_provider: FileProvider,
 ) {
     let mut backoff = MyBackoff::new();
 
@@ -375,14 +551,14 @@ fn bav_assign_worker(
 
         let results = solve(empty_skel_fstr);
 
-        report_any_bugs(&filepaths.0, &results);
+        report_any_bugs(&filepaths.0, &results, &file_provider);
 
         if results.iter().all(|r| r.has_unrecoverable_error()) {
             println!("All err on file {}", empty_skel_fstr);
             fs::remove_file(filepaths.0).unwrap_or(());
             fs::remove_file(filepaths.1).unwrap_or(());
         } else {
-            add_iterations_to_q(script, md, &filepaths.0, &filepaths.1, Arc::clone(&qout));
+            add_iterations_to_q(script, md, Arc::clone(&qout), &file_provider);
         }
     }
 
@@ -391,10 +567,9 @@ fn bav_assign_worker(
 
 fn add_iterations_to_q(
     mut script: Script,
-    md: Metadata,
-    filepath: &Path,
-    md_fp: &Path,
+    mut md: Metadata,
     qout: BavAssingedQ,
+    file_provider: &FileProvider,
 ) -> Option<()> {
     let mut backoff = MyBackoff::new();
 
@@ -404,16 +579,14 @@ fn add_iterations_to_q(
     let script_str = script.to_string();
 
     let num_bavs = md.bavns.len();
-    const MAX_ITER: u32 = 0;
+    const MAX_ITER: u32 = 1;
     println!("starting max(2^{}, {}) iterations", num_bavs, MAX_ITER);
     let mut urng = RandUniqPermGen::new_definite(num_bavs, MAX_ITER);
     while let Some(truth_values) = urng.sample() {
-        let new_filename = get_iter_fileout_name(filepath, urng.get_count());
-        let new_file = Path::new(&new_filename[..]).to_path_buf();
-
+        let new_file = file_provider.iterfile(&mut md).ok()?;
         let str_with_model = dyn_fmt(&script_str, to_strs(&truth_values)).ok()?;
         fs::write(&new_file, str_with_model).ok()?;
-        let mut to_push = (new_file.to_path_buf(), md_fp.to_path_buf());
+        let mut to_push = (new_file.to_path_buf(), md.metadata_file.clone());
         while let Err(PushError(reject)) = qout.push(to_push) {
             to_push = reject;
             backoff.snooze();
@@ -422,47 +595,20 @@ fn add_iterations_to_q(
     Some(())
 }
 
-fn report_any_bugs(file: &Path, results: &Vec<RSolve>) -> bool {
+fn report_any_bugs(file: &Path, results: &Vec<RSolve>, fp: &FileProvider) -> bool {
     results
         .iter()
         .find(|r| r.has_bug_error())
         .map(|r| {
-            println!("Error bug in {:?} !!! {:?}", file, r);
-            println!("{}", r);
+            fp.bug_report(file, &format!("{}", r));
         })
         .is_some()
         || if !RSolve::differential_test(&results).is_ok() {
-            println!("Soundness bug in {:?} !!!", file);
+            fp.bug_report(file, &format!("{:?}", results));
             true
         } else {
             false
         }
-}
-
-fn get_new_name(source_file: &Path, prefix: &str) -> String {
-    let source_filename = match source_file.file_name().and_then(|n| n.to_str()) {
-        Some(name) => name,
-        None => "unknown",
-    };
-    prefix.to_owned() + "_" + source_filename
-}
-
-fn serialize_to_f(
-    based_off_of: &Path,
-    script: &Script,
-    md: &Metadata,
-) -> Result<(PathBuf, PathBuf), String> {
-    let md_name = get_new_name(based_off_of, "md");
-    let script_name = get_new_name(based_off_of, "script");
-    let md_file = Path::new(&md_name);
-    let script_file = Path::new(&script_name);
-
-    let md_serial = serde_lexpr::to_string(&(&md, &script_name)).map_err(|e| format!("{:?}", e))?;
-    let script_serial = script.to_string();
-
-    fs::write(md_file, md_serial).map_err(|e| format!("{:?}", e))?;
-    fs::write(script_file, script_serial).map_err(|e| format!("{:?}", e))?;
-    Ok((script_file.to_path_buf(), md_file.to_path_buf()))
 }
 
 fn deserialize_from_f(
@@ -472,7 +618,7 @@ fn deserialize_from_f(
 
     let md_contents =
         fs::read_to_string(&md_file).map_err(|e| e.to_string() + " from metadata IO")?;
-    let (md, _): (Metadata, PathBuf) =
+    let md: Metadata =
         serde_lexpr::from_str(&md_contents).map_err(|e| e.to_string() + " from serde")?;
 
     Ok((script, md))
@@ -496,7 +642,7 @@ fn script_f_from_metadata_f(md_file: &PathBuf) -> Result<PathBuf, String> {
 
 pub struct PoisonPill {}
 
-fn solver_worker(qin: BavAssingedQ, prev_stage: StageCompleteA) {
+fn solver_worker(qin: BavAssingedQ, prev_stage: StageCompleteA, file_provider: FileProvider) {
     let mut backoff = MyBackoff::new();
 
     while !prev_stage.is_complete() || qin.len() > 0 {
@@ -514,9 +660,9 @@ fn solver_worker(qin: BavAssingedQ, prev_stage: StageCompleteA) {
         results
             .iter()
             .filter(|r| r.has_sat())
-            .for_each(|r| resub_model(r, &filepaths, &qin));
+            .for_each(|r| resub_model(r, &filepaths, &qin, &file_provider));
 
-        if !report_any_bugs(filepaths.0.as_path(), &results) {
+        if !report_any_bugs(filepaths.0.as_path(), &results, &file_provider) {
             fs::remove_file(&filepaths.0).unwrap_or(());
         }
 
@@ -524,7 +670,12 @@ fn solver_worker(qin: BavAssingedQ, prev_stage: StageCompleteA) {
     }
 }
 
-pub fn resub_model(result: &RSolve, filepaths: &(PathBuf, PathBuf), _q: &BavAssingedQ) {
+fn resub_model(
+    result: &RSolve,
+    filepaths: &(PathBuf, PathBuf),
+    _q: &BavAssingedQ,
+    file_provider: &FileProvider,
+) {
     let (mut script, md) = match deserialize_from_f(&filepaths) {
         Ok(deserial) => deserial,
         Err(e) => {
@@ -532,26 +683,33 @@ pub fn resub_model(result: &RSolve, filepaths: &(PathBuf, PathBuf), _q: &BavAssi
             return;
         }
     };
+
     let mut to_replace: Vec<(String, SExp)> = result
         .extract_const_var_vals(&md.constvns)
         .into_iter()
         .map(|(sym, val)| (sym.to_string(), val.clone()))
         .collect();
+
     if to_replace.len() > 0 {
         rv(&mut script, &mut to_replace);
 
-        let new_name = get_new_name(&filepaths.0, &format!("resub_{}", result.solver.name()));
-        let resubbed_fs = serialize_to_f(Path::new(&new_name), &script, &md).unwrap();
-        println!("RESUB~~~ {:?} ", resubbed_fs);
+        let resubbed_f = match file_provider.serialize_resub(&script, &md) {
+            Ok(f) => f,
+            Err(e) => {
+                println!("Resub file name err {}", e);
+                return;
+            }
+        };
 
-        let results = solve(resubbed_fs.0.to_str().unwrap_or("defaultname"));
+        println!("RESUB~~~ {:?} ", resubbed_f);
 
-        if !report_any_bugs(resubbed_fs.0.as_path(), &results) {
-            fs::remove_file(&resubbed_fs.0).unwrap_or(());
-            fs::remove_file(&resubbed_fs.1).unwrap_or(());
+        let results = solve(resubbed_f.to_str().unwrap_or("defaultname"));
+
+        if !report_any_bugs(&resubbed_f, &results, &file_provider) {
+            fs::remove_file(&resubbed_f).unwrap_or(());
         }
 
-        println!("Done hecking file {:?}", &resubbed_fs.0);
+        println!("Done hecking file {:?}", &resubbed_f);
     }
 }
 
@@ -628,7 +786,7 @@ pub fn strip_and_transform(source_file: &Path) -> Option<(Script, Metadata)> {
         return None;
     }
 
-    let mut md = Metadata::new_empty();
+    let mut md = Metadata::new(source_file);
     to_skel(&mut script, &mut md).ok()?;
     println!("Done skelling");
     return Some((script, md));
