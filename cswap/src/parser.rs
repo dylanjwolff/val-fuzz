@@ -104,6 +104,51 @@ fn symbol(s: &str) -> IResult<&str, &str> {
     take_while1(|c: char| !c.is_whitespace() && !(c == '(') && !(c == ')'))(s)
 }
 
+fn bool_fp_ops(s: &str) -> IResult<&str, BoolOp> {
+    let naked_bop_tags = alt((
+        map(tag("fp.leq"), |_| BoolOp::Fpleq()),
+        map(tag("fp.lt"), |_| BoolOp::Fplt()),
+        map(tag("fp.geq"), |_| BoolOp::Fpgeq()),
+        map(tag("fp.gt"), |_| BoolOp::Fpgt()),
+        map(tag("fp.eq"), |_| BoolOp::Fpeq()),
+        map(tag("fp.isNormal"), |_| BoolOp::Fpnorm()),
+        map(tag("fp.isSubnormal"), |_| BoolOp::Fpsubn()),
+        map(tag("fp.isZero"), |_| BoolOp::Fpzero()),
+        map(tag("fp.isInfinite"), |_| BoolOp::Fpinf()),
+        map(tag("fp.isNaN"), |_| BoolOp::Fpnana()),
+        map(tag("fp.isNegative"), |_| BoolOp::Fpneg()),
+        map(tag("fp.isPositive"), |_| BoolOp::Fppos()),
+    ));
+
+    ws!(naked_bop_tags)(s)
+}
+
+fn bool_str_ops(s: &str) -> IResult<&str, BoolOp> {
+    let naked_bop_tags = alt((
+        map(tag("str.<"), |_| BoolOp::Strlt()),
+        map(tag("str.in_re"), |_| BoolOp::Strre()),
+        map(tag("str.prefixof"), |_| BoolOp::Strpref()),
+        map(tag("str.suffixof"), |_| BoolOp::Strsuff()),
+        map(tag("str.contains"), |_| BoolOp::Strcont()),
+        map(tag("str.is_digit"), |_| BoolOp::Strisdig()),
+    ));
+
+    ws!(naked_bop_tags)(s)
+}
+
+fn bool_bv_ops(s: &str) -> IResult<&str, BoolOp> {
+    let naked_bop_tags = alt((
+        map(tag("bvugt"), |_| BoolOp::Bvgt()),
+        map(tag("bvuge"), |_| BoolOp::Bvge()),
+        map(tag("bvslt"), |_| BoolOp::Bvslt()),
+        map(tag("bvsle"), |_| BoolOp::Bvsle()),
+        map(tag("bvsgt"), |_| BoolOp::Bvsgt()),
+        map(tag("bvsge"), |_| BoolOp::Bvsge()),
+    ));
+
+    ws!(naked_bop_tags)(s)
+}
+
 fn bool_int_ops(s: &str) -> IResult<&str, BoolOp> {
     let naked_bop_tags = alt((
         map(tag(">="), |_| BoolOp::Gte()),
@@ -131,15 +176,18 @@ fn bool_core_ops(s: &str) -> IResult<&str, BoolOp> {
 }
 
 fn bool_sexp(s: &str) -> IResult<&str, SExp> {
-    let inner_int = map(tuple((bool_int_ops, many1(sexp))), |(o, v)| {
-        SExp::BExp(rccell!(o), v.into_iter().map(|s| rccell!(s)).collect())
-    });
-    let inner_core = map(tuple((bool_core_ops, many1(sexp))), |(o, v)| {
+    let bool_ops = alt((
+        bool_core_ops,
+        bool_int_ops,
+        bool_bv_ops,
+        bool_str_ops,
+        bool_fp_ops,
+    ));
+    let inner = map(tuple((bool_ops, many1(sexp))), |(o, v)| {
         SExp::BExp(rccell!(o), v.into_iter().map(|s| rccell!(s)).collect())
     });
 
-    let naked_b = alt((inner_int, inner_core));
-    brack!(naked_b)(s)
+    brack!(inner)(s)
 }
 
 fn var_binding(s: &str) -> IResult<&str, (SymbolRc, SortRc)> {

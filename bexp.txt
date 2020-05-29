@@ -1,0 +1,66 @@
+(bvule (_ BitVec m) (_ BitVec m) Bool)
+      - binary predicate for unsigned less than or equal
+    (bvugt (_ BitVec m) (_ BitVec m) Bool)
+      - binary predicate for unsigned greater than
+    (bvuge (_ BitVec m) (_ BitVec m) Bool)
+      - binary predicate for unsigned greater than or equal
+    (bvslt (_ BitVec m) (_ BitVec m) Bool)
+      - binary predicate for signed less than
+    (bvsle (_ BitVec m) (_ BitVec m) Bool)
+      - binary predicate for signed less than or equal
+    (bvsgt (_ BitVec m) (_ BitVec m) Bool)
+      - binary predicate for signed greater than
+    (bvsge (_ BitVec m) (_ BitVec m) Bool)
+      - binary predicate for signed greater than or equal
+Bitvector Constants:
+    (_ bvX n) where X and n are numerals, i.e. (_ bv13 32),
+    abbreviates the term #bY of sort (_ BitVec n) such that
+ ; Lexicographic ordering
+        (str.< String String Bool :chainable)
+; RE membership
+        (str.in_re String RegLan Bool) 
+; RE membership
+        (str.in_re String RegLan Bool) 
+ ; First string is a prefix of second one.
+       ; (str.prefixof s t) is true iff s is a prefix of t.
+       (str.prefixof String String Bool)
+
+       ; First string is a suffix of second one.
+       ; (str.suffixof s t) is true iff s is a suffix of t.
+       (str.suffixof String String Bool)
+
+       ; First string contains second one
+       ; (str.contains s t) iff s contains t.
+       (str.contains String String Bool)
+ ; Digit check
+       ; (str.is_digit s) is true iff s consists of a single character which is 
+       ; a decimal digit, that is, a code point in the range 0x0030 ... 0x0039.
+       (str.is_digit String Bool)
+; comparison operators
+   ; Note that all comparisons evaluate to false if either argument is NaN
+   (fp.leq (_ FloatingPoint eb sb) (_ FloatingPoint eb sb) Bool :chainable)
+   (fp.lt  (_ FloatingPoint eb sb) (_ FloatingPoint eb sb) Bool :chainable) 
+   (fp.geq (_ FloatingPoint eb sb) (_ FloatingPoint eb sb) Bool :chainable) 
+   (fp.gt  (_ FloatingPoint eb sb) (_ FloatingPoint eb sb) Bool :chainable)
+
+   ; IEEE 754-2008 equality (as opposed to SMT-LIB =)
+   (fp.eq (_ FloatingPoint eb sb) (_ FloatingPoint eb sb) Bool :chainable) 
+
+   ; Classification of numbers
+   (fp.isNormal (_ FloatingPoint eb sb) Bool)
+   (fp.isSubnormal (_ FloatingPoint eb sb) Bool)
+   (fp.isZero (_ FloatingPoint eb sb) Bool)
+   (fp.isInfinite (_ FloatingPoint eb sb) Bool)
+   (fp.isNaN (_ FloatingPoint eb sb) Bool)
+   (fp.isNegative (_ FloatingPoint eb sb) Bool)
+   (fp.isPositive (_ FloatingPoint eb sb) Bool)
+ "
+    [[(_ +oo eb sb)]] is +infinity
+    [[(_ -oo eb sb)]] is -infinity
+    [[(_ NaN eb sb)]] is not_a_number
+    [[(_ +zero eb sb)]] is [[fp]]([[#b0]], [[#b0..0]], [[#b0..0]]) where 
+                           the first bitvector literal has eb 0s and
+                           the second has sb - 1 0s  
+    [[(_ -zero eb sb)]] is [[fp]]([[#b1]], [[#b0..0]], [[#b0..0]]) where
+                           the first bitvector literal has eb 0s and
+                           the second has sb - 1 0s  
