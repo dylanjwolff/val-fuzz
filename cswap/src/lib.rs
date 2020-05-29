@@ -54,6 +54,8 @@ use transforms::{end_insert_pt, get_bav_assign_fmt_str, to_skel};
 use walkdir::WalkDir;
 #[macro_use]
 use serde::{Serialize, Deserialize};
+use std::collections::hash_map::DefaultHasher;
+use std::hash::{Hash, Hasher};
 use tempfile::tempfile;
 use tempfile::Builder;
 use tempfile::NamedTempFile;
@@ -62,6 +64,21 @@ type InputPPQ = Arc<SegQueue<Result<PathBuf, PoisonPill>>>;
 type SkeletonQueue = Arc<SegQueue<(PathBuf, PathBuf)>>;
 type BavAssingedQ = Arc<ArrayQueue<(PathBuf, PathBuf)>>;
 type StageCompleteA = Arc<StageComplete>;
+
+#[derive(Debug, Clone)]
+pub struct Config {
+    pub file_provider: FileProvider,
+    pub max_iter: u32,
+    pub rng_seed: u64,
+}
+
+impl Config {
+    fn get_specific_seed<T: Hash>(&self, t: &T) -> u64 {
+        let mut s = DefaultHasher::new();
+        t.hash(&mut s);
+        s.finish() + self.rng_seed
+    }
+}
 
 #[derive(Debug, Eq, PartialEq, Clone)]
 pub struct FileProvider {
@@ -353,7 +370,7 @@ impl StageComplete {
     }
 }
 
-fn launch(qs: (InputPPQ, SkeletonQueue), worker_counts: (u8, u8, u8), fp: FileProvider) {
+fn launch(qs: (InputPPQ, SkeletonQueue), worker_counts: (u8, u8, u8), cfg: Config) {
     const STACK_SIZE: usize = 500 * 1024 * 1024; // 100mb
     let baq = ArrayQueue::new(100);
     let a_baq = Arc::new(baq);
@@ -369,7 +386,7 @@ fn launch(qs: (InputPPQ, SkeletonQueue), worker_counts: (u8, u8, u8), fp: FilePr
             let t_q = Arc::clone(&qs.0);
             let t_q2 = Arc::clone(&qs.1);
             let t_s1 = Arc::clone(&stage0);
-            let t_fp = fp.clone();
+            let t_fp = cfg.file_provider.clone();
 
             thread::Builder::new()
                 .stack_size(STACK_SIZE)
@@ -383,11 +400,11 @@ fn launch(qs: (InputPPQ, SkeletonQueue), worker_counts: (u8, u8, u8), fp: FilePr
             let t_baq = Arc::clone(&a_baq);
             let t_s1 = Arc::clone(&stage0);
             let t_s2 = Arc::clone(&stage1);
-            let t_fp = fp.clone();
+            let t_cfg = cfg.clone();
 
             thread::Builder::new()
                 .stack_size(STACK_SIZE)
-                .spawn(move || bav_assign_worker(t_q2, t_s1, t_baq, t_s2, t_fp))
+                .spawn(move || bav_assign_worker(t_q2, t_s1, t_baq, t_s2, t_cfg))
         })
         .collect::<Vec<std::io::Result<JoinHandle<()>>>>();
 
@@ -395,7 +412,7 @@ fn launch(qs: (InputPPQ, SkeletonQueue), worker_counts: (u8, u8, u8), fp: FilePr
         .map(|_| {
             let t_baq = Arc::clone(&a_baq);
             let t_s2 = Arc::clone(&stage1);
-            let t_fp = fp.clone();
+            let t_fp = cfg.file_provider.clone();
 
             thread::Builder::new()
                 .stack_size(STACK_SIZE)
@@ -429,7 +446,7 @@ fn launch(qs: (InputPPQ, SkeletonQueue), worker_counts: (u8, u8, u8), fp: FilePr
     );
 }
 
-pub fn from_skels(dirname: &str, worker_counts: (u8, u8), fp: FileProvider) {
+pub fn from_skels(dirname: &str, worker_counts: (u8, u8), cfg: Config) {
     let q2 = SegQueue::new();
     for entry in WalkDir::new(dirname)
         .into_iter()
@@ -438,7 +455,7 @@ pub fn from_skels(dirname: &str, worker_counts: (u8, u8), fp: FileProvider) {
         .filter(|e| {
             e.file_name()
                 .to_str()
-                .map(|s| s.starts_with("md_skel"))
+                .map(|s| s.starts_with("md_"))
                 .unwrap_or(false)
         })
     {
@@ -458,10 +475,10 @@ pub fn from_skels(dirname: &str, worker_counts: (u8, u8), fp: FileProvider) {
     let q = SegQueue::new();
     let aq = Arc::new(q);
     let aq2 = Arc::new(q2);
-    launch((aq, aq2), (0, worker_counts.0, worker_counts.1), fp);
+    launch((aq, aq2), (0, worker_counts.0, worker_counts.1), cfg);
 }
 
-pub fn exec(dirname: &str, worker_counts: (u8, u8, u8), fp: FileProvider) {
+pub fn exec(dirname: &str, worker_counts: (u8, u8, u8), cfg: Config) {
     let q = SegQueue::new();
     for entry in WalkDir::new(dirname)
         .into_iter()
@@ -479,7 +496,7 @@ pub fn exec(dirname: &str, worker_counts: (u8, u8, u8), fp: FileProvider) {
     let q2 = SegQueue::new();
     let aq2 = Arc::new(q2);
 
-    launch((aq, aq2), worker_counts, fp);
+    launch((aq, aq2), worker_counts, cfg);
 }
 
 fn mutator_worker(
@@ -526,7 +543,7 @@ fn bav_assign_worker(
     prev_stage: StageCompleteA,
     qout: BavAssingedQ,
     stage: StageCompleteA,
-    file_provider: FileProvider,
+    cfg: Config,
 ) {
     let mut backoff = MyBackoff::new();
 
@@ -551,14 +568,14 @@ fn bav_assign_worker(
 
         let results = solve(empty_skel_fstr);
 
-        report_any_bugs(&filepaths.0, &results, &file_provider);
+        report_any_bugs(&filepaths.0, &results, &cfg.file_provider);
 
         if results.iter().all(|r| r.has_unrecoverable_error()) {
             println!("All err on file {}", empty_skel_fstr);
             fs::remove_file(filepaths.0).unwrap_or(());
             fs::remove_file(filepaths.1).unwrap_or(());
         } else {
-            add_iterations_to_q(script, md, Arc::clone(&qout), &file_provider);
+            add_iterations_to_q(script, md, Arc::clone(&qout), &cfg);
         }
     }
 
@@ -569,7 +586,7 @@ fn add_iterations_to_q(
     mut script: Script,
     mut md: Metadata,
     qout: BavAssingedQ,
-    file_provider: &FileProvider,
+    cfg: &Config,
 ) -> Option<()> {
     let mut backoff = MyBackoff::new();
 
@@ -579,11 +596,16 @@ fn add_iterations_to_q(
     let script_str = script.to_string();
 
     let num_bavs = md.bavns.len();
-    const MAX_ITER: u32 = 1;
-    println!("starting max(2^{}, {}) iterations", num_bavs, MAX_ITER);
-    let mut urng = RandUniqPermGen::new_definite(num_bavs, MAX_ITER);
+    println!("starting max(2^{}, {}) iterations", num_bavs, cfg.max_iter);
+
+    let mut urng = RandUniqPermGen::new_definite_seeded(
+        cfg.get_specific_seed(&md.seed_file),
+        num_bavs,
+        cfg.max_iter,
+    );
+
     while let Some(truth_values) = urng.sample() {
-        let new_file = file_provider.iterfile(&mut md).ok()?;
+        let new_file = cfg.file_provider.iterfile(&mut md).ok()?;
         let str_with_model = dyn_fmt(&script_str, to_strs(&truth_values)).ok()?;
         fs::write(&new_file, str_with_model).ok()?;
         let mut to_push = (new_file.to_path_buf(), md.metadata_file.clone());
@@ -727,10 +749,10 @@ struct RandUniqPermGen {
 
 use rand_xoshiro::Xoshiro256Plus;
 impl RandUniqPermGen {
-    fn new_definite(numbits: usize, maxiter: u32) -> Self {
+    fn new_definite_seeded(seed: u64, numbits: usize, maxiter: u32) -> Self {
         let buf = BitVec::from_elem(numbits, false).to_bytes();
         let seen = BTreeSet::new();
-        let rng = Xoshiro256Plus::seed_from_u64(8085);
+        let rng = Xoshiro256Plus::seed_from_u64(seed);
 
         let true_max = if (maxiter as f64).log2() < (numbits as f64) {
             maxiter
@@ -748,6 +770,10 @@ impl RandUniqPermGen {
             use_max: true,
             use_retries: false,
         }
+    }
+
+    fn new_definite(numbits: usize, maxiter: u32) -> Self {
+        Self::new_definite_seeded(0, numbits, maxiter)
     }
 
     fn get_count(&self) -> u32 {

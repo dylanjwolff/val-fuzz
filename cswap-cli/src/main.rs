@@ -8,11 +8,14 @@ use clap::Arg;
 use clap::ArgMatches;
 use cswap::exec;
 use cswap::from_skels;
+use cswap::Config;
 use cswap::FileProvider;
 
 const DIR: &'static str = "Seed/Skeleton Directory";
 const FROM_SKELS: &'static str = "from-skels";
 const WORKERS: &'static str = "worker-counts";
+const MAX_ITER: &'static str = "max-iter";
+const SEED: &'static str = "seed";
 
 fn main() {
     let matches: ArgMatches = App::new("Value Constant Mutation Fuzzer for SMTlib2 Solvers")
@@ -33,6 +36,18 @@ fn main() {
                 .help("Worker threads for each stage of three stages (e.g. 0,1,2)")
                 .takes_value(true),
         )
+        .arg(
+            Arg::with_name(MAX_ITER)
+                .short("i")
+                .help("Maximum iterations (BAM assignments) per seed file")
+                .takes_value(true),
+        )
+        .arg(
+            Arg::with_name(SEED)
+                .short("s")
+                .help("Seed for randomization. Runs are repeatable with the same seed")
+                .takes_value(true),
+        )
         .get_matches();
 
     let dir_name = matches.value_of(DIR).unwrap();
@@ -40,12 +55,26 @@ fn main() {
         Some(workerstr) => parse_workers(workerstr),
         None => (2, 2, 9),
     };
+    let max_iter = match matches.value_of(MAX_ITER) {
+        Some(iterstr) => iterstr.parse::<u32>().unwrap(),
+        None => 1,
+    };
+    let seed = match matches.value_of(SEED) {
+        Some(seedstr) => seedstr.parse::<u64>().unwrap(),
+        None => 0,
+    };
     println!("Starting with workers {:?}", workers);
 
-    let fp = FileProvider::new("cswap-fuzz-run-out");
+    let fp = FileProvider::new(&(seed.to_string() + "-cswap-fuzz-run-out"));
+    let cfg = Config {
+        file_provider: fp,
+        rng_seed: seed,
+        max_iter: max_iter,
+    };
+
     match matches.is_present(FROM_SKELS) {
-        true => from_skels(dir_name, (workers.1, workers.2), fp),
-        false => exec(dir_name, workers, fp),
+        true => from_skels(dir_name, (workers.1, workers.2), cfg),
+        false => exec(dir_name, workers, cfg),
     }
 }
 

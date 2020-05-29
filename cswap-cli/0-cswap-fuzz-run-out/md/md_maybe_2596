@@ -1,0 +1,1 @@
+((bavns "BAV1" "BAV2") (constvns) (seed_file . "../known/5/e79542cc6/maybe_2596.smt2") (skeleton_file . "/home/dylan/git/constant-swap/cswap-cli/0-cswap-fuzz-run-out/skel/skel_maybe_2596.smt2") (metadata_file . "/home/dylan/git/constant-swap/cswap-cli/0-cswap-fuzz-run-out/md/md_maybe_2596"))
