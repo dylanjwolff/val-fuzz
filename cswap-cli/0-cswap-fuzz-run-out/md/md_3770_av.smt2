@@ -1,0 +1,1 @@
+((bavns "BAV1") (constvns "GEN1" "GEN2" "GEN3" "GEN4" "GEN5" "GEN6" "GEN7" "GEN8") (seed_file . "3770_av.smt2") (skeleton_file . "skel_3770_av.smt2") (metadata_file . "md_3770_av.smt2"))

@@ -76,7 +76,8 @@ impl Config {
     fn get_specific_seed<T: Hash>(&self, t: &T) -> u64 {
         let mut s = DefaultHasher::new();
         t.hash(&mut s);
-        s.finish() + self.rng_seed
+        self.rng_seed.hash(&mut s);
+        s.finish()
     }
 }
 
@@ -110,48 +111,35 @@ impl FileProvider {
         }
     }
 
-    fn skelfile<'a>(&self, md: &'a mut Metadata) -> io::Result<&'a Path> {
+    fn skelfile<'a>(&self, md: &'a mut Metadata) -> io::Result<PathBuf> {
         let tfile = Builder::new()
             .prefix("skel_")
             .rand_bytes(0)
-            .suffix(
-                md.seed_file
-                    .file_name()
-                    .and_then(|n| n.to_str())
-                    .unwrap_or("default_name"),
-            )
+            .suffix(&md.seed_file)
             .tempfile_in(&self.skeldir)?;
         //  tfile.keep();
-        md.skeleton_file = tfile.path().to_path_buf();
-        Ok(&md.skeleton_file)
+        let path = tfile.path();
+        md.skeleton_file = name(&path);
+        Ok(path.to_path_buf())
     }
 
-    fn mdfile<'a>(&self, md: &'a mut Metadata) -> io::Result<&'a Path> {
+    fn mdfile<'a>(&self, md: &'a mut Metadata) -> io::Result<PathBuf> {
         let tfile = Builder::new()
             .prefix("md_")
             .rand_bytes(0)
-            .suffix(
-                md.seed_file
-                    .file_stem()
-                    .and_then(|n| n.to_str())
-                    .unwrap_or("default_name"),
-            )
+            .suffix(&md.seed_file)
             .tempfile_in(&self.mddir)?;
         //  tfile.keep();
-        md.metadata_file = tfile.path().to_path_buf();
-        Ok(&md.skeleton_file)
+        let path = tfile.path();
+        md.metadata_file = name(path);
+        Ok(path.to_path_buf())
     }
 
     fn iterfile(&self, md: &Metadata) -> io::Result<PathBuf> {
         let tfile = Builder::new()
             .prefix("iter_")
             .rand_bytes(10)
-            .suffix(
-                md.seed_file
-                    .file_name()
-                    .and_then(|n| n.to_str())
-                    .unwrap_or("default_name"),
-            )
+            .suffix(&md.seed_file)
             .tempfile_in(&self.bugdir)?;
         //  tfile.keep();
         Ok(tfile.path().to_path_buf())
@@ -161,12 +149,7 @@ impl FileProvider {
         let tfile = Builder::new()
             .prefix("resub_")
             .rand_bytes(10)
-            .suffix(
-                md.seed_file
-                    .file_name()
-                    .and_then(|n| n.to_str())
-                    .unwrap_or("default_name"),
-            )
+            .suffix(&md.seed_file)
             .tempfile_in(&self.bugdir)?;
         //  tfile.keep();
         Ok(tfile.path().to_path_buf())
@@ -204,27 +187,27 @@ impl FileProvider {
         &self,
         script: &'a Script,
         md: &'b mut Metadata,
-    ) -> Result<&'b Path, io::Error> {
-        self.skelfile(md)
-            .and_then(|f| fs::write(f, script.to_string()));
-        Ok(&md.skeleton_file)
+    ) -> Result<PathBuf, io::Error> {
+        let f = self.skelfile(md)?;
+        fs::write(&f, script.to_string())?;
+        Ok(f)
     }
 
-    fn serialize_md<'a>(&self, md: &'a mut Metadata) -> Result<&'a Path, io::Error> {
-        self.mdfile(md)?;
+    fn serialize_md<'a>(&self, md: &'a mut Metadata) -> Result<PathBuf, io::Error> {
+        let f = self.mdfile(md)?;
         let mdstr = serde_lexpr::to_string(&md)?;
-        fs::write(&md.metadata_file, mdstr)?;
-        Ok(&md.metadata_file)
+        fs::write(&f, mdstr)?;
+        Ok(f)
     }
 
     fn serialize_skel_and_md<'a, 'b>(
         &self,
         script: &'a Script,
         md: &'b mut Metadata,
-    ) -> Result<(&'b Path, &'b Path), io::Error> {
-        self.serialize_skel(script, md)?;
-        self.serialize_md(md)?;
-        Ok((&md.skeleton_file, &md.metadata_file))
+    ) -> Result<(PathBuf, PathBuf), io::Error> {
+        let fs = self.serialize_skel(script, md)?;
+        let fm = self.serialize_md(md)?;
+        Ok((fs, fm))
     }
 
     fn serialize_resub(&self, script: &Script, md: &Metadata) -> Result<PathBuf, io::Error> {
@@ -274,9 +257,15 @@ impl MyBackoff {
 pub struct Metadata {
     bavns: Vec<String>,
     constvns: Vec<String>,
-    seed_file: PathBuf,
-    skeleton_file: PathBuf,
-    metadata_file: PathBuf,
+    seed_file: String,
+    skeleton_file: String,
+    metadata_file: String,
+}
+pub fn name(pb: &Path) -> String {
+    pb.file_name()
+        .and_then(|n| n.to_str())
+        .unwrap_or("default_filename")
+        .to_owned()
 }
 
 impl Metadata {
@@ -284,19 +273,35 @@ impl Metadata {
         Metadata {
             bavns: vec![],
             constvns: vec![],
-            seed_file: Path::new("").to_path_buf(),
-            skeleton_file: Path::new("").to_path_buf(),
-            metadata_file: Path::new("").to_path_buf(),
+            seed_file: "".to_owned(),
+            skeleton_file: "".to_owned(),
+            metadata_file: "".to_owned(),
         }
     }
     pub fn new(seed: &Path) -> Self {
         Metadata {
             bavns: vec![],
             constvns: vec![],
-            seed_file: seed.to_path_buf(),
-            skeleton_file: Path::new("").to_path_buf(),
-            metadata_file: Path::new("").to_path_buf(),
+            seed_file: name(seed),
+            skeleton_file: "".to_owned(),
+            metadata_file: "".to_owned(),
         }
+    }
+
+    pub fn seed_path(&self, fp: &FileProvider) -> PathBuf {
+        panic!("Unimplemented!");
+    }
+
+    pub fn skel_path(&self, fp: &FileProvider) -> PathBuf {
+        let mut p = fp.skeldir.clone();
+        p.push(&self.skeleton_file);
+        p
+    }
+
+    pub fn md_path(&self, fp: &FileProvider) -> PathBuf {
+        let mut p = fp.mddir.clone();
+        p.push(&self.metadata_file);
+        p
     }
 }
 
@@ -446,7 +451,9 @@ fn launch(qs: (InputPPQ, SkeletonQueue), worker_counts: (u8, u8, u8), cfg: Confi
     );
 }
 
-pub fn from_skels(dirname: &str, worker_counts: (u8, u8), cfg: Config) {
+pub fn from_skels(dirname: &str, worker_counts: (u8, u8), mut cfg: Config) {
+    cfg.file_provider.skeldir = Path::new(dirname).to_path_buf();
+    cfg.file_provider.mddir = Path::new(dirname).to_path_buf();
     let q2 = SegQueue::new();
     for entry in WalkDir::new(dirname)
         .into_iter()
@@ -460,7 +467,7 @@ pub fn from_skels(dirname: &str, worker_counts: (u8, u8), cfg: Config) {
         })
     {
         let metad_path = entry.into_path();
-        let script_path = match script_f_from_metadata_f(&metad_path) {
+        let script_path = match script_f_from_metadata_f(&metad_path, &cfg.file_provider) {
             Ok(r) => r,
             Err(e) => {
                 println!("can't find script for {:?} error: {}", metad_path, e);
@@ -526,7 +533,9 @@ fn mutator_worker(
         match strip_and_transform(&filepath) {
             Some((script, mut md)) => {
                 match file_provider.serialize_skel_and_md(&script, &mut md) {
-                    Ok(_) => qout.push((md.skeleton_file, md.metadata_file)),
+                    Ok((skel_file, md_file)) => {
+                        qout.push((skel_file.to_path_buf(), md_file.to_path_buf()))
+                    }
                     Err(e) => println!("Skel/Md Serial Err: {}", e),
                 };
             }
@@ -608,7 +617,7 @@ fn add_iterations_to_q(
         let new_file = cfg.file_provider.iterfile(&mut md).ok()?;
         let str_with_model = dyn_fmt(&script_str, to_strs(&truth_values)).ok()?;
         fs::write(&new_file, str_with_model).ok()?;
-        let mut to_push = (new_file.to_path_buf(), md.metadata_file.clone());
+        let mut to_push = (new_file.to_path_buf(), md.md_path(&cfg.file_provider));
         while let Err(PushError(reject)) = qout.push(to_push) {
             to_push = reject;
             backoff.snooze();
@@ -646,20 +655,12 @@ fn deserialize_from_f(
     Ok((script, md))
 }
 
-fn script_f_from_metadata_f(md_file: &PathBuf) -> Result<PathBuf, String> {
+fn script_f_from_metadata_f(md_file: &PathBuf, fp: &FileProvider) -> Result<PathBuf, String> {
     let md_contents =
         fs::read_to_string(&md_file).map_err(|e| e.to_string() + " from metadata IO")?;
-    let (_, script_file): (Metadata, PathBuf) =
+    let md: Metadata =
         serde_lexpr::from_str(&md_contents).map_err(|e| e.to_string() + " from serde")?;
-
-    match md_file.parent() {
-        Some(dir) => {
-            let mut f = dir.clone().to_path_buf();
-            f.push(script_file);
-            Ok(f)
-        }
-        None => Ok(script_file),
-    }
+    Ok(md.skel_path(fp))
 }
 
 pub struct PoisonPill {}
