@@ -4,7 +4,6 @@ expression: "CVC4_Command_Builder::new().timeout(Duration::from_secs(3)).models(
 ---
 [
     "timeout",
-    "-v",
     "3s",
     "cvc4",
     "--produce-models",
