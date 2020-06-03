@@ -7,9 +7,12 @@ use clap::Arg;
 use clap::ArgMatches;
 use cswap::parser::rmv_comments;
 use cswap::parser::script;
+use cswap::solver::profiles_solve;
+use cswap::solver::profiles_to_string;
 use cswap::solver::solve;
 use cswap::solver::solve_cvc4;
 use cswap::solver::solve_z3;
+use cswap::solver::ProfileIndex;
 
 use cswap::solver::RSolve;
 
@@ -23,6 +26,7 @@ const INFILE: &'static str = "File to Solve";
 const CREDUCE_SCRIPT: &'static str = "creduce-script";
 const PROFILES: &'static str = "profiles";
 const FORMAT: &'static str = "format";
+const LIST_PROFILES: &'static str = "list-profiles";
 
 fn main() {
     let ecode = {
@@ -56,10 +60,20 @@ fn main() {
                     .short("f")
                     .help("Format the SMTLIB2 file to stdout. Removes all comments"),
             )
+            .arg(
+                Arg::with_name(LIST_PROFILES)
+                    .short("l")
+                    .help("List the profiles availaible for use with the -p option"),
+            )
             .get_matches();
         let log_level = matches.occurrences_of("verbosity");
         let maybe_cr_script = matches.value_of(CREDUCE_SCRIPT);
         let infile_name = matches.value_of(INFILE).unwrap();
+
+        if matches.is_present(LIST_PROFILES) {
+            println!("{}", profiles_to_string());
+            return;
+        }
 
         match matches.is_present(FORMAT) {
             true => format(Path::new(infile_name)),
@@ -109,23 +123,6 @@ fn main() {
     std::process::exit(ecode);
 }
 
-#[derive(Debug, Eq, PartialEq, Hash, Clone)]
-pub enum ProfileIndex {
-    Z3(usize),
-    CVC4(usize),
-}
-
-impl ProfileIndex {
-    fn new(ind: usize) -> Self {
-        let num_cvc4_profiles = CVC4_PROFILES.len();
-        if ind < num_cvc4_profiles {
-            Self::CVC4(ind)
-        } else {
-            Self::Z3(ind - num_cvc4_profiles)
-        }
-    }
-}
-
 fn print_creduce(results: &Vec<RSolve>, crs: &str, infile_name: &str) {
     let eb = results
         .iter()
@@ -142,26 +139,6 @@ fn parse_profiles(profiles_str: &str) -> HashSet<ProfileIndex> {
         .map(|strind| strind.parse::<usize>().unwrap())
         .map(|ind| ProfileIndex::new(ind))
         .collect()
-}
-
-pub fn profiles_solve(filename: &str, pis: &HashSet<ProfileIndex>) -> Vec<RSolve> {
-    let filepath = Path::new(filename);
-
-    let mr_cvc4 = CVC4_PROFILES
-        .iter()
-        .zip(0..CVC4_PROFILES.len() - 1)
-        .filter(|(_, i)| pis.contains(&ProfileIndex::CVC4(*i)))
-        .map(|(p, _)| p)
-        .map(|profile| solve_cvc4(profile, &filepath));
-
-    let mr_z3 = Z3_PROFILES
-        .iter()
-        .zip(0..Z3_PROFILES.len() - 1)
-        .filter(|(_, i)| pis.contains(&ProfileIndex::Z3(*i)))
-        .map(|(p, _)| p)
-        .map(|profile| solve_z3(profile, &filepath));
-
-    mr_cvc4.chain(mr_z3).collect()
 }
 
 fn format(file: &Path) {
