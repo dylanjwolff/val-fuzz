@@ -1,0 +1,5 @@
+---
+source: cswap/src/parser.rs
+expression: "format!(\"{}\", c . sort ())"
+---
+"(_ FloatingPoint 4 4)"

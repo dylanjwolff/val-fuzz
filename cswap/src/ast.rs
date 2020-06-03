@@ -1,10 +1,9 @@
-use crate::Timer;
 use std::cell::RefCell;
 use std::fmt;
 use std::fs;
 use std::path::Path;
 use std::rc::Rc;
-use std::time::Duration;
+
 #[macro_use]
 use serde::{Serialize, Deserialize};
 
@@ -47,6 +46,7 @@ pub enum Sort {
     Str(),
     Bool(),
     BitVec(u32),
+    Fp(String, String),
     Array(),
     UserDef(String),
     Compound(Vec<SortRc>),
@@ -115,6 +115,23 @@ pub enum Constant {
     Bin(Vec<char>),
     Str(String),
     Bool(bool),
+    Fp(FPConst),
+}
+
+#[derive(Serialize, Deserialize, Debug, Eq, PartialEq, Clone)]
+pub enum FPConst {
+    Num(BitVecConst, BitVecConst, BitVecConst),
+    PZero(String, String),
+    NZero(String, String),
+    PInf(String, String),
+    NInf(String, String),
+    Nan(String, String),
+}
+
+#[derive(Serialize, Deserialize, Debug, Eq, PartialEq, Clone)]
+pub enum BitVecConst {
+    Hex(String),
+    Bin(Vec<char>),
 }
 
 #[allow(non_camel_case_types)]
@@ -243,6 +260,59 @@ impl fmt::Display for Constant {
             Constant::Str(s) => write!(f, "\"{}\"", s),
             Constant::Bool(b) => write!(f, "{}", b),
             Constant::Bin(bv) => write!(f, "#b{}", bv.into_iter().collect::<String>()),
+            Constant::Fp(fp) => write!(f, "{}", fp),
+        }
+    }
+}
+
+impl Constant {
+    pub fn sort(&self) -> Sort {
+        match self {
+            Constant::UInt(_) => Sort::UInt(),
+            Constant::Dec(_) => Sort::Dec(),
+            Constant::Str(_) => Sort::Str(),
+            Constant::Bool(_) => Sort::Bool(),
+            Constant::Bin(bit_s) => Sort::BitVec(bit_s.len() as u32),
+            Constant::Hex(hit_s) => Sort::BitVec((hit_s.len() as u32) * 4),
+            Constant::Fp(fp) => match fp {
+                FPConst::PInf(m, n)
+                | FPConst::NInf(m, n)
+                | FPConst::PZero(m, n)
+                | FPConst::NZero(m, n)
+                | FPConst::Nan(m, n) => Sort::Fp(m.to_owned(), n.to_owned()),
+                FPConst::Num(_, e, s) => Sort::Fp(e.len().to_string(), (s.len() - 1).to_string()),
+            },
+        }
+    }
+}
+
+impl BitVecConst {
+    fn len(&self) -> u32 {
+        match self {
+            BitVecConst::Bin(bits) => bits.len() as u32,
+            BitVecConst::Hex(hits) => (hits.len() as u32) * 4,
+        }
+    }
+}
+
+impl fmt::Display for FPConst {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        match self {
+            FPConst::Num(i, e, s) => write!(f, "(fp {} {} {})", i, e, s),
+            FPConst::PInf(m, n) => write!(f, "(_ +oo {} {})", m, n),
+            FPConst::NInf(m, n) => write!(f, "(_ -oo {} {})", m, n),
+            FPConst::PZero(m, n) => write!(f, "(_ +zero {} {})", m, n),
+            FPConst::NZero(m, n) => write!(f, "(_ -zero {} {})", m, n),
+            FPConst::Nan(m, n) => write!(f, "(_ NaN {} {})", m, n),
+        }
+    }
+}
+
+impl fmt::Display for BitVecConst {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        match self {
+            BitVecConst::Hex(s) => write!(f, "#x{}", s),
+            BitVecConst::Bin(bv) => write!(f, "#b{}", bv.into_iter().collect::<String>()),
         }
     }
 }
@@ -261,6 +331,7 @@ impl fmt::Display for Sort {
             Sort::Dec() => write!(f, "Real"),
             Sort::Bool() => write!(f, "Bool"),
             Sort::Str() => write!(f, "String"),
+            Sort::Fp(m, n) => write!(f, "(_ FloatingPoint {} {})", m, n),
             Sort::BitVec(len) => write!(f, "(_ BitVec {})", len),
             Sort::Array() => write!(f, "Array"),
             Sort::UserDef(s) => write!(f, "{}", s),
@@ -397,7 +468,6 @@ mod tests {
     use super::*;
     use crate::parser::*;
     use insta::assert_debug_snapshot;
-    use walkdir::WalkDir;
 
     #[test]
     fn sort_display_snap() {

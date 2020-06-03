@@ -10,9 +10,9 @@ use cswap::parser::script;
 use cswap::solver::solve;
 use cswap::solver::solve_cvc4;
 use cswap::solver::solve_z3;
-use cswap::solver::CVC4_Command_Builder;
+
 use cswap::solver::RSolve;
-use cswap::solver::Z3_Command_Builder;
+
 use cswap::solver::CVC4_PROFILES;
 use cswap::solver::Z3_PROFILES;
 use std::collections::HashSet;

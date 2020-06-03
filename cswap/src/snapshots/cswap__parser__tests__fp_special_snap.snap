@@ -1,0 +1,13 @@
+---
+source: cswap/src/parser.rs
+expression: "fp(\"(_ +oo 2 3)\")"
+---
+Ok(
+    (
+        "",
+        PInf(
+            "2",
+            "3",
+        ),
+    ),
+)

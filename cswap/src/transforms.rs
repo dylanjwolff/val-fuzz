@@ -1,7 +1,6 @@
 use crate::ast::{AstNode, BoolOp, Command, Constant, Logic, SExp, Script, Sort, Symbol};
 use crate::ast::{CommandRc, SExpRc, SortRc, SymbolRc};
 
-use crate::parser::sexp;
 use crate::solver::check_valid_solve_as_temp;
 use crate::Metadata;
 use crate::Timer;
@@ -453,14 +452,7 @@ fn choles_c(cmd: &mut Command) -> Vec<(Rcse, Sort)> {
 fn choles_rcse(rcse: &Rcse) -> Vec<(Rcse, Sort)> {
     let inner = |sexp: &SExp| match sexp {
         SExp::Constant(c) => {
-            let sort = match &*c.borrow_mut() {
-                Constant::UInt(_) => Sort::UInt(),
-                Constant::Dec(_) => Sort::Dec(),
-                Constant::Str(_) => Sort::Str(),
-                Constant::Bool(_) => Sort::Bool(),
-                Constant::Bin(bit_s) => Sort::BitVec(bit_s.len() as u32),
-                Constant::Hex(hit_s) => Sort::BitVec((hit_s.len() as u32) * 4),
-            };
+            let sort = c.borrow().sort();
             vec![(rcse.clone(), sort)]
         }
         SExp::Compound(sexps) | SExp::BExp(_, sexps) => {
@@ -669,6 +661,7 @@ pub trait Visitor {
 mod tests {
     use super::*;
     use crate::parser::script;
+    use crate::parser::sexp;
     use insta::assert_debug_snapshot;
 
     #[test]
