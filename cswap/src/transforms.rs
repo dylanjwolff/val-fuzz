@@ -1,7 +1,6 @@
 use crate::ast::{AstNode, BoolOp, Command, Constant, Logic, SExp, Script, Sort, Symbol};
 use crate::ast::{CommandRc, SExpRc, SortRc, SymbolRc};
 
-use crate::parser::sexp;
 use crate::solver::check_valid_solve_as_temp;
 use crate::Metadata;
 use crate::Timer;
@@ -669,6 +668,7 @@ pub trait Visitor {
 mod tests {
     use super::*;
     use crate::parser::script;
+    use crate::parser::sexp;
     use insta::assert_debug_snapshot;
 
     #[test]

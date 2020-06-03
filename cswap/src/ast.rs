@@ -1,10 +1,10 @@
-use crate::Timer;
+
 use std::cell::RefCell;
 use std::fmt;
 use std::fs;
 use std::path::Path;
 use std::rc::Rc;
-use std::time::Duration;
+
 #[macro_use]
 use serde::{Serialize, Deserialize};
 
@@ -397,7 +397,7 @@ mod tests {
     use super::*;
     use crate::parser::*;
     use insta::assert_debug_snapshot;
-    use walkdir::WalkDir;
+    
 
     #[test]
     fn sort_display_snap() {

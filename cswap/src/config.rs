@@ -3,9 +3,9 @@ use std::fs;
 use std::io;
 use std::path::Path;
 use std::path::PathBuf;
-use tempfile::tempfile;
+
 use tempfile::Builder;
-use tempfile::NamedTempFile;
+
 
 #[macro_use]
 use serde::{Serialize, Deserialize};
@@ -213,7 +213,7 @@ impl Metadata {
         }
     }
 
-    pub fn seed_path(&self, fp: &FileProvider) -> PathBuf {
+    pub fn seed_path(&self, _fp: &FileProvider) -> PathBuf {
         panic!("Unimplemented!");
     }
 

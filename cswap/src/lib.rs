@@ -21,15 +21,14 @@ use crate::solver::RSolve;
 use crate::transforms::rv;
 use crate::utils::StageComplete;
 use ast::Script;
-use bit_vec::BitVec;
+
 use config::Config;
 use config::FileProvider;
 use config::Metadata;
 use crossbeam::queue::ArrayQueue;
 use crossbeam::queue::PushError;
 use crossbeam::queue::SegQueue;
-use crossbeam::utils::Backoff;
-use std::io;
+
 use utils::dyn_fmt;
 use utils::to_strs;
 use utils::MyBackoff;
@@ -37,34 +36,24 @@ use utils::RandUniqPermGen;
 use utils::Timer;
 
 use crate::ast::SExp;
-use crate::ast::Symbol;
-use nom::{bytes::complete::tag, IResult};
-use parser::{rmv_comments, script};
+
 use rand::Rng;
-use rand_xoshiro::rand_core::SeedableRng;
-use solver::check_valid_solve;
+
 use solver::solve;
-use solver::SolveResult;
-use std::collections::BTreeSet;
+
 use std::fs;
 use std::path::Path;
 use std::path::PathBuf;
-use std::sync::atomic::AtomicBool;
-use std::sync::atomic::Ordering;
+
 use std::sync::Arc;
-use std::sync::Mutex;
+
 use std::thread;
 use std::thread::JoinHandle;
-use std::time::Duration;
+
 use transforms::{end_insert_pt, get_bav_assign_fmt_str, to_skel};
 use walkdir::WalkDir;
 #[macro_use]
-use serde::{Serialize, Deserialize};
-use std::collections::hash_map::DefaultHasher;
-use std::hash::{Hash, Hasher};
-use tempfile::tempfile;
-use tempfile::Builder;
-use tempfile::NamedTempFile;
+use std::hash::{Hasher};
 
 type InputPPQ = Arc<SegQueue<Result<PathBuf, PoisonPill>>>;
 type SkeletonQueue = Arc<SegQueue<(PathBuf, PathBuf)>>;
@@ -438,6 +427,9 @@ pub fn strip_and_transform(source_file: &Path) -> Option<(Script, Metadata)> {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::parser::script;
+    use crate::solver::check_valid_solve;
+    use bit_vec::BitVec;
     use std::fs;
 
     use std::thread;

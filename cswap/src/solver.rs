@@ -3,13 +3,13 @@ use crate::parser::*;
 use std::fmt;
 use std::io::Write;
 use std::path::Path;
-use std::path::PathBuf;
+
 use std::process;
 use std::str::from_utf8;
 use std::time::Duration;
-use tempfile::tempfile;
+
 use tempfile::Builder;
-use tempfile::NamedTempFile;
+
 
 #[derive(Debug, Eq, PartialEq, Clone)]
 pub enum SolveResult {
@@ -426,7 +426,7 @@ pub fn solve_cvc4(cvc4_cmd: &CVC4_Command_Builder, target: &Path) -> RSolve {
     });
 
     match cvc4mrs {
-        Ok((cvc4_succ, cvc4_out, cvc4_err)) => {
+        Ok((_cvc4_succ, cvc4_out, cvc4_err)) => {
             RSolve::move_new(Solver::CVC4(cvc4_cmd.clone()), cvc4_out, cvc4_err)
         }
         Err(_) => RSolve::process_error(),
@@ -444,7 +444,7 @@ pub fn solve_z3(z3_command: &Z3_Command_Builder, target: &Path) -> RSolve {
     });
 
     match z3mrs {
-        Ok((z3_succ, z3_out, z3_err)) => {
+        Ok((_z3_succ, z3_out, z3_err)) => {
             RSolve::move_new(Solver::Z3(z3_command.clone()), z3_out, z3_err)
         }
         Err(_) => RSolve::process_error(),
@@ -512,7 +512,7 @@ pub fn check_valid_solve_as_temp(script: &Script) -> Result<Vec<RSolve>, String>
 mod tests {
     use super::*;
     use insta::assert_debug_snapshot;
-    use walkdir::WalkDir;
+    
 
     #[test]
     fn tempfile_solve_snap() {
