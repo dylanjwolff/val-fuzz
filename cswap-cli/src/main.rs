@@ -6,10 +6,10 @@ extern crate cswap;
 use clap::App;
 use clap::Arg;
 use clap::ArgMatches;
+use cswap::config::Config;
+use cswap::config::FileProvider;
 use cswap::exec;
 use cswap::from_skels;
-use cswap::Config;
-use cswap::FileProvider;
 
 const DIR: &'static str = "Seed/Skeleton Directory";
 const FROM_SKELS: &'static str = "from-skels";
