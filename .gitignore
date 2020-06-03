@@ -2,3 +2,4 @@ target
 tags
 bin
 .solvers
+z3.log
