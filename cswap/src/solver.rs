@@ -1,5 +1,6 @@
 use crate::ast::*;
 use crate::parser::*;
+use std::collections::HashSet;
 use std::fmt;
 use std::io::Write;
 use std::path::Path;
@@ -77,6 +78,60 @@ lazy_static! {
             .check_unsat_cores()
             .dump_all(),
     ];
+}
+
+pub fn profiles_to_string() -> String {
+    CVC4_PROFILES
+        .iter()
+        .map(|p| p.cmd.join(" "))
+        .chain(Z3_PROFILES.iter().map(|p| p.cmd.join(" ")))
+        .enumerate()
+        .map(|(i, s)| i.to_string() + ":\t" + &s)
+        .collect::<Vec<String>>()
+        .join("\n")
+}
+
+pub fn all_profiles() -> HashSet<ProfileIndex> {
+    (0..Z3_PROFILES.len() + CVC4_PROFILES.len())
+        .map(|p| ProfileIndex::new(p))
+        .collect()
+}
+
+#[derive(Debug, Eq, PartialEq, Hash, Clone)]
+pub enum ProfileIndex {
+    Z3(usize),
+    CVC4(usize),
+}
+
+pub fn profiles_solve(filename: &str, pis: &HashSet<ProfileIndex>) -> Vec<RSolve> {
+    let filepath = Path::new(filename);
+
+    let mr_cvc4 = CVC4_PROFILES
+        .iter()
+        .zip(0..CVC4_PROFILES.len() - 1)
+        .filter(|(_, i)| pis.contains(&ProfileIndex::CVC4(*i)))
+        .map(|(p, _)| p)
+        .map(|profile| solve_cvc4(profile, &filepath));
+
+    let mr_z3 = Z3_PROFILES
+        .iter()
+        .zip(0..Z3_PROFILES.len() - 1)
+        .filter(|(_, i)| pis.contains(&ProfileIndex::Z3(*i)))
+        .map(|(p, _)| p)
+        .map(|profile| solve_z3(profile, &filepath));
+
+    mr_cvc4.chain(mr_z3).collect()
+}
+
+impl ProfileIndex {
+    pub fn new(ind: usize) -> Self {
+        let num_cvc4_profiles = CVC4_PROFILES.len();
+        if ind < num_cvc4_profiles {
+            Self::CVC4(ind)
+        } else {
+            Self::Z3(ind - num_cvc4_profiles)
+        }
+    }
 }
 
 #[derive(Debug, Eq, PartialEq, Clone)]

@@ -17,6 +17,7 @@ pub mod solver;
 pub mod transforms;
 pub mod utils;
 
+use crate::solver::profiles_solve;
 use crate::solver::RSolve;
 use crate::transforms::rv;
 use crate::utils::StageComplete;
@@ -102,11 +103,11 @@ fn launch(qs: (InputPPQ, SkeletonQueue), worker_counts: (u8, u8, u8), cfg: Confi
         .map(|_| {
             let t_baq = Arc::clone(&a_baq);
             let t_s2 = Arc::clone(&stage1);
-            let t_fp = cfg.file_provider.clone();
+            let t_cfg = cfg.clone();
 
             thread::Builder::new()
                 .stack_size(STACK_SIZE)
-                .spawn(move || solver_worker(t_baq, t_s2, t_fp))
+                .spawn(move || solver_worker(t_baq, t_s2, t_cfg))
         })
         .collect::<Vec<std::io::Result<JoinHandle<()>>>>();
 
@@ -261,7 +262,7 @@ fn bav_assign_worker(
 
         let empty_skel_fstr = &filepaths.0.to_str().unwrap();
 
-        let results = solve(empty_skel_fstr);
+        let results = profiles_solve(empty_skel_fstr, &cfg.profiles);
 
         report_any_bugs(&filepaths.0, &results, &cfg.file_provider);
 
@@ -350,7 +351,7 @@ fn script_f_from_metadata_f(md_file: &PathBuf, fp: &FileProvider) -> Result<Path
 
 pub struct PoisonPill {}
 
-fn solver_worker(qin: BavAssingedQ, prev_stage: StageCompleteA, file_provider: FileProvider) {
+fn solver_worker(qin: BavAssingedQ, prev_stage: StageCompleteA, cfg: Config) {
     let mut backoff = MyBackoff::new();
 
     while !prev_stage.is_complete() || qin.len() > 0 {
@@ -362,25 +363,20 @@ fn solver_worker(qin: BavAssingedQ, prev_stage: StageCompleteA, file_provider: F
             }
         };
 
-        let results = solve(filepaths.0.to_str().unwrap_or("defaultname"));
+        let results = profiles_solve(filepaths.0.to_str().unwrap_or("defaultname"), &cfg.profiles);
 
         results
             .iter()
             .filter(|r| r.has_sat())
-            .for_each(|r| resub_model(r, &filepaths, &qin, &file_provider));
+            .for_each(|r| resub_model(r, &filepaths, &qin, &cfg));
 
-        if !report_any_bugs(filepaths.0.as_path(), &results, &file_provider) {
+        if !report_any_bugs(filepaths.0.as_path(), &results, &cfg.file_provider) {
             fs::remove_file(&filepaths.0).unwrap_or(());
         }
     }
 }
 
-fn resub_model(
-    result: &RSolve,
-    filepaths: &(PathBuf, PathBuf),
-    _q: &BavAssingedQ,
-    file_provider: &FileProvider,
-) {
+fn resub_model(result: &RSolve, filepaths: &(PathBuf, PathBuf), _q: &BavAssingedQ, cfg: &Config) {
     let (mut script, md) = match deserialize_from_f(&filepaths) {
         Ok(deserial) => deserial,
         Err(e) => {
@@ -398,7 +394,7 @@ fn resub_model(
     if to_replace.len() > 0 {
         rv(&mut script, &mut to_replace);
 
-        let resubbed_f = match file_provider.serialize_resub(&script, &md) {
+        let resubbed_f = match cfg.file_provider.serialize_resub(&script, &md) {
             Ok(f) => f,
             Err(e) => {
                 println!("Resub file name err {}", e);
@@ -406,9 +402,9 @@ fn resub_model(
             }
         };
 
-        let results = solve(resubbed_f.to_str().unwrap_or("defaultname"));
+        let results = profiles_solve(resubbed_f.to_str().unwrap_or("defaultname"), &cfg.profiles);
 
-        if !report_any_bugs(&resubbed_f, &results, &file_provider) {
+        if !report_any_bugs(&resubbed_f, &results, &cfg.file_provider) {
             fs::remove_file(&resubbed_f).unwrap_or(());
         }
     }

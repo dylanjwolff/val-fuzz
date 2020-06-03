@@ -8,7 +8,9 @@ use tempfile::Builder;
 
 #[macro_use]
 use serde::{Serialize, Deserialize};
+use crate::solver::ProfileIndex;
 use std::collections::hash_map::DefaultHasher;
+use std::collections::HashSet;
 use std::hash::Hash;
 use std::hash::Hasher;
 
@@ -17,6 +19,7 @@ pub struct Config {
     pub file_provider: FileProvider,
     pub max_iter: u32,
     pub rng_seed: u64,
+    pub profiles: HashSet<ProfileIndex>,
 }
 
 macro_rules! liftio {
