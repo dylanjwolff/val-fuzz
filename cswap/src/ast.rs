@@ -46,6 +46,7 @@ pub enum Sort {
     Str(),
     Bool(),
     BitVec(u32),
+    Fp(String, String),
     Array(),
     UserDef(String),
     Compound(Vec<SortRc>),
@@ -264,6 +265,36 @@ impl fmt::Display for Constant {
     }
 }
 
+impl Constant {
+    pub fn sort(&self) -> Sort {
+        match self {
+            Constant::UInt(_) => Sort::UInt(),
+            Constant::Dec(_) => Sort::Dec(),
+            Constant::Str(_) => Sort::Str(),
+            Constant::Bool(_) => Sort::Bool(),
+            Constant::Bin(bit_s) => Sort::BitVec(bit_s.len() as u32),
+            Constant::Hex(hit_s) => Sort::BitVec((hit_s.len() as u32) * 4),
+            Constant::Fp(fp) => match fp {
+                FPConst::PInf(m, n)
+                | FPConst::NInf(m, n)
+                | FPConst::PZero(m, n)
+                | FPConst::NZero(m, n)
+                | FPConst::Nan(m, n) => Sort::Fp(m.to_owned(), n.to_owned()),
+                FPConst::Num(_, e, s) => Sort::Fp(e.len().to_string(), (s.len() - 1).to_string()),
+            },
+        }
+    }
+}
+
+impl BitVecConst {
+    fn len(&self) -> u32 {
+        match self {
+            BitVecConst::Bin(bits) => bits.len() as u32,
+            BitVecConst::Hex(hits) => (hits.len() as u32) * 4,
+        }
+    }
+}
+
 impl fmt::Display for FPConst {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         match self {
@@ -300,6 +331,7 @@ impl fmt::Display for Sort {
             Sort::Dec() => write!(f, "Real"),
             Sort::Bool() => write!(f, "Bool"),
             Sort::Str() => write!(f, "String"),
+            Sort::Fp(m, n) => write!(f, "(_ FloatingPoint {} {})", m, n),
             Sort::BitVec(len) => write!(f, "(_ BitVec {})", len),
             Sort::Array() => write!(f, "Array"),
             Sort::UserDef(s) => write!(f, "{}", s),

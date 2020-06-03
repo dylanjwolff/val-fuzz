@@ -141,6 +141,7 @@ fn constant(s: &str) -> IResult<&str, Constant> {
         map(hex, |h| Constant::Hex(h.to_owned())),
         map(bin, |b| Constant::Bin(b.to_owned())),
         map(string, |s| Constant::Str(s.to_owned())),
+        map(fp, |f| Constant::Fp(f)),
     ))(s)
 }
 
@@ -499,6 +500,19 @@ mod tests {
     use super::*;
     use insta::assert_debug_snapshot;
     use std::fs;
+
+    #[test]
+    fn sort_of_const_special_snap() {
+        let c = constant("(_ NaN 2 3)").unwrap().1;
+        assert_debug_snapshot!(format!("{}", c.sort()));
+    }
+
+    #[test]
+    fn sort_of_const_num_snap() {
+        let c = constant("(fp #b0 #xf #b10110)").unwrap().1;
+        assert_debug_snapshot!(format!("{}", c.sort()));
+    }
+
     #[test]
     fn fp_snap() {
         assert_debug_snapshot!(fp("(fp #b0 #b00000000000 #x0000000000000)"));
