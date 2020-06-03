@@ -114,6 +114,23 @@ pub enum Constant {
     Bin(Vec<char>),
     Str(String),
     Bool(bool),
+    Fp(FPConst),
+}
+
+#[derive(Serialize, Deserialize, Debug, Eq, PartialEq, Clone)]
+pub enum FPConst {
+    Num(BitVecConst, BitVecConst, BitVecConst),
+    PZero(String, String),
+    NZero(String, String),
+    PInf(String, String),
+    NInf(String, String),
+    Nan(String, String),
+}
+
+#[derive(Serialize, Deserialize, Debug, Eq, PartialEq, Clone)]
+pub enum BitVecConst {
+    Hex(String),
+    Bin(Vec<char>),
 }
 
 #[allow(non_camel_case_types)]
@@ -242,6 +259,29 @@ impl fmt::Display for Constant {
             Constant::Str(s) => write!(f, "\"{}\"", s),
             Constant::Bool(b) => write!(f, "{}", b),
             Constant::Bin(bv) => write!(f, "#b{}", bv.into_iter().collect::<String>()),
+            Constant::Fp(fp) => write!(f, "{}", fp),
+        }
+    }
+}
+
+impl fmt::Display for FPConst {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        match self {
+            FPConst::Num(i, e, s) => write!(f, "(fp {} {} {})", i, e, s),
+            FPConst::PInf(m, n) => write!(f, "(_ +oo {} {})", m, n),
+            FPConst::NInf(m, n) => write!(f, "(_ -oo {} {})", m, n),
+            FPConst::PZero(m, n) => write!(f, "(_ +zero {} {})", m, n),
+            FPConst::NZero(m, n) => write!(f, "(_ -zero {} {})", m, n),
+            FPConst::Nan(m, n) => write!(f, "(_ NaN {} {})", m, n),
+        }
+    }
+}
+
+impl fmt::Display for BitVecConst {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        match self {
+            BitVecConst::Hex(s) => write!(f, "#x{}", s),
+            BitVecConst::Bin(bv) => write!(f, "#b{}", bv.into_iter().collect::<String>()),
         }
     }
 }

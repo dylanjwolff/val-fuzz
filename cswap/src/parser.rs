@@ -1,6 +1,6 @@
 use super::ast::{
-    BoolOp, Command, Constant, Logic, SExp, SExpBoxRc, SExpRc, Script, Sort, SortRc, Symbol,
-    SymbolRc,
+    BitVecConst, BoolOp, Command, Constant, FPConst, Logic, SExp, SExpBoxRc, SExpRc, Script, Sort,
+    SortRc, Symbol, SymbolRc,
 };
 use nom::branch::alt;
 use nom::bytes::complete::take_until;
@@ -88,6 +88,50 @@ fn string(s: &str) -> IResult<&str, &str> {
     map(tuple((char('"'), not_quote, char('"'))), |(_, sout, _)| {
         sout
     })(s)
+}
+
+fn bv(s: &str) -> IResult<&str, BitVecConst> {
+    alt((
+        map(hex, |h| BitVecConst::Hex(h.to_owned())),
+        map(bin, |b| BitVecConst::Bin(b.to_owned())),
+    ))(s)
+}
+
+fn fp(s: &str) -> IResult<&str, FPConst> {
+    let num = preceded(
+        ws!(tag("fp")),
+        map(tuple((ws!(bv), ws!(bv), ws!(bv))), |(i, e, s)| {
+            FPConst::Num(i, e, s)
+        }),
+    );
+
+    let specials = preceded(
+        ws!(tag("_")),
+        alt((
+            map(
+                preceded(ws!(tag("+oo")), tuple((ws!(integer), ws!(integer)))),
+                |(m, n)| FPConst::PInf(m.to_owned(), n.to_owned()),
+            ),
+            map(
+                preceded(ws!(tag("-oo")), tuple((ws!(integer), ws!(integer)))),
+                |(m, n)| FPConst::NInf(m.to_owned(), n.to_owned()),
+            ),
+            map(
+                preceded(ws!(tag("-zero")), tuple((ws!(integer), ws!(integer)))),
+                |(m, n)| FPConst::NZero(m.to_owned(), n.to_owned()),
+            ),
+            map(
+                preceded(ws!(tag("+zero")), tuple((ws!(integer), ws!(integer)))),
+                |(m, n)| FPConst::PZero(m.to_owned(), n.to_owned()),
+            ),
+            map(
+                preceded(ws!(tag("NaN")), tuple((ws!(integer), ws!(integer)))),
+                |(m, n)| FPConst::Nan(m.to_owned(), n.to_owned()),
+            ),
+        )),
+    );
+
+    brack!(alt((num, specials)))(s)
 }
 
 fn constant(s: &str) -> IResult<&str, Constant> {
@@ -455,6 +499,15 @@ mod tests {
     use super::*;
     use insta::assert_debug_snapshot;
     use std::fs;
+    #[test]
+    fn fp_snap() {
+        assert_debug_snapshot!(fp("(fp #b0 #b00000000000 #x0000000000000)"));
+    }
+
+    #[test]
+    fn fp_special_snap() {
+        assert_debug_snapshot!(fp("(_ +oo 2 3)"));
+    }
 
     #[test]
     fn generic_snap() {
