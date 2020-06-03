@@ -6,7 +6,6 @@ use std::path::PathBuf;
 
 use tempfile::Builder;
 
-
 #[macro_use]
 use serde::{Serialize, Deserialize};
 use std::collections::hash_map::DefaultHasher;

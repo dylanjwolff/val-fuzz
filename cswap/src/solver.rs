@@ -10,7 +10,6 @@ use std::time::Duration;
 
 use tempfile::Builder;
 
-
 #[derive(Debug, Eq, PartialEq, Clone)]
 pub enum SolveResult {
     SoundnessBug,
@@ -512,7 +511,6 @@ pub fn check_valid_solve_as_temp(script: &Script) -> Result<Vec<RSolve>, String>
 mod tests {
     use super::*;
     use insta::assert_debug_snapshot;
-    
 
     #[test]
     fn tempfile_solve_snap() {

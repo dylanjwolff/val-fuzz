@@ -1,4 +1,3 @@
-
 use std::cell::RefCell;
 use std::fmt;
 use std::fs;
@@ -397,7 +396,6 @@ mod tests {
     use super::*;
     use crate::parser::*;
     use insta::assert_debug_snapshot;
-    
 
     #[test]
     fn sort_display_snap() {
