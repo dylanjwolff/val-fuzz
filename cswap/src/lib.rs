@@ -110,6 +110,16 @@ fn launch(qs: (InputPPQ, SkeletonQueue), worker_counts: (u8, u8, u8), cfg: Confi
         })
         .collect::<Vec<std::io::Result<JoinHandle<()>>>>();
 
+    thread::Builder::new()
+        .spawn(move || {
+            let mut b = MyBackoff::new();
+            loop {
+                b.snooze();
+                println!("QLENS: {} {} {}", qs.0.len(), qs.1.len(), a_baq.len());
+            }
+        })
+        .unwrap();
+
     let mut backoff = MyBackoff::new();
     for h in handles {
         h.unwrap().join().unwrap();
@@ -127,13 +137,6 @@ fn launch(qs: (InputPPQ, SkeletonQueue), worker_counts: (u8, u8, u8), cfg: Confi
         h.unwrap().join().unwrap();
         backoff.snooze();
     }
-
-    println!(
-        "Queue lengths {} {} {}",
-        qs.0.len(),
-        qs.1.len(),
-        a_baq.len()
-    );
 }
 
 pub fn from_skels(dirname: &str, worker_counts: (u8, u8), mut cfg: Config) {
