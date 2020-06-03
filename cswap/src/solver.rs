@@ -91,6 +91,12 @@ pub fn profiles_to_string() -> String {
         .join("\n")
 }
 
+pub fn all_profiles() -> HashSet<ProfileIndex> {
+    (0..Z3_PROFILES.len() + CVC4_PROFILES.len())
+        .map(|p| ProfileIndex::new(p))
+        .collect()
+}
+
 #[derive(Debug, Eq, PartialEq, Hash, Clone)]
 pub enum ProfileIndex {
     Z3(usize),

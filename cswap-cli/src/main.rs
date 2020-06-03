@@ -10,12 +10,18 @@ use cswap::config::Config;
 use cswap::config::FileProvider;
 use cswap::exec;
 use cswap::from_skels;
+use cswap::solver::all_profiles;
+use cswap::solver::profiles_to_string;
+use cswap::solver::ProfileIndex;
+use std::collections::HashSet;
 
 const DIR: &'static str = "Seed/Skeleton Directory";
 const FROM_SKELS: &'static str = "from-skels";
 const WORKERS: &'static str = "worker-counts";
 const MAX_ITER: &'static str = "max-iter";
 const SEED: &'static str = "seed";
+const PROFILES: &'static str = "profiles";
+const LIST_PROFILES: &'static str = "list-profiles";
 
 fn main() {
     let matches: ArgMatches = App::new("Value Constant Mutation Fuzzer for SMTlib2 Solvers")
@@ -48,8 +54,28 @@ fn main() {
                 .help("Seed for randomization. Runs are repeatable with the same seed")
                 .takes_value(true),
         )
+        .arg(
+            Arg::with_name(PROFILES)
+                .short("p")
+                .help("Set the solver profiles to use")
+                .takes_value(true),
+        )
+        .arg(
+            Arg::with_name(LIST_PROFILES)
+                .short("l")
+                .help("List the profiles availaible for use with the -p option"),
+        )
         .get_matches();
 
+    if matches.is_present(LIST_PROFILES) {
+        println!("{}", profiles_to_string());
+        return;
+    }
+
+    let profiles = match matches.value_of(PROFILES) {
+        Some(pstr) => parse_profiles(pstr),
+        None => all_profiles(),
+    };
     let dir_name = matches.value_of(DIR).unwrap();
     let workers = match matches.value_of(WORKERS) {
         Some(workerstr) => parse_workers(workerstr),
@@ -70,6 +96,7 @@ fn main() {
         file_provider: fp,
         rng_seed: seed,
         max_iter: max_iter,
+        profiles: profiles,
     };
 
     match matches.is_present(FROM_SKELS) {
@@ -88,4 +115,12 @@ fn parse_workers(workern_str: &str) -> (u8, u8, u8) {
         workers.next().unwrap(),
         workers.next().unwrap(),
     )
+}
+
+fn parse_profiles(profiles_str: &str) -> HashSet<ProfileIndex> {
+    profiles_str
+        .split(',')
+        .map(|strind| strind.parse::<usize>().unwrap())
+        .map(|ind| ProfileIndex::new(ind))
+        .collect()
 }
