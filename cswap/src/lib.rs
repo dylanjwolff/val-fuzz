@@ -65,6 +65,12 @@ type SkeletonQueue = Arc<SegQueue<(PathBuf, PathBuf)>>;
 type BavAssingedQ = Arc<ArrayQueue<(PathBuf, PathBuf)>>;
 type StageCompleteA = Arc<StageComplete>;
 
+macro_rules! liftio {
+    ($x:expr) => {
+        $x.map_err(|e| io::Error::new(io::ErrorKind::Other, format!("Lifted: {:?}", e)))
+    };
+}
+
 #[derive(Debug, Clone)]
 pub struct Config {
     pub file_provider: FileProvider,
@@ -117,10 +123,9 @@ impl FileProvider {
             .rand_bytes(0)
             .suffix(&md.seed_file)
             .tempfile_in(&self.skeldir)?;
-        //  tfile.keep();
-        let path = tfile.path();
-        md.skeleton_file = name(&path);
-        Ok(path.to_path_buf())
+        let (_, pb) = liftio!(tfile.keep())?;
+        md.skeleton_file = name(&pb);
+        Ok(pb)
     }
 
     fn mdfile<'a>(&self, md: &'a mut Metadata) -> io::Result<PathBuf> {
@@ -129,10 +134,9 @@ impl FileProvider {
             .rand_bytes(0)
             .suffix(&md.seed_file)
             .tempfile_in(&self.mddir)?;
-        //  tfile.keep();
-        let path = tfile.path();
-        md.metadata_file = name(path);
-        Ok(path.to_path_buf())
+        let (_, pb) = liftio!(tfile.keep())?;
+        md.metadata_file = name(&pb);
+        Ok(pb)
     }
 
     fn iterfile(&self, md: &Metadata) -> io::Result<PathBuf> {
@@ -140,9 +144,9 @@ impl FileProvider {
             .prefix("iter_")
             .rand_bytes(10)
             .suffix(&md.seed_file)
-            .tempfile_in(&self.bugdir)?;
-        //  tfile.keep();
-        Ok(tfile.path().to_path_buf())
+            .tempfile_in(&self.scratchdir)?;
+        let (_, pb) = liftio!(tfile.keep())?;
+        Ok(pb)
     }
 
     fn resubfile(&self, md: &Metadata) -> io::Result<PathBuf> {
@@ -150,9 +154,9 @@ impl FileProvider {
             .prefix("resub_")
             .rand_bytes(10)
             .suffix(&md.seed_file)
-            .tempfile_in(&self.bugdir)?;
-        //  tfile.keep();
-        Ok(tfile.path().to_path_buf())
+            .tempfile_in(&self.scratchdir)?;
+        let (_, pb) = liftio!(tfile.keep())?;
+        Ok(pb)
     }
 
     fn bug_report(&self, buggy_file: &Path, report: &str) {
@@ -166,7 +170,10 @@ impl FileProvider {
                     .unwrap_or("default_name"),
             )
             .tempfile_in(&self.bugdir)
-            .and_then(|tf| fs::write(tf.path(), report));
+            .and_then(|tf| {
+                fs::write(tf.path(), report)?;
+                liftio!(tf.keep())
+            });
         match r {
             Err(e) => println!("Error writing bug report for {:?}: {}", buggy_file, e),
             _ => (),
@@ -528,7 +535,6 @@ fn mutator_worker(
             }
         };
 
-        println!("Begin file {:?}", filepath);
         backoff.reset();
         match strip_and_transform(&filepath) {
             Some((script, mut md)) => {
@@ -541,7 +547,6 @@ fn mutator_worker(
             }
             None => continue,
         }
-        println!("End file {:?}", filepath);
     }
 
     stage.finish();
@@ -605,7 +610,6 @@ fn add_iterations_to_q(
     let script_str = script.to_string();
 
     let num_bavs = md.bavns.len();
-    println!("starting max(2^{}, {}) iterations", num_bavs, cfg.max_iter);
 
     let mut urng = RandUniqPermGen::new_definite_seeded(
         cfg.get_specific_seed(&md.seed_file),
@@ -677,7 +681,6 @@ fn solver_worker(qin: BavAssingedQ, prev_stage: StageCompleteA, file_provider: F
             }
         };
 
-        println!("Checking file {:?}", filepaths.0);
         let results = solve(filepaths.0.to_str().unwrap_or("defaultname"));
 
         results
@@ -688,8 +691,6 @@ fn solver_worker(qin: BavAssingedQ, prev_stage: StageCompleteA, file_provider: F
         if !report_any_bugs(filepaths.0.as_path(), &results, &file_provider) {
             fs::remove_file(&filepaths.0).unwrap_or(());
         }
-
-        println!("Done hecking file {:?}", &filepaths.0);
     }
 }
 
@@ -724,15 +725,11 @@ fn resub_model(
             }
         };
 
-        println!("RESUB~~~ {:?} ", resubbed_f);
-
         let results = solve(resubbed_f.to_str().unwrap_or("defaultname"));
 
         if !report_any_bugs(&resubbed_f, &results, &file_provider) {
             fs::remove_file(&resubbed_f).unwrap_or(());
         }
-
-        println!("Done hecking file {:?}", &resubbed_f);
     }
 }
 
@@ -807,7 +804,6 @@ impl RandUniqPermGen {
 pub fn strip_and_transform(source_file: &Path) -> Option<(Script, Metadata)> {
     let mut script = parser::script_from_f(source_file).ok()?;
     // TODO error handling here on prev 3 lines
-    println!("Done parsing");
 
     if script.is_unsupported_logic() {
         return None;
@@ -815,7 +811,6 @@ pub fn strip_and_transform(source_file: &Path) -> Option<(Script, Metadata)> {
 
     let mut md = Metadata::new(source_file);
     to_skel(&mut script, &mut md).ok()?;
-    println!("Done skelling");
     return Some((script, md));
 }
 
