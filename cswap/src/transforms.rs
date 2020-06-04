@@ -42,10 +42,10 @@ fn set_logic_all(script: &mut Script) {
         .map(|cmd| cmd.replace(Command::Logic(rccell!(Logic::Other("ALL".to_owned())))));
 }
 
-fn init_vars(script: &mut Script, vars: Vec<(String, Sort)>) {
+fn init_vars(script: &mut Script, vars: Vec<(String, Sort)>) -> Vec<CommandRc> {
     let Script::Commands(cmds) = script;
     if cmds.len() == 0 {
-        return;
+        return vec![];
     }
 
     let maybe_log_pos = cmds.iter().position(|cmd| cmd.borrow().is_logic());
@@ -63,8 +63,9 @@ fn init_vars(script: &mut Script, vars: Vec<(String, Sort)>) {
         .map(|cmd| rccell!(cmd))
         .collect::<Vec<CommandRc>>();
 
-    cmds.append(&mut decls);
+    cmds.append(&mut decls.clone());
     cmds.append(&mut end);
+    decls
 }
 
 fn add_ba(script: &mut Script, bavs: Vec<(String, SExp, VarBindings)>) {
@@ -180,7 +181,9 @@ pub fn to_skel(script: &mut Script, md: &mut Metadata) -> Result<(), ()> {
 
     let mut vng = VarNameGenerator::new("GEN");
     let choles = choles(script);
-    rcholes(script, choles, md, is_valid);
+    if !try_all_rcholes(script, &choles, md, is_valid) {
+        rcholes(script, &choles, md, is_valid);
+    }
 
     let mut scopes = BTreeMap::new();
     rl(script, &mut scopes)?;
@@ -400,9 +403,47 @@ impl Rcse {
     }
 }
 
+fn rmv_cmds(cmds: Vec<CommandRc>) {
+    for cmd in cmds {
+        let mut inner = cmd.borrow_mut();
+        *inner = Command::no_op();
+    }
+}
+
+pub fn try_all_rcholes(
+    script: &mut Script,
+    choles: &Vec<(Rcse, Sort)>,
+    md: &mut Metadata,
+    validator: fn(&Script) -> bool,
+) -> bool {
+    let mut vng = VarNameGenerator::new("GEN");
+    let mut names = vec![];
+    let mut ogvs = vec![];
+    for (chole, sort) in choles.iter() {
+        ogvs.push(chole.clone_v());
+        let name = vng.get_name(sort.clone());
+        chole.swap(SExp::Symbol(rccell!(Symbol::Var(name.clone()))));
+        names.push(name);
+    }
+
+    let inits = init_vars(script, vng.vars_generated);
+
+    if validator(script) {
+        println!("ALL RCHOLE SUCC");
+        md.constvns.extend(names);
+        true
+    } else {
+        for ((chole, _), ogv) in choles.iter().zip(ogvs.iter()) {
+            chole.swap(ogv.clone());
+        }
+        rmv_cmds(inits);
+        false
+    }
+}
+
 pub fn rcholes(
     script: &mut Script,
-    choles: Vec<(Rcse, Sort)>,
+    choles: &Vec<(Rcse, Sort)>,
     md: &mut Metadata,
     validator: fn(&Script) -> bool,
 ) {
@@ -416,13 +457,14 @@ pub fn rcholes(
         }
 
         let o = chole.clone_v();
-        let name = vng.get_name(sort);
+        let name = vng.get_name(sort.clone());
         chole.swap(SExp::Symbol(rccell!(Symbol::Var(name.clone()))));
-        init_vars(script, vec![vng.vars_generated.pop().unwrap()]);
+        let inits = init_vars(script, vec![vng.vars_generated.pop().unwrap()]);
 
         if validator(script) {
             md.constvns.push(name.clone())
         } else {
+            rmv_cmds(inits);
             chole.swap(o);
         }
     }
@@ -665,13 +707,62 @@ mod tests {
     use insta::assert_debug_snapshot;
 
     #[test]
+    fn all_rcholes_undo_then_inc_snap() {
+        let str_script = "(assert (= 3 4))";
+        let mut p = script(str_script).unwrap().1;
+        let mut md = Metadata::new_empty();
+        let choles = choles(&mut p);
+
+        try_all_rcholes(&mut p, &choles, &mut md, |_s| false);
+        rcholes(&mut p, &choles, &mut md, is_valid);
+
+        assert_debug_snapshot!(p.to_string());
+    }
+
+    #[test]
+    fn inc_rcholes_undo_snap() {
+        let str_script = "(assert (= 3 4))";
+        let mut p = script(str_script).unwrap().1;
+        let mut md = Metadata::new_empty();
+        let choles = choles(&mut p);
+
+        rcholes(&mut p, &choles, &mut md, |_s| false);
+
+        assert_debug_snapshot!(p.to_string());
+    }
+
+    #[test]
+    fn all_rcholes_undo_snap() {
+        let str_script = "(assert (= 3 4))";
+        let mut p = script(str_script).unwrap().1;
+        let mut md = Metadata::new_empty();
+        let choles = choles(&mut p);
+
+        assert!(!try_all_rcholes(&mut p, &choles, &mut md, |_s| false));
+
+        assert_debug_snapshot!(p.to_string() + "\n" + &md.constvns.join("\n"));
+    }
+
+    #[test]
+    fn all_rcholes_snap() {
+        let str_script = "(assert (= 3 4))";
+        let mut p = script(str_script).unwrap().1;
+        let mut md = Metadata::new_empty();
+        let choles = choles(&mut p);
+
+        assert!(try_all_rcholes(&mut p, &choles, &mut md, is_valid));
+
+        assert_debug_snapshot!(p.to_string() + "\n" + &md.constvns.join("\n"));
+    }
+
+    #[test]
     fn choles_snap() {
         let str_script = "(assert (= 3 4))";
         let mut p = script(str_script).unwrap().1;
         let mut md = Metadata::new_empty();
         let choles = choles(&mut p);
 
-        rcholes(&mut p, choles, &mut md, is_valid);
+        rcholes(&mut p, &choles, &mut md, is_valid);
 
         assert_debug_snapshot!(p.to_string());
     }

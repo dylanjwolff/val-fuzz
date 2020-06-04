@@ -1,0 +1,5 @@
+---
+source: cswap/src/transforms.rs
+expression: "p.to_string() + \"\\n\" + &md.constvns.join(\"\\n\")"
+---
+"(declare-const GEN1 Int)\n(declare-const GEN2 Int)\n(assert (= GEN1 GEN2))\n\nGEN1\nGEN2"
