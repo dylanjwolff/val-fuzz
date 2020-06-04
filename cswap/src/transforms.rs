@@ -429,7 +429,6 @@ pub fn try_all_rcholes(
     let inits = init_vars(script, vng.vars_generated);
 
     if validator(script) {
-        println!("ALL RCHOLE SUCC");
         md.constvns.extend(names);
         true
     } else {
