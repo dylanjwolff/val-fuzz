@@ -1,0 +1,1 @@
+ls ../samples/**/*.smt2 | shuf | head -10 | xargs -n 1 cp -t test
