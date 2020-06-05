@@ -15,6 +15,7 @@ use cswap::solver::profiles_to_string;
 use cswap::solver::ProfileIndex;
 use std::collections::HashSet;
 
+const STACK_SIZE: &'static str = "stack-size";
 const DIR: &'static str = "Seed/Skeleton Directory";
 const FROM_SKELS: &'static str = "from-skels";
 const WORKERS: &'static str = "worker-counts";
@@ -65,6 +66,11 @@ fn main() {
                 .short("l")
                 .help("List the profiles availaible for use with the -p option"),
         )
+        .arg(
+            Arg::with_name(STACK_SIZE)
+                .short("z")
+                .help("stack size per thread in MB (default 500MB)"),
+        )
         .get_matches();
 
     if matches.is_present(LIST_PROFILES) {
@@ -89,6 +95,10 @@ fn main() {
         Some(seedstr) => seedstr.parse::<u64>().unwrap(),
         None => 0,
     };
+    let stack_size = match matches.value_of(STACK_SIZE) {
+        Some(stacksstr) => stacksstr.parse::<usize>().unwrap() * 1024 * 1024,
+        None => 500 * 1024 * 1024,
+    };
     println!("Starting with workers {:?}", workers);
 
     let fp = FileProvider::new(&(seed.to_string() + "-cswap-fuzz-run-out"));
@@ -96,7 +106,8 @@ fn main() {
         file_provider: fp,
         rng_seed: seed,
         max_iter: max_iter,
-        profiles: profiles,
+        stack_size: stack_size,
+        profiles,
     };
 
     match matches.is_present(FROM_SKELS) {

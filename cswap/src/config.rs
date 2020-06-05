@@ -19,6 +19,7 @@ pub struct Config {
     pub file_provider: FileProvider,
     pub max_iter: u32,
     pub rng_seed: u64,
+    pub stack_size: usize,
     pub profiles: HashSet<ProfileIndex>,
 }
 

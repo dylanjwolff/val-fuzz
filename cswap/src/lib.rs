@@ -65,8 +65,7 @@ type BavAssingedQ = Arc<ArrayQueue<(PathBuf, PathBuf)>>;
 type StageCompleteA = Arc<StageComplete>;
 
 fn launch(qs: (InputPPQ, SkeletonQueue), worker_counts: (u8, u8, u8), cfg: Config) {
-    const STACK_SIZE: usize = 500 * 1024 * 1024; // 100mb
-    let baq = ArrayQueue::new(100);
+    let baq = ArrayQueue::new((worker_counts.1 as usize) * cfg.max_iter as usize);
     let a_baq = Arc::new(baq);
 
     let stage0 = match worker_counts.0 {
@@ -83,7 +82,7 @@ fn launch(qs: (InputPPQ, SkeletonQueue), worker_counts: (u8, u8, u8), cfg: Confi
             let t_fp = cfg.file_provider.clone();
 
             thread::Builder::new()
-                .stack_size(STACK_SIZE)
+                .stack_size(cfg.stack_size)
                 .spawn(move || mutator_worker(t_q, t_q2, t_s1, t_fp))
         })
         .collect::<Vec<std::io::Result<JoinHandle<()>>>>();
@@ -97,7 +96,7 @@ fn launch(qs: (InputPPQ, SkeletonQueue), worker_counts: (u8, u8, u8), cfg: Confi
             let t_cfg = cfg.clone();
 
             thread::Builder::new()
-                .stack_size(STACK_SIZE)
+                .stack_size(cfg.stack_size)
                 .spawn(move || bav_assign_worker(t_q2, t_s1, t_baq, t_s2, t_cfg))
         })
         .collect::<Vec<std::io::Result<JoinHandle<()>>>>();
@@ -109,7 +108,7 @@ fn launch(qs: (InputPPQ, SkeletonQueue), worker_counts: (u8, u8, u8), cfg: Confi
             let t_cfg = cfg.clone();
 
             thread::Builder::new()
-                .stack_size(STACK_SIZE)
+                .stack_size(cfg.stack_size)
                 .spawn(move || solver_worker(t_baq, t_s2, t_cfg))
         })
         .collect::<Vec<std::io::Result<JoinHandle<()>>>>();
