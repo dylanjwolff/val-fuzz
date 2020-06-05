@@ -21,11 +21,8 @@ pub mod utils;
 use crate::fuzzer::bav_assign;
 use crate::fuzzer::mutator;
 use crate::fuzzer::solver_fn;
-use crate::solver::profiles_solve;
-use crate::solver::RSolve;
-use crate::transforms::rv;
+
 use crate::utils::StageComplete;
-use ast::Script;
 
 use config::Config;
 use config::FileProvider;
@@ -34,17 +31,9 @@ use crossbeam::queue::ArrayQueue;
 use crossbeam::queue::PushError;
 use crossbeam::queue::SegQueue;
 
-use utils::dyn_fmt;
-use utils::to_strs;
 use utils::MyBackoff;
-use utils::RandUniqPermGen;
+
 use utils::Timer;
-
-use crate::ast::SExp;
-
-use rand::Rng;
-
-use solver::solve;
 
 use std::fs;
 use std::path::Path;
@@ -285,7 +274,7 @@ mod tests {
     use super::*;
     use crate::parser::script;
     use crate::solver::check_valid_solve;
-    use bit_vec::BitVec;
+
     use std::fs;
 
     use std::thread;

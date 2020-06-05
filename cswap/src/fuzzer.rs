@@ -11,16 +11,13 @@ use crate::utils::dyn_fmt;
 use crate::utils::to_strs;
 use crate::utils::MyBackoff;
 use crate::utils::RandUniqPermGen;
-use crate::utils::StageComplete;
-use crate::utils::Timer;
+
 use walkdir::WalkDir;
 
 use crate::ast::SExp;
 use crate::transforms::{end_insert_pt, get_bav_assign_fmt_str, to_skel};
 
 use rand::Rng;
-
-use crate::solver::solve;
 
 use std::fs;
 use std::path::Path;
@@ -78,7 +75,7 @@ fn do_iterations(
     mut md: Metadata,
     cfg: &Config,
 ) -> Option<Vec<(PathBuf, PathBuf)>> {
-    let mut backoff = MyBackoff::new();
+    let _backoff = MyBackoff::new();
 
     let eip = end_insert_pt(&script);
     script.init(eip);
