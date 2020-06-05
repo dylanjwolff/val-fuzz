@@ -75,8 +75,8 @@ fn main() {
         .arg(
             Arg::with_name(STACK_SIZE)
                 .short("z")
+                .takes_value(true)
                 .help("stack size per thread in MB (default 500MB)"),
-                .takes_value(true),
         )
         .get_matches();
 
