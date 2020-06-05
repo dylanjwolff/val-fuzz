@@ -1,4 +1,4 @@
-use crate::ast::{AstNode, BoolOp, Command, Constant, Logic, SExp, Script, Sort, Symbol};
+use crate::ast::{AstNode, BoolOp, Command, Logic, SExp, Script, Sort, Symbol};
 use crate::ast::{CommandRc, SExpRc, SortRc, SymbolRc};
 
 use crate::solver::check_valid_solve_as_temp;
@@ -57,7 +57,7 @@ fn init_vars(script: &mut Script, vars: Vec<(String, Sort)>) -> Vec<CommandRc> {
 
     let mut end = cmds.split_off(after_log_pos);
 
-    let mut decls = vars
+    let decls = vars
         .into_iter()
         .map(|(vname, sort)| Command::DeclConst(vname, rccell!(sort)))
         .map(|cmd| rccell!(cmd))

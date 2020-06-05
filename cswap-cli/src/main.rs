@@ -15,6 +15,7 @@ use cswap::solver::profiles_to_string;
 use cswap::solver::ProfileIndex;
 use std::collections::HashSet;
 
+const STACK_SIZE: &'static str = "stack-size";
 const DIR: &'static str = "Seed/Skeleton Directory";
 const FROM_SKELS: &'static str = "from-skels";
 const WORKERS: &'static str = "worker-counts";
@@ -22,6 +23,7 @@ const MAX_ITER: &'static str = "max-iter";
 const SEED: &'static str = "seed";
 const PROFILES: &'static str = "profiles";
 const LIST_PROFILES: &'static str = "list-profiles";
+const NO_MULTITHREAD: &'static str = "no-multithreading";
 
 fn main() {
     let matches: ArgMatches = App::new("Value Constant Mutation Fuzzer for SMTlib2 Solvers")
@@ -65,6 +67,17 @@ fn main() {
                 .short("l")
                 .help("List the profiles availaible for use with the -p option"),
         )
+        .arg(
+            Arg::with_name(NO_MULTITHREAD)
+                .short("n")
+                .help("Run the fuzzer in a single process/thread for debugging"),
+        )
+        .arg(
+            Arg::with_name(STACK_SIZE)
+                .short("z")
+                .takes_value(true)
+                .help("stack size per thread in MB (default 500MB)"),
+        )
         .get_matches();
 
     if matches.is_present(LIST_PROFILES) {
@@ -89,6 +102,10 @@ fn main() {
         Some(seedstr) => seedstr.parse::<u64>().unwrap(),
         None => 0,
     };
+    let stack_size = match matches.value_of(STACK_SIZE) {
+        Some(stacksstr) => stacksstr.parse::<usize>().unwrap() * 1024 * 1024,
+        None => 500 * 1024 * 1024,
+    };
     println!("Starting with workers {:?}", workers);
 
     let fp = FileProvider::new(&(seed.to_string() + "-cswap-fuzz-run-out"));
@@ -96,8 +113,14 @@ fn main() {
         file_provider: fp,
         rng_seed: seed,
         max_iter: max_iter,
-        profiles: profiles,
+        stack_size: stack_size,
+        profiles,
     };
+
+    if matches.is_present(NO_MULTITHREAD) {
+        cswap::fuzzer::exec_single_thread(dir_name, cfg);
+        return;
+    }
 
     match matches.is_present(FROM_SKELS) {
         true => from_skels(dir_name, (workers.1, workers.2), cfg),
