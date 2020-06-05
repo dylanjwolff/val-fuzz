@@ -12,11 +12,15 @@ extern crate lazy_static;
 pub mod ast;
 
 pub mod config;
+pub mod fuzzer;
 pub mod parser;
 pub mod solver;
 pub mod transforms;
 pub mod utils;
 
+use crate::fuzzer::bav_assign;
+use crate::fuzzer::mutator;
+use crate::fuzzer::solver_fn;
 use crate::solver::profiles_solve;
 use crate::solver::RSolve;
 use crate::transforms::rv;
@@ -51,7 +55,6 @@ use std::sync::Arc;
 use std::thread;
 use std::thread::JoinHandle;
 
-use transforms::{end_insert_pt, get_bav_assign_fmt_str, to_skel};
 use walkdir::WalkDir;
 #[macro_use]
 use std::hash::{Hasher};
@@ -195,6 +198,7 @@ pub fn exec(dirname: &str, worker_counts: (u8, u8, u8), cfg: Config) {
     launch((aq, aq2), worker_counts, cfg);
 }
 
+pub struct PoisonPill {}
 fn mutator_worker(
     qin: InputPPQ,
     qout: SkeletonQueue,
@@ -218,16 +222,8 @@ fn mutator_worker(
         };
 
         backoff.reset();
-        match strip_and_transform(&filepath) {
-            Some((script, mut md)) => {
-                match file_provider.serialize_skel_and_md(&script, &mut md) {
-                    Ok((skel_file, md_file)) => {
-                        qout.push((skel_file.to_path_buf(), md_file.to_path_buf()))
-                    }
-                    Err(e) => println!("Skel/Md Serial Err: {}", e),
-                };
-            }
-            None => continue,
+        if let Some((skelf, mdf)) = mutator(filepath, &file_provider) {
+            qout.push((skelf, mdf))
         }
     }
 
@@ -252,105 +248,18 @@ fn bav_assign_worker(
             }
         };
 
-        let (script, md) = match deserialize_from_f(&filepaths) {
-            Ok(deserial) => deserial,
-            Err(e) => {
-                println!("baw deserial err in {:?}: {}", filepaths, e);
-                continue;
+        if let Some(mut all_to_add) = bav_assign(filepaths, &cfg) {
+            while let Some(mut to_push) = all_to_add.pop() {
+                while let Err(PushError(reject)) = qout.push(to_push) {
+                    to_push = reject;
+                    backoff.snooze();
+                }
             }
-        };
-
-        let empty_skel_fstr = &filepaths.0.to_str().unwrap();
-
-        let results = profiles_solve(empty_skel_fstr, &cfg.profiles);
-
-        report_any_bugs(&filepaths.0, &results, &cfg.file_provider);
-
-        if results.iter().all(|r| r.has_unrecoverable_error()) {
-            println!("All err on file {}", empty_skel_fstr);
-            fs::remove_file(filepaths.0).unwrap_or(());
-            fs::remove_file(filepaths.1).unwrap_or(());
-        } else {
-            add_iterations_to_q(script, md, Arc::clone(&qout), &cfg);
         }
     }
 
     stage.finish();
 }
-
-fn add_iterations_to_q(
-    mut script: Script,
-    mut md: Metadata,
-    qout: BavAssingedQ,
-    cfg: &Config,
-) -> Option<()> {
-    let mut backoff = MyBackoff::new();
-
-    let eip = end_insert_pt(&script);
-    script.init(eip);
-    script.replace(eip, get_bav_assign_fmt_str(&md.bavns));
-    let script_str = script.to_string();
-
-    let num_bavs = md.bavns.len();
-
-    let mut urng = RandUniqPermGen::new_definite_seeded(
-        cfg.get_specific_seed(&md.seed_file),
-        num_bavs,
-        cfg.max_iter,
-    );
-
-    while let Some(truth_values) = urng.sample() {
-        let new_file = cfg.file_provider.iterfile(&mut md).ok()?;
-        let str_with_model = dyn_fmt(&script_str, to_strs(&truth_values)).ok()?;
-        fs::write(&new_file, str_with_model).ok()?;
-        let mut to_push = (new_file.to_path_buf(), md.md_path(&cfg.file_provider));
-        while let Err(PushError(reject)) = qout.push(to_push) {
-            to_push = reject;
-            backoff.snooze();
-        }
-    }
-    Some(())
-}
-
-fn report_any_bugs(file: &Path, results: &Vec<RSolve>, fp: &FileProvider) -> bool {
-    results
-        .iter()
-        .find(|r| r.has_bug_error())
-        .map(|r| {
-            fp.bug_report(file, &format!("{}", r));
-        })
-        .is_some()
-        || if !RSolve::differential_test(&results).is_ok() {
-            fp.bug_report(file, &format!("{:?}", results));
-            true
-        } else {
-            false
-        }
-}
-
-fn deserialize_from_f(
-    (script_file, md_file): &(PathBuf, PathBuf),
-) -> Result<(Script, Metadata), String> {
-    let script = parser::script_from_f_unsanitized(script_file)?;
-
-    let md_contents =
-        fs::read_to_string(&md_file).map_err(|e| e.to_string() + " from metadata IO")?;
-    let md: Metadata =
-        serde_lexpr::from_str(&md_contents).map_err(|e| e.to_string() + " from serde")?;
-
-    Ok((script, md))
-}
-
-fn script_f_from_metadata_f(md_file: &PathBuf, fp: &FileProvider) -> Result<PathBuf, String> {
-    let md_contents =
-        fs::read_to_string(&md_file).map_err(|e| e.to_string() + " from metadata IO")?;
-    let md: Metadata =
-        serde_lexpr::from_str(&md_contents).map_err(|e| e.to_string() + " from serde")?;
-    Ok(md.skel_path(fp))
-}
-
-pub struct PoisonPill {}
-
 fn solver_worker(qin: BavAssingedQ, prev_stage: StageCompleteA, cfg: Config) {
     let mut backoff = MyBackoff::new();
 
@@ -362,67 +271,16 @@ fn solver_worker(qin: BavAssingedQ, prev_stage: StageCompleteA, cfg: Config) {
                 continue;
             }
         };
-
-        let results = profiles_solve(filepaths.0.to_str().unwrap_or("defaultname"), &cfg.profiles);
-
-        results
-            .iter()
-            .filter(|r| r.has_sat())
-            .for_each(|r| resub_model(r, &filepaths, &qin, &cfg));
-
-        if !report_any_bugs(filepaths.0.as_path(), &results, &cfg.file_provider) {
-            fs::remove_file(&filepaths.0).unwrap_or(());
-        }
+        solver_fn(filepaths, &cfg);
     }
 }
-
-fn resub_model(result: &RSolve, filepaths: &(PathBuf, PathBuf), _q: &BavAssingedQ, cfg: &Config) {
-    let (mut script, md) = match deserialize_from_f(&filepaths) {
-        Ok(deserial) => deserial,
-        Err(e) => {
-            println!("solver deserial err from {:?}: {}", filepaths, e);
-            return;
-        }
-    };
-
-    let mut to_replace: Vec<(String, SExp)> = result
-        .extract_const_var_vals(&md.constvns)
-        .into_iter()
-        .map(|(sym, val)| (sym.to_string(), val.clone()))
-        .collect();
-
-    if to_replace.len() > 0 {
-        rv(&mut script, &mut to_replace);
-
-        let resubbed_f = match cfg.file_provider.serialize_resub(&script, &md) {
-            Ok(f) => f,
-            Err(e) => {
-                println!("Resub file name err {}", e);
-                return;
-            }
-        };
-
-        let results = profiles_solve(resubbed_f.to_str().unwrap_or("defaultname"), &cfg.profiles);
-
-        if !report_any_bugs(&resubbed_f, &results, &cfg.file_provider) {
-            fs::remove_file(&resubbed_f).unwrap_or(());
-        }
-    }
+fn script_f_from_metadata_f(md_file: &PathBuf, fp: &FileProvider) -> Result<PathBuf, String> {
+    let md_contents =
+        fs::read_to_string(&md_file).map_err(|e| e.to_string() + " from metadata IO")?;
+    let md: Metadata =
+        serde_lexpr::from_str(&md_contents).map_err(|e| e.to_string() + " from serde")?;
+    Ok(md.skel_path(fp))
 }
-
-pub fn strip_and_transform(source_file: &Path) -> Option<(Script, Metadata)> {
-    let mut script = parser::script_from_f(source_file).ok()?;
-    // TODO error handling here on prev 3 lines
-
-    if script.is_unsupported_logic() {
-        return None;
-    }
-
-    let mut md = Metadata::new(source_file);
-    to_skel(&mut script, &mut md).ok()?;
-    return Some((script, md));
-}
-
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -434,17 +292,6 @@ mod tests {
     use std::thread;
 
     const STACK_SIZE: usize = 20 * 1024 * 1024;
-
-    #[test]
-    fn bv_replace() {
-        let fmt_str = get_bav_assign_fmt_str(&vec!["BAV1".to_owned()]).to_string();
-        println!("{}", fmt_str);
-        let bv = BitVec::from_elem(1, true);
-        assert_eq!(
-            dyn_fmt(&fmt_str, to_strs(&bv)).unwrap(),
-            "(assert (= BAV1 true))"
-        );
-    }
 
     #[ignore]
     #[test]
