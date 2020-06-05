@@ -23,6 +23,7 @@ const MAX_ITER: &'static str = "max-iter";
 const SEED: &'static str = "seed";
 const PROFILES: &'static str = "profiles";
 const LIST_PROFILES: &'static str = "list-profiles";
+const NO_MULTITHREAD: &'static str = "no-multithreading";
 
 fn main() {
     let matches: ArgMatches = App::new("Value Constant Mutation Fuzzer for SMTlib2 Solvers")
@@ -67,9 +68,15 @@ fn main() {
                 .help("List the profiles availaible for use with the -p option"),
         )
         .arg(
+            Arg::with_name(NO_MULTITHREAD)
+                .short("n")
+                .help("Run the fuzzer in a single process/thread for debugging"),
+        )
+        .arg(
             Arg::with_name(STACK_SIZE)
                 .short("z")
                 .help("stack size per thread in MB (default 500MB)"),
+                .takes_value(true),
         )
         .get_matches();
 
@@ -109,6 +116,11 @@ fn main() {
         stack_size: stack_size,
         profiles,
     };
+
+    if matches.is_present(NO_MULTITHREAD) {
+        cswap::fuzzer::exec_single_thread(dir_name, cfg);
+        return;
+    }
 
     match matches.is_present(FROM_SKELS) {
         true => from_skels(dir_name, (workers.1, workers.2), cfg),
