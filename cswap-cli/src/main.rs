@@ -2,6 +2,14 @@
 #[allow(unused)]
 extern crate clap;
 extern crate cswap;
+extern crate log;
+extern crate log4rs;
+
+use log::info;
+use log::LevelFilter;
+use log4rs::append::console::ConsoleAppender;
+use log4rs::config::Config as L4rsConfig;
+use log4rs::config::{Appender, Logger, Root};
 
 use clap::App;
 use clap::Arg;
@@ -24,6 +32,7 @@ const SEED: &'static str = "seed";
 const PROFILES: &'static str = "profiles";
 const LIST_PROFILES: &'static str = "list-profiles";
 const NO_MULTITHREAD: &'static str = "no-multithreading";
+const VERBOSITY: &'static str = "verbosity";
 
 fn main() {
     let matches: ArgMatches = App::new("Value Constant Mutation Fuzzer for SMTlib2 Solvers")
@@ -32,6 +41,12 @@ fn main() {
                 .help("Location of the seeds (or skeletons) for the run")
                 .required(true)
                 .index(1),
+        )
+        .arg(
+            Arg::with_name(VERBOSITY)
+                .short("v")
+                .multiple(true)
+                .help("Sets the level of verbosity of logging"),
         )
         .arg(
             Arg::with_name(FROM_SKELS)
@@ -80,6 +95,7 @@ fn main() {
         )
         .get_matches();
 
+    setup_logging(matches.occurrences_of(VERBOSITY));
     if matches.is_present(LIST_PROFILES) {
         println!("{}", profiles_to_string());
         return;
@@ -89,11 +105,14 @@ fn main() {
         Some(pstr) => parse_profiles(pstr),
         None => all_profiles(),
     };
+
     let dir_name = matches.value_of(DIR).unwrap();
     let workers = match matches.value_of(WORKERS) {
         Some(workerstr) => parse_workers(workerstr),
         None => (2, 2, 9),
     };
+    info!("Using {:?} worker configuration", workers);
+
     let max_iter = match matches.value_of(MAX_ITER) {
         Some(iterstr) => iterstr.parse::<u32>().unwrap(),
         None => 1,
@@ -106,7 +125,6 @@ fn main() {
         Some(stacksstr) => stacksstr.parse::<usize>().unwrap() * 1024 * 1024,
         None => 500 * 1024 * 1024,
     };
-    println!("Starting with workers {:?}", workers);
 
     let fp = FileProvider::new(&(seed.to_string() + "-cswap-fuzz-run-out"));
     let cfg = Config {
@@ -146,4 +164,23 @@ fn parse_profiles(profiles_str: &str) -> HashSet<ProfileIndex> {
         .map(|strind| strind.parse::<usize>().unwrap())
         .map(|ind| ProfileIndex::new(ind))
         .collect()
+}
+
+fn setup_logging(vb_occurrences: u64) {
+    let verbosity = match vb_occurrences {
+        0 => LevelFilter::Warn,
+        1 => LevelFilter::Info,
+        2 => LevelFilter::Debug,
+        3 | _ => LevelFilter::Trace,
+    };
+
+    let stdout = ConsoleAppender::builder().build();
+    let config = L4rsConfig::builder()
+        .appender(Appender::builder().build("stdout", Box::new(stdout)))
+        .logger(Logger::builder().build("cswap_cli", verbosity))
+        .logger(Logger::builder().build("cswap", verbosity))
+        .build(Root::builder().appender("stdout").build(LevelFilter::Warn))
+        .unwrap();
+
+    let _handle = log4rs::init_config(config).unwrap();
 }

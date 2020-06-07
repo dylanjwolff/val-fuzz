@@ -5,6 +5,7 @@ use crate::solver::check_valid_solve_as_temp;
 use crate::Metadata;
 use crate::Timer;
 use bit_vec::BitVec;
+use log::warn;
 use std::cell::RefCell;
 use std::collections::BTreeMap;
 use std::iter::once;
@@ -451,7 +452,7 @@ pub fn rcholes(
     let mut vng = VarNameGenerator::new("GEN");
     for (chole, sort) in choles {
         if timer.is_done() {
-            println!("Timeout filling Constant Holes");
+            warn!("Timeout filling Constant Holes");
             break;
         }
 
@@ -687,7 +688,7 @@ fn is_valid(s: &Script) -> bool {
     match check_valid_solve_as_temp(s) {
         Ok(responses) => responses.iter().any(|r| !r.has_unrecoverable_error()),
         Err(e) => {
-            println!("validator error!: {}", e);
+            warn!("validator error!: {}", e);
             false
         }
     }

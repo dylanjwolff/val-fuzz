@@ -1,3 +1,4 @@
+extern crate log;
 extern crate nom;
 extern crate rand;
 extern crate rand_core;
@@ -30,6 +31,10 @@ use config::Metadata;
 use crossbeam::queue::ArrayQueue;
 use crossbeam::queue::PushError;
 use crossbeam::queue::SegQueue;
+use log::debug;
+use log::info;
+use log::trace;
+use log::warn;
 
 use utils::MyBackoff;
 
@@ -107,7 +112,7 @@ fn launch(qs: (InputPPQ, SkeletonQueue), worker_counts: (u8, u8, u8), cfg: Confi
             let mut b = MyBackoff::new();
             loop {
                 b.snooze();
-                println!("QLENS: {} {} {}", qs.0.len(), qs.1.len(), a_baq.len());
+                info!("QLENS: {} {} {}", qs.0.len(), qs.1.len(), a_baq.len());
             }
         })
         .unwrap();
@@ -150,12 +155,12 @@ pub fn from_skels(dirname: &str, worker_counts: (u8, u8), mut cfg: Config) {
         let script_path = match script_f_from_metadata_f(&metad_path, &cfg.file_provider) {
             Ok(r) => r,
             Err(e) => {
-                println!("can't find script for {:?} error: {}", metad_path, e);
+                warn!("can't find script for {:?} error: {}", metad_path, e);
                 continue;
             }
         };
 
-        println!("push {:?}", metad_path);
+        debug!("push {:?}", metad_path);
         q2.push((script_path, metad_path));
     }
 
@@ -173,7 +178,7 @@ pub fn exec(dirname: &str, worker_counts: (u8, u8, u8), cfg: Config) {
         .filter(|e| !e.file_type().is_dir())
     {
         let filepath = entry.into_path();
-        println!("push {:?}", filepath);
+        debug!("push {:?}", filepath);
         q.push(Ok(filepath));
     }
     q.push(Err(PoisonPill {}));
@@ -236,7 +241,9 @@ fn bav_assign_worker(
             }
         };
 
-        if let Some(mut all_to_add) = bav_assign(filepaths, &cfg) {
+        trace!("Starting assignments of {:?} skeletion", filepaths.0);
+        if let Some(mut all_to_add) = bav_assign(filepaths.clone(), &cfg) {
+            trace!("Adding assignments of {:?} skeletion to the Q", filepaths.0);
             while let Some(mut to_push) = all_to_add.pop() {
                 while let Err(PushError(reject)) = qout.push(to_push) {
                     to_push = reject;
@@ -244,6 +251,7 @@ fn bav_assign_worker(
                 }
             }
         }
+        trace!("Done with adding assignments to {:?}", filepaths.0);
     }
 
     stage.finish();

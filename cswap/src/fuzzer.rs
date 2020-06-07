@@ -17,8 +17,11 @@ use walkdir::WalkDir;
 use crate::ast::SExp;
 use crate::transforms::{end_insert_pt, get_bav_assign_fmt_str, to_skel};
 
+use crate::liftio;
+use log::debug;
+use log::trace;
+use log::warn;
 use rand::Rng;
-
 use std::fs;
 use std::path::Path;
 use std::path::PathBuf;
@@ -31,7 +34,7 @@ pub fn exec_single_thread(dirname: &str, cfg: Config) {
         .filter(|e| !e.file_type().is_dir())
     {
         let filepath = entry.into_path();
-        println!("push {:?}", filepath);
+        debug!("push {:?}", filepath);
         q.push(filepath);
     }
 
@@ -53,7 +56,9 @@ pub fn mutator(filepath: PathBuf, file_provider: &FileProvider) -> Option<(PathB
 }
 
 pub fn bav_assign(filepaths: (PathBuf, PathBuf), cfg: &Config) -> Option<Vec<(PathBuf, PathBuf)>> {
+    trace!("WHAT");
     let (script, md) = deserialize_from_f(&filepaths).ok()?;
+    trace!("Validating skeleton for {}", md.seed_file);
     let empty_skel_fstr = &filepaths.0.to_str()?;
 
     let results = profiles_solve(empty_skel_fstr, &cfg.profiles);
@@ -61,7 +66,7 @@ pub fn bav_assign(filepaths: (PathBuf, PathBuf), cfg: &Config) -> Option<Vec<(Pa
     report_any_bugs(&filepaths.0, &results, &cfg.file_provider);
 
     if results.iter().all(|r| r.has_unrecoverable_error()) {
-        println!("All err on file {}", empty_skel_fstr);
+        warn!("All err on file {}", empty_skel_fstr);
         fs::remove_file(filepaths.0).unwrap_or(());
         fs::remove_file(filepaths.1).unwrap_or(());
         return Some(vec![]);
@@ -75,6 +80,7 @@ fn do_iterations(
     mut md: Metadata,
     cfg: &Config,
 ) -> Option<Vec<(PathBuf, PathBuf)>> {
+    trace!("Iterations beginning for {}", md.seed_file);
     let _backoff = MyBackoff::new();
 
     let eip = end_insert_pt(&script);
@@ -105,10 +111,12 @@ fn report_any_bugs(file: &Path, results: &Vec<RSolve>, fp: &FileProvider) -> boo
         .iter()
         .find(|r| r.has_bug_error())
         .map(|r| {
+            debug!("Reporting bug for file {:?}", file);
             fp.bug_report(file, &format!("{}", r));
         })
         .is_some()
         || if !RSolve::differential_test(&results).is_ok() {
+            debug!("Reporting soundness bug for file {:?}", file);
             fp.bug_report(file, &format!("{:?}", results));
             true
         } else {
@@ -146,7 +154,7 @@ fn resub_model(result: &RSolve, filepaths: &(PathBuf, PathBuf), cfg: &Config) {
     let (mut script, md) = match deserialize_from_f(&filepaths) {
         Ok(deserial) => deserial,
         Err(e) => {
-            println!("solver deserial err from {:?}: {}", filepaths, e);
+            warn!("solver deserial err from {:?}: {}", filepaths, e);
             return;
         }
     };
@@ -163,7 +171,7 @@ fn resub_model(result: &RSolve, filepaths: &(PathBuf, PathBuf), cfg: &Config) {
         let resubbed_f = match cfg.file_provider.serialize_resub(&script, &md) {
             Ok(f) => f,
             Err(e) => {
-                println!("Resub file name err {}", e);
+                warn!("Resub file name err {}", e);
                 return;
             }
         };
@@ -197,7 +205,7 @@ mod test {
     #[test]
     fn bv_replace() {
         let fmt_str = get_bav_assign_fmt_str(&vec!["BAV1".to_owned()]).to_string();
-        println!("{}", fmt_str);
+
         let bv = BitVec::from_elem(1, true);
         assert_eq!(
             dyn_fmt(&fmt_str, to_strs(&bv)).unwrap(),
