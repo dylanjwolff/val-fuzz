@@ -27,7 +27,14 @@ pub struct Config {
 #[macro_export]
 macro_rules! liftio {
     ($x:expr) => {
-        $x.map_err(|e| io::Error::new(io::ErrorKind::Other, format!("Lifted: {:?}", e)))
+        $x.map_err(|e| io::Error::new(io::ErrorKind::Other, format!("(Lifted) {:?}", e)))
+    };
+}
+
+#[macro_export]
+macro_rules! liftio_e {
+    ($x:expr) => {
+        io::Error::new(io::ErrorKind::Other, format!("(Lifted) {:?}", $x))
     };
 }
 

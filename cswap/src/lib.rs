@@ -215,9 +215,10 @@ fn mutator_worker(
         };
 
         backoff.reset();
-        if let Some((skelf, mdf)) = mutator(filepath, &file_provider) {
-            qout.push((skelf, mdf))
-        }
+        match mutator(filepath.clone(), &file_provider) {
+            Ok((skelf, mdf)) => qout.push((skelf, mdf)),
+            Err(e) => warn!("Mutator error: {} in files {:?}", e, filepath),
+        };
     }
 
     stage.finish();
@@ -242,14 +243,17 @@ fn bav_assign_worker(
         };
 
         trace!("Starting assignments of {:?} skeletion", filepaths.0);
-        if let Some(mut all_to_add) = bav_assign(filepaths.clone(), &cfg) {
-            trace!("Adding assignments of {:?} skeletion to the Q", filepaths.0);
-            while let Some(mut to_push) = all_to_add.pop() {
-                while let Err(PushError(reject)) = qout.push(to_push) {
-                    to_push = reject;
-                    backoff.snooze();
+        match bav_assign(filepaths.clone(), &cfg) {
+            Ok(mut all_to_add) => {
+                trace!("Adding assignments of {:?} skeletion to the Q", filepaths.0);
+                while let Some(mut to_push) = all_to_add.pop() {
+                    while let Err(PushError(reject)) = qout.push(to_push) {
+                        to_push = reject;
+                        backoff.snooze();
+                    }
                 }
             }
+            Err(e) => warn!("BAV Error: {} in files {:?}", e, filepaths),
         }
         trace!("Done with adding assignments to {:?}", filepaths.0);
     }

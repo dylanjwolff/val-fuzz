@@ -1,6 +1,7 @@
 use crate::ast::{AstNode, BoolOp, Command, Logic, SExp, Script, Sort, Symbol};
 use crate::ast::{CommandRc, SExpRc, SortRc, SymbolRc};
 
+use crate::liftio;
 use crate::solver::check_valid_solve_as_temp;
 use crate::Metadata;
 use crate::Timer;
@@ -8,6 +9,7 @@ use bit_vec::BitVec;
 use log::warn;
 use std::cell::RefCell;
 use std::collections::BTreeMap;
+use std::io;
 use std::iter::once;
 use std::rc::Rc;
 use std::time::Duration;
@@ -177,7 +179,7 @@ pub fn get_bav_assign_fmt_str(bavns: &Vec<String>) -> Command {
     assert_many(&mut baveq)
 }
 
-pub fn to_skel(script: &mut Script, md: &mut Metadata) -> Result<(), ()> {
+pub fn to_skel(script: &mut Script, md: &mut Metadata) -> io::Result<()> {
     set_logic_all(script);
 
     let mut vng = VarNameGenerator::new("GEN");
@@ -191,7 +193,7 @@ pub fn to_skel(script: &mut Script, md: &mut Metadata) -> Result<(), ()> {
 
     vng.basename = "BAV".to_owned();
     let mut bavs = vec![];
-    bav(script, &mut vng, &mut bavs).ok_or(())?;
+    bav(script, &mut vng, &mut bavs)?;
 
     init_vars(script, vng.vars_generated);
     let mut bavns = bavs
@@ -213,7 +215,7 @@ pub fn add_get_model(script: &mut Script) {
     });
 }
 
-pub fn rl(script: &mut Script, scoped_vars: &mut BTreeMap<String, Vec<SExp>>) -> Result<(), ()> {
+pub fn rl(script: &mut Script, scoped_vars: &mut BTreeMap<String, Vec<SExp>>) -> io::Result<()> {
     let timer = Timer::new();
     timer.start(Duration::from_secs(5));
     match script {
@@ -230,9 +232,9 @@ fn rl_c(
     cmd: &mut Command,
     scoped_vars: &mut BTreeMap<String, Vec<SExp>>,
     timer: &Timer,
-) -> Result<(), ()> {
+) -> io::Result<()> {
     if timer.is_done() {
-        return Err(());
+        return liftio!(Err("Timeout Replacing 'Let' statements"));
     }
 
     match cmd {
@@ -249,14 +251,14 @@ fn rl_s(
     scoped_vars: &mut BTreeMap<String, Vec<SExp>>,
     timer: &Timer,
     mut recur_count: u8,
-) -> Result<(), ()> {
+) -> io::Result<()> {
     if timer.is_done() {
-        return Err(());
+        return liftio!(Err("Timeout Replacing 'Let' statements"));
     }
 
     recur_count = recur_count + 1;
     if recur_count > RECUR_LIMIT {
-        return Err(());
+        return liftio!(Err("Reached Recursion Limit Replacing 'Let' statements"));
     }
 
     match sexp {
@@ -526,7 +528,7 @@ pub fn bav(
     script: &mut Script,
     vng: &mut VarNameGenerator,
     bava: &mut Vec<(String, SExp, VarBindings)>,
-) -> Option<()> {
+) -> io::Result<()> {
     let timer = Timer::new_started(Duration::from_secs(30));
     let mut qvars = vec![];
     match script {
@@ -536,7 +538,7 @@ pub fn bav(
             }
         }
     };
-    Some(())
+    Ok(())
 }
 
 type VarBindings = Vec<(SymbolRc, SortRc)>;
@@ -547,15 +549,15 @@ fn bav_c(
     bava: &mut Vec<(String, SExp, VarBindings)>,
     qvars: &mut VarBindings,
     timer: Timer,
-) -> Option<()> {
+) -> io::Result<()> {
     if timer.is_done() {
-        return None;
+        return liftio!(Err("Timeout creating Boolean Abstraction"));
     }
     match cmd {
         Command::Assert(sexp) | Command::CheckSatAssuming(sexp) => {
             bav_se(&mut *sexp.borrow_mut(), vng, bava, qvars, timer.clone())
         }
-        _ => Some(()),
+        _ => Ok(()),
     }
 }
 
@@ -565,9 +567,9 @@ fn bav_se(
     bavs: &mut Vec<(String, SExp, VarBindings)>,
     qvars: &mut VarBindings,
     timer: Timer,
-) -> Option<()> {
+) -> io::Result<()> {
     if timer.is_done() {
-        return None;
+        return liftio!(Err("Timeout creating Boolean Abstraction"));
     }
 
     match sexp {
@@ -578,22 +580,22 @@ fn bav_se(
             for sexp in sexps {
                 bav_se(&mut *sexp.borrow_mut(), vng, bavs, qvars, timer.clone())?;
             }
-            Some(())
+            Ok(())
         }
         SExp::Compound(sexps) => {
             for sexp in sexps {
                 bav_se(&mut *sexp.borrow_mut(), vng, bavs, qvars, timer.clone())?;
             }
-            Some(())
+            Ok(())
         }
         SExp::Let(_, _) => panic!("Let statments should be filtered out!"),
         SExp::QForAll(vbs, rest) => {
             qvars.extend(vbs.clone());
             bav_se(&mut *rest.borrow_mut(), vng, bavs, qvars, timer.clone())?;
             qvars.truncate(qvars.len() - vbs.len());
-            Some(())
+            Ok(())
         }
-        _ => Some(()),
+        _ => Ok(()),
     }
 }
 

@@ -12,12 +12,15 @@ use crate::utils::to_strs;
 use crate::utils::MyBackoff;
 use crate::utils::RandUniqPermGen;
 
+use std::io;
 use walkdir::WalkDir;
 
 use crate::ast::SExp;
 use crate::transforms::{end_insert_pt, get_bav_assign_fmt_str, to_skel};
 
 use crate::liftio;
+use crate::liftio_e;
+use bit_vec::BitVec;
 use log::debug;
 use log::trace;
 use log::warn;
@@ -39,49 +42,50 @@ pub fn exec_single_thread(dirname: &str, cfg: Config) {
     }
 
     for f in q.into_iter() {
-        mutator(f, &cfg.file_provider)
+        match mutator(f.clone(), &cfg.file_provider)
             .and_then(|skel| bav_assign(skel, &cfg))
             .map(|iters| {
                 for iter in iters.into_iter() {
                     solver_fn(iter, &cfg);
                 }
-            });
+            }) {
+            Err(e) => warn!("{} in file {:?}", e, f),
+            _ => (),
+        };
     }
 }
 
-pub fn mutator(filepath: PathBuf, file_provider: &FileProvider) -> Option<(PathBuf, PathBuf)> {
+pub fn mutator(filepath: PathBuf, file_provider: &FileProvider) -> io::Result<(PathBuf, PathBuf)> {
     let (script, mut md) = strip_and_transform(&filepath)?;
-    let (mdf, skelf) = file_provider.serialize_skel_and_md(&script, &mut md).ok()?;
-    Some((skelf.to_path_buf(), mdf.to_path_buf()))
+    let (skelf, mdf) = file_provider.serialize_skel_and_md(&script, &mut md)?;
+    Ok((skelf.to_path_buf(), mdf.to_path_buf()))
 }
 
-pub fn bav_assign(filepaths: (PathBuf, PathBuf), cfg: &Config) -> Option<Vec<(PathBuf, PathBuf)>> {
-    trace!("WHAT");
-    let (script, md) = deserialize_from_f(&filepaths).ok()?;
+pub fn bav_assign(
+    filepaths: (PathBuf, PathBuf),
+    cfg: &Config,
+) -> io::Result<Vec<(PathBuf, PathBuf)>> {
+    let (script, md) = deserialize_from_f(&filepaths)?;
     trace!("Validating skeleton for {}", md.seed_file);
-    let empty_skel_fstr = &filepaths.0.to_str()?;
+
+    let e = liftio_e!(Err::<(), &str>("Filename not a str"));
+    let empty_skel_fstr = &filepaths.0.to_str().ok_or(e)?;
 
     let results = profiles_solve(empty_skel_fstr, &cfg.profiles);
 
     report_any_bugs(&filepaths.0, &results, &cfg.file_provider);
 
     if results.iter().all(|r| r.has_unrecoverable_error()) {
-        warn!("All err on file {}", empty_skel_fstr);
-        fs::remove_file(filepaths.0).unwrap_or(());
-        fs::remove_file(filepaths.1).unwrap_or(());
-        return Some(vec![]);
+        fs::remove_file(&filepaths.0).unwrap_or(());
+        fs::remove_file(&filepaths.1).unwrap_or(());
+        return liftio!(Err(format!("All error on file {:?}", filepaths.0)));
     } else {
-        return do_iterations(script, md, &cfg);
+        return Ok(do_iterations(script, md, &cfg));
     }
 }
 
-fn do_iterations(
-    mut script: Script,
-    mut md: Metadata,
-    cfg: &Config,
-) -> Option<Vec<(PathBuf, PathBuf)>> {
+fn do_iterations(mut script: Script, mut md: Metadata, cfg: &Config) -> Vec<(PathBuf, PathBuf)> {
     trace!("Iterations beginning for {}", md.seed_file);
-    let _backoff = MyBackoff::new();
 
     let eip = end_insert_pt(&script);
     script.init(eip);
@@ -98,12 +102,26 @@ fn do_iterations(
 
     let mut fs = vec![];
     while let Some(truth_values) = urng.sample() {
-        let new_file = cfg.file_provider.iterfile(&mut md).ok()?;
-        let str_with_model = dyn_fmt(&script_str, to_strs(&truth_values)).ok()?;
-        fs::write(&new_file, str_with_model).ok()?;
-        fs.push((new_file.to_path_buf(), md.md_path(&cfg.file_provider)));
+        match do_iteration(&script_str, truth_values, &mut fs, &mut md, &cfg) {
+            Err(e) => warn!("Iteration error: {} in file {}", e, md.skeleton_file),
+            _ => (),
+        }
     }
-    Some(fs)
+    fs
+}
+
+fn do_iteration(
+    script_str: &str,
+    truth_values: BitVec,
+    fs: &mut Vec<(PathBuf, PathBuf)>,
+    md: &mut Metadata,
+    cfg: &Config,
+) -> io::Result<()> {
+    let new_file = cfg.file_provider.iterfile(md)?;
+    let str_with_model = liftio!(dyn_fmt(&script_str, to_strs(&truth_values)))?;
+    fs::write(&new_file, str_with_model)?;
+    fs.push((new_file.to_path_buf(), md.md_path(&cfg.file_provider)));
+    Ok(())
 }
 
 fn report_any_bugs(file: &Path, results: &Vec<RSolve>, fp: &FileProvider) -> bool {
@@ -126,13 +144,13 @@ fn report_any_bugs(file: &Path, results: &Vec<RSolve>, fp: &FileProvider) -> boo
 
 fn deserialize_from_f(
     (script_file, md_file): &(PathBuf, PathBuf),
-) -> Result<(Script, Metadata), String> {
+) -> io::Result<(Script, Metadata)> {
+    trace!("Reading script from {:?}", script_file);
     let script = script_from_f_unsanitized(script_file)?;
 
-    let md_contents =
-        fs::read_to_string(&md_file).map_err(|e| e.to_string() + " from metadata IO")?;
-    let md: Metadata =
-        serde_lexpr::from_str(&md_contents).map_err(|e| e.to_string() + " from serde")?;
+    trace!("Reading md from {:?}", md_file);
+    let md_contents = fs::read_to_string(&md_file)?;
+    let md: Metadata = liftio!(serde_lexpr::from_str(&md_contents))?;
 
     Ok((script, md))
 }
@@ -184,17 +202,16 @@ fn resub_model(result: &RSolve, filepaths: &(PathBuf, PathBuf), cfg: &Config) {
     }
 }
 
-pub fn strip_and_transform(source_file: &Path) -> Option<(Script, Metadata)> {
-    let mut script = script_from_f(source_file).ok()?;
-    // TODO error handling here on prev 3 lines
+pub fn strip_and_transform(source_file: &Path) -> io::Result<(Script, Metadata)> {
+    let mut script = script_from_f(source_file)?;
 
     if script.is_unsupported_logic() {
-        return None;
+        return liftio!(Err("Unsupported Logic"));
     }
 
     let mut md = Metadata::new(source_file);
-    to_skel(&mut script, &mut md).ok()?;
-    return Some((script, md));
+    to_skel(&mut script, &mut md)?;
+    return Ok((script, md));
 }
 
 #[cfg(test)]
