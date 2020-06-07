@@ -2,6 +2,7 @@ use super::ast::{
     BitVecConst, BoolOp, Command, Constant, FPConst, Logic, SExp, SExpBoxRc, SExpRc, Script, Sort,
     SortRc, Symbol, SymbolRc,
 };
+use crate::liftio;
 use nom::branch::alt;
 use nom::bytes::complete::take_until;
 use nom::bytes::complete::take_while;
@@ -22,6 +23,7 @@ use nom::sequence::preceded;
 use nom::sequence::terminated;
 use nom::{bytes::complete::tag, combinator::map, sequence::tuple, IResult};
 use std::fs;
+use std::io;
 use std::path::Path;
 
 macro_rules! ws {
@@ -471,25 +473,22 @@ fn generic(s: &str) -> IResult<&str, &str> {
     terminated(not_line_ending, line_ending)(s)
 }
 
-pub fn script_from_f_unsanitized(filepath: &Path) -> Result<Script, String> {
-    let contents: String = fs::read_to_string(&filepath).map_err(|e| e.to_string())?;
-    let presult = script(&contents[..]).map_err(|e| e.to_string())?;
+pub fn script_from_f_unsanitized(filepath: &Path) -> io::Result<Script> {
+    let contents: String = fs::read_to_string(&filepath)?;
+    let presult = liftio!(script(&contents[..]))?;
     if presult.0 != "" {
-        Err("Incomplete Parse!".to_owned())
+        liftio!(Err("Incomplete Parse!".to_owned()))
     } else {
         Ok(presult.1)
     }
 }
 
-pub fn script_from_f(filepath: &Path) -> Result<Script, String> {
-    let contents: String = fs::read_to_string(&filepath).map_err(|e| e.to_string())?;
-    let stripped_contents = &rmv_comments(&contents[..])
-        .map_err(|e| e.to_string())?
-        .1
-        .join(" ")[..];
-    let presult = script(&stripped_contents[..]).map_err(|e| e.to_string())?;
+pub fn script_from_f(filepath: &Path) -> io::Result<Script> {
+    let contents: String = fs::read_to_string(&filepath)?;
+    let stripped_contents = &liftio!(rmv_comments(&contents[..]))?.1.join(" ")[..];
+    let presult = liftio!(script(&stripped_contents[..]))?;
     if presult.0 != "" {
-        Err("Incomplete Parse!".to_owned())
+        liftio!(Err("Incomplete Parse!".to_owned()))
     } else {
         Ok(presult.1)
     }

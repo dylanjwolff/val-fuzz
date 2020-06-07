@@ -9,6 +9,7 @@ use tempfile::Builder;
 #[macro_use]
 use serde::{Serialize, Deserialize};
 use crate::solver::ProfileIndex;
+use log::warn;
 use std::collections::hash_map::DefaultHasher;
 use std::collections::HashSet;
 use std::hash::Hash;
@@ -23,9 +24,17 @@ pub struct Config {
     pub profiles: HashSet<ProfileIndex>,
 }
 
+#[macro_export]
 macro_rules! liftio {
     ($x:expr) => {
-        $x.map_err(|e| io::Error::new(io::ErrorKind::Other, format!("Lifted: {:?}", e)))
+        $x.map_err(|e| io::Error::new(io::ErrorKind::Other, format!("(Lifted) {:?}", e)))
+    };
+}
+
+#[macro_export]
+macro_rules! liftio_e {
+    ($x:expr) => {
+        io::Error::new(io::ErrorKind::Other, format!("(Lifted) {:?}", $x))
     };
 }
 
@@ -126,7 +135,7 @@ impl FileProvider {
                 liftio!(tf.keep())
             });
         match r {
-            Err(e) => println!("Error writing bug report for {:?}: {}", buggy_file, e),
+            Err(e) => warn!("Error writing bug report for {:?}: {}", buggy_file, e),
             _ => (),
         }
     }
