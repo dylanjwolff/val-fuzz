@@ -121,10 +121,12 @@ fn main() {
         Some(seedstr) => seedstr.parse::<u64>().unwrap(),
         None => 0,
     };
+    info!("Seed is {:?}", seed);
     let stack_size = match matches.value_of(STACK_SIZE) {
         Some(stacksstr) => stacksstr.parse::<usize>().unwrap() * 1024 * 1024,
         None => 500 * 1024 * 1024,
     };
+    info!("Stack size is {:?}B", stack_size);
 
     let fp = FileProvider::new(&(seed.to_string() + "-cswap-fuzz-run-out"));
     let cfg = Config {
