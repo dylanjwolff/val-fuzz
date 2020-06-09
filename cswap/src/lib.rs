@@ -114,7 +114,7 @@ fn launch(qs: (InputPPQ, SkeletonQueue), worker_counts: (u8, u8, u8), cfg: Confi
             let mut b = MyBackoff::new();
             loop {
                 b.snooze();
-                info!("QLENS: {} {} {}", qs.0.len(), qs.1.len(), a_baq.len());
+                info!("QLENS: {} {} {}", qs.0.len() - 1, qs.1.len(), a_baq.len());
             }
         })
         .unwrap();
@@ -123,24 +123,31 @@ fn launch(qs: (InputPPQ, SkeletonQueue), worker_counts: (u8, u8, u8), cfg: Confi
     for h in handles {
         h.unwrap().join().unwrap();
         backoff.snooze();
+        trace!("Thread finished stage 1");
     }
+    info!("Stage 1 Complete");
 
     backoff.reset();
     for h in bav_handles {
         h.unwrap().join().unwrap();
         backoff.snooze();
+        trace!("Thread finished stage 2");
     }
+    info!("Stage 2 Complete");
 
     backoff.reset();
     for h in solver_handles {
         h.unwrap().join().unwrap();
         backoff.snooze();
+        trace!("Thread finished stage 3");
     }
+    info!("Stage 3 Complete");
 }
 
 pub fn from_skels(dirname: &str, worker_counts: (u8, u8), mut cfg: Config) {
     cfg.file_provider.skeldir = Path::new(dirname).to_path_buf();
     cfg.file_provider.mddir = Path::new(dirname).to_path_buf();
+    debug!("Working from skeleton files");
     let q2 = SegQueue::new();
     for entry in WalkDir::new(dirname)
         .into_iter()
@@ -273,14 +280,19 @@ fn solver_worker(qin: BavAssingedQ, prev_stage: StageCompleteA, cfg: Config) {
                 continue;
             }
         };
-        solver_fn(filepaths, &cfg);
+        trace!("Solving {:?}", filepaths.0);
+        solver_fn(filepaths.clone(), &cfg);
+        trace!("Done solving {:?}", filepaths.0);
     }
 }
 fn script_f_from_metadata_f(md_file: &PathBuf, fp: &FileProvider) -> Result<PathBuf, String> {
+    trace!("Parsing MD file");
     let md_contents =
-        fs::read_to_string(&md_file).map_err(|e| e.to_string() + " from metadata IO")?;
-    let md: Metadata =
-        serde_lexpr::from_str(&md_contents).map_err(|e| e.to_string() + " from serde")?;
+        Box::new(fs::read_to_string(&md_file).map_err(|e| e.to_string() + " from metadata IO")?);
+    trace!("Parsing MD");
+    let md: Box<Metadata> =
+        Box::new(serde_lexpr::from_str(&*md_contents).map_err(|e| e.to_string() + " from serde")?);
+    trace!("Done Parsing MD");
     Ok(md.skel_path(fp))
 }
 #[cfg(test)]
