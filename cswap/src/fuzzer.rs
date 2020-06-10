@@ -89,8 +89,8 @@ impl<'a> StatefulBavAssign<'a> {
         report_any_bugs(&filepaths.0, &results, &cfg.file_provider);
 
         if results.iter().all(|r| r.has_unrecoverable_error()) {
-            //            fs::remove_file(&filepaths.0).unwrap_or(());
-            //           fs::remove_file(&filepaths.1).unwrap_or(());
+            fs::remove_file(&filepaths.0).unwrap_or(());
+            fs::remove_file(&filepaths.1).unwrap_or(());
             return liftio!(Err(format!("All error on file {:?}", filepaths.0)));
         }
 
