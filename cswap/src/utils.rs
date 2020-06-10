@@ -222,9 +222,14 @@ fn eof_str<'a>(s: &'a str) -> IResult<&'a str, &'a str> {
     }
 }
 
-type DFormatParseError<'a> = nom::Err<((&'a str, std::vec::Vec<&'a str>), nom::error::ErrorKind)>;
+pub type DFormatParseError<'a> =
+    nom::Err<((&'a str, std::vec::Vec<&'a str>), nom::error::ErrorKind)>;
 
 pub fn dyn_fmt<'a>(s: &'a str, mut vs: Vec<&'a str>) -> Result<String, DFormatParseError<'a>> {
+    if vs.len() == 0 {
+        return Ok(s.to_owned());
+    }
+
     vs.reverse();
     let (_rem, ss) = dynamic_format_parser((s, vs))?;
     let cap = ss.iter().map(|s| s.len()).sum();
@@ -250,6 +255,11 @@ mod tests {
             dyn_fmt("{} asdf {}!", vec!["sub", "stitute"]).unwrap(),
             "sub asdf stitute!"
         );
+    }
+
+    #[test]
+    fn dfmt_no_replace() {
+        assert_eq!(dyn_fmt("asdf!", vec![]).unwrap(), "asdf!");
     }
 
     #[test]

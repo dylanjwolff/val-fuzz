@@ -9,6 +9,7 @@ use crate::solver::RSolve;
 use crate::transforms::rv;
 use crate::utils::dyn_fmt;
 use crate::utils::to_strs;
+use crate::utils::DFormatParseError;
 use crate::utils::MyBackoff;
 use crate::utils::RandUniqPermGen;
 
@@ -110,6 +111,14 @@ fn do_iterations(mut script: Script, mut md: Metadata, cfg: &Config) -> Vec<(Pat
     fs
 }
 
+fn slim_dynfmt_err_msg(e: DFormatParseError) -> String {
+    match e {
+        nom::Err::Incomplete(n) => format!("Incomplete parse on Dynamic Fmt; needed {:?}", n),
+        nom::Err::Error(ec) => format!("Dynamic format parse error of kind {:?}", ec.1),
+        nom::Err::Failure(ec) => format!("Dynamic format parse failure of kind {:?}", ec.1),
+    }
+}
+
 fn do_iteration(
     script_str: &str,
     truth_values: BitVec,
@@ -118,7 +127,8 @@ fn do_iteration(
     cfg: &Config,
 ) -> io::Result<()> {
     let new_file = cfg.file_provider.iterfile(md)?;
-    let str_with_model = liftio!(dyn_fmt(&script_str, to_strs(&truth_values)))?;
+    let str_with_model =
+        liftio!(dyn_fmt(&script_str, to_strs(&truth_values)).map_err(|e| slim_dynfmt_err_msg(e)))?;
     fs::write(&new_file, str_with_model)?;
     fs.push((new_file.to_path_buf(), md.md_path(&cfg.file_provider)));
     Ok(())
