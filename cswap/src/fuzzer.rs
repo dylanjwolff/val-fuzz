@@ -65,9 +65,9 @@ pub fn mutator(filepath: PathBuf, file_provider: &FileProvider) -> io::Result<(P
 }
 
 pub struct StatefulBavAssign<'a> {
-    top_of_script: String,
-    bav_fmt_string: String,
-    bottom_of_script: String,
+    top_of_script: Box<String>,
+    bav_fmt_string: Box<String>,
+    bottom_of_script: Box<String>,
     md: Metadata,
     pub urng: RandUniqPermGen,
     cfg: &'a Config,
@@ -104,20 +104,24 @@ impl<'a> StatefulBavAssign<'a> {
         );
 
         Ok(StatefulBavAssign {
-            top_of_script: top.to_string(),
+            top_of_script: top,
             bav_fmt_string: fmt_str,
-            bottom_of_script: bottom.to_string(),
+            bottom_of_script: bottom,
             md: md,
             urng: urng,
             cfg: cfg,
         })
     }
 
-    fn split(script: Script, bavns: &Vec<String>) -> (String, String, String) {
+    fn split(script: Script, bavns: &Vec<String>) -> (Box<String>, Box<String>, Box<String>) {
         let eip = end_insert_pt(&script);
         let (top, bottom) = Script::split(script, eip);
-        let fmt_str = format!("{}\n", get_bav_assign_fmt_str(bavns));
-        (top.to_string(), fmt_str, bottom.to_string())
+        let fmt_str = Box::new(format!("{}\n", get_bav_assign_fmt_str(bavns)));
+        (
+            Box::new(top.to_string()),
+            fmt_str,
+            Box::new(bottom.to_string()),
+        )
     }
 
     pub fn do_iteration_tv(&mut self, truth_values: BitVec) -> io::Result<(PathBuf, PathBuf)> {
