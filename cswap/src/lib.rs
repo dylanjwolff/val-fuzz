@@ -41,6 +41,7 @@ use utils::MyBackoff;
 use utils::Timer;
 
 use std::cmp::max;
+use std::cmp::min;
 use std::fs;
 use std::path::Path;
 use std::path::PathBuf;
@@ -60,7 +61,11 @@ type BavAssingedQ = Arc<ArrayQueue<(PathBuf, PathBuf)>>;
 type StageCompleteA = Arc<StageComplete>;
 
 fn launch(qs: (InputPPQ, SkeletonQueue), worker_counts: (u8, u8, u8), cfg: Config) {
-    let baq_cap = max((worker_counts.1 as usize) * cfg.max_iter as usize, 1);
+    let criteria_a = max((worker_counts.1 as usize) * cfg.max_iter as usize, 1);
+    let criteria_b = max((worker_counts.2 as usize) * 10 as usize, 1);
+    let baq_cap = min(criteria_a, criteria_b);
+    info!("Iterations Q has capacity {}", baq_cap);
+
     let baq = ArrayQueue::new(baq_cap);
     let a_baq = Arc::new(baq);
 

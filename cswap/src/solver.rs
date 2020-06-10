@@ -632,8 +632,10 @@ mod tests {
                 .cmd
         );
     }
+
+    #[ignore]
     #[test]
-    fn unsupp_snap() {
+    fn segf_in_name() {
         let stdout="script_skel_segfaults2_minimal.smt2:2.14: No set-logic command was given before this point.
             script_skel_segfaults2_minimal.smt2:2.14: CVC4 will make all theories available.
             script_skel_segfaults2_minimal.smt2:2.14: Consider setting a stricter logic for (likely) better performance.
