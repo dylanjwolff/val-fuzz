@@ -1,5 +1,7 @@
 target
 tags
+tags.lock
+tags.temp
 bin
 .solvers
 z3.log

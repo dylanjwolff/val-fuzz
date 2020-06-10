@@ -19,9 +19,9 @@ pub mod solver;
 pub mod transforms;
 pub mod utils;
 
-use crate::fuzzer::bav_assign;
 use crate::fuzzer::mutator;
 use crate::fuzzer::solver_fn;
+use crate::fuzzer::StatefulBavAssign;
 
 use crate::utils::StageComplete;
 
@@ -41,6 +41,7 @@ use utils::MyBackoff;
 use utils::Timer;
 
 use std::cmp::max;
+use std::cmp::min;
 use std::fs;
 use std::path::Path;
 use std::path::PathBuf;
@@ -60,7 +61,11 @@ type BavAssingedQ = Arc<ArrayQueue<(PathBuf, PathBuf)>>;
 type StageCompleteA = Arc<StageComplete>;
 
 fn launch(qs: (InputPPQ, SkeletonQueue), worker_counts: (u8, u8, u8), cfg: Config) {
-    let baq_cap = max((worker_counts.1 as usize) * cfg.max_iter as usize, 1);
+    let criteria_a = max((worker_counts.1 as usize) * cfg.max_iter as usize, 1);
+    let criteria_b = max((worker_counts.2 as usize) * 10 as usize, 1);
+    let baq_cap = min(criteria_a, criteria_b);
+    info!("Iterations Q has capacity {}", baq_cap);
+
     let baq = ArrayQueue::new(baq_cap);
     let a_baq = Arc::new(baq);
 
@@ -252,10 +257,18 @@ fn bav_assign_worker(
         };
 
         trace!("Starting assignments of {:?} skeletion", filepaths.0);
-        match bav_assign(filepaths.clone(), &cfg) {
-            Ok(mut all_to_add) => {
+
+        match StatefulBavAssign::new(filepaths.clone(), &cfg) {
+            Ok(mut sba) => {
                 trace!("Adding assignments of {:?} skeletion to the Q", filepaths.0);
-                while let Some(mut to_push) = all_to_add.pop() {
+                while let Some(tv) = sba.urng.sample() {
+                    let mut to_push = match sba.do_iteration_tv(tv) {
+                        Ok(v) => v,
+                        Err(e) => {
+                            warn!("Iteration error {}", e);
+                            continue;
+                        }
+                    };
                     while let Err(PushError(reject)) = qout.push(to_push) {
                         to_push = reject;
                         backoff.snooze();
@@ -269,6 +282,7 @@ fn bav_assign_worker(
 
     stage.finish();
 }
+
 fn solver_worker(qin: BavAssingedQ, prev_stage: StageCompleteA, cfg: Config) {
     let mut backoff = MyBackoff::new();
 

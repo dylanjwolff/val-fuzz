@@ -1,0 +1,8 @@
+---
+source: cswap/src/ast.rs
+expression: "(s1.to_string(), s2.to_string())"
+---
+(
+    "(assert true)\n",
+    "(check-sat)\n",
+)

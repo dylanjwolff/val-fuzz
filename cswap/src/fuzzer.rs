@@ -9,9 +9,11 @@ use crate::solver::RSolve;
 use crate::transforms::rv;
 use crate::utils::dyn_fmt;
 use crate::utils::to_strs;
+use crate::utils::DFormatParseError;
 use crate::utils::MyBackoff;
 use crate::utils::RandUniqPermGen;
 
+use std::fs::OpenOptions;
 use std::io;
 use walkdir::WalkDir;
 
@@ -26,6 +28,7 @@ use log::trace;
 use log::warn;
 use rand::Rng;
 use std::fs;
+use std::io::Write;
 use std::path::Path;
 use std::path::PathBuf;
 
@@ -43,7 +46,7 @@ pub fn exec_single_thread(dirname: &str, cfg: Config) {
 
     for f in q.into_iter() {
         match mutator(f.clone(), &cfg.file_provider)
-            .and_then(|skel| bav_assign(skel, &cfg))
+            .and_then(|skel| group_bav_assign(skel, &cfg))
             .map(|iters| {
                 for iter in iters.into_iter() {
                     solver_fn(iter, &cfg);
@@ -61,67 +64,100 @@ pub fn mutator(filepath: PathBuf, file_provider: &FileProvider) -> io::Result<(P
     Ok((skelf.to_path_buf(), mdf.to_path_buf()))
 }
 
-pub fn bav_assign(
+pub struct StatefulBavAssign<'a> {
+    top_of_script: String,
+    bav_fmt_string: String,
+    bottom_of_script: String,
+    md: Metadata,
+    pub urng: RandUniqPermGen,
+    cfg: &'a Config,
+}
+
+impl<'a> StatefulBavAssign<'a> {
+    pub fn new(
+        filepaths: (PathBuf, PathBuf),
+        cfg: &'a Config,
+    ) -> io::Result<StatefulBavAssign<'a>> {
+        let (script, md) = deserialize_from_f(&filepaths)?;
+        trace!("Validating skeleton for {}", md.seed_file);
+
+        let e = liftio_e!(Err::<(), &str>("Filename not a str"));
+        let empty_skel_fstr = &filepaths.0.to_str().ok_or(e)?;
+
+        let results = profiles_solve(empty_skel_fstr, &cfg.profiles);
+
+        report_any_bugs(&filepaths.0, &results, &cfg.file_provider);
+
+        if results.iter().all(|r| r.has_unrecoverable_error()) {
+            //            fs::remove_file(&filepaths.0).unwrap_or(());
+            //           fs::remove_file(&filepaths.1).unwrap_or(());
+            return liftio!(Err(format!("All error on file {:?}", filepaths.0)));
+        }
+
+        let (top, fmt_str, bottom) = Self::split(script, &md.bavns);
+        let num_bavs = md.bavns.len();
+
+        let urng = RandUniqPermGen::new_definite_seeded(
+            cfg.get_specific_seed(&md.seed_file),
+            num_bavs,
+            cfg.max_iter,
+        );
+
+        Ok(StatefulBavAssign {
+            top_of_script: top.to_string(),
+            bav_fmt_string: fmt_str,
+            bottom_of_script: bottom.to_string(),
+            md: md,
+            urng: urng,
+            cfg: cfg,
+        })
+    }
+
+    fn split(script: Script, bavns: &Vec<String>) -> (String, String, String) {
+        let eip = end_insert_pt(&script);
+        let (top, bottom) = Script::split(script, eip);
+        let fmt_str = format!("{}\n", get_bav_assign_fmt_str(bavns));
+        (top.to_string(), fmt_str, bottom.to_string())
+    }
+
+    pub fn do_iteration_tv(&mut self, truth_values: BitVec) -> io::Result<(PathBuf, PathBuf)> {
+        let new_file: PathBuf = self.cfg.file_provider.iterfile(&self.md)?;
+        let mut f = OpenOptions::new()
+            .create(true)
+            .append(true)
+            .open(&new_file)?;
+
+        let str_with_model = liftio!(dyn_fmt(&self.bav_fmt_string, to_strs(&truth_values))
+            .map_err(|e| slim_dynfmt_err_msg(e)))?;
+
+        f.write_all(self.top_of_script.as_bytes())?;
+        f.write_all(str_with_model.as_bytes())?;
+        f.write_all(self.bottom_of_script.as_bytes())?;
+
+        Ok((
+            new_file.to_path_buf(),
+            self.md.md_path(&self.cfg.file_provider),
+        ))
+    }
+}
+
+fn group_bav_assign(
     filepaths: (PathBuf, PathBuf),
     cfg: &Config,
 ) -> io::Result<Vec<(PathBuf, PathBuf)>> {
-    let (script, md) = deserialize_from_f(&filepaths)?;
-    trace!("Validating skeleton for {}", md.seed_file);
-
-    let e = liftio_e!(Err::<(), &str>("Filename not a str"));
-    let empty_skel_fstr = &filepaths.0.to_str().ok_or(e)?;
-
-    let results = profiles_solve(empty_skel_fstr, &cfg.profiles);
-
-    report_any_bugs(&filepaths.0, &results, &cfg.file_provider);
-
-    if results.iter().all(|r| r.has_unrecoverable_error()) {
-        fs::remove_file(&filepaths.0).unwrap_or(());
-        fs::remove_file(&filepaths.1).unwrap_or(());
-        return liftio!(Err(format!("All error on file {:?}", filepaths.0)));
-    } else {
-        return Ok(do_iterations(script, md, &cfg));
-    }
-}
-
-fn do_iterations(mut script: Script, mut md: Metadata, cfg: &Config) -> Vec<(PathBuf, PathBuf)> {
-    trace!("Iterations beginning for {}", md.seed_file);
-
-    let eip = end_insert_pt(&script);
-    script.init(eip);
-    script.replace(eip, get_bav_assign_fmt_str(&md.bavns));
-    let script_str = script.to_string();
-
-    let num_bavs = md.bavns.len();
-
-    let mut urng = RandUniqPermGen::new_definite_seeded(
-        cfg.get_specific_seed(&md.seed_file),
-        num_bavs,
-        cfg.max_iter,
-    );
-
+    let mut sba = StatefulBavAssign::new(filepaths, cfg)?;
     let mut fs = vec![];
-    while let Some(truth_values) = urng.sample() {
-        match do_iteration(&script_str, truth_values, &mut fs, &mut md, &cfg) {
-            Err(e) => warn!("Iteration error: {} in file {}", e, md.skeleton_file),
-            _ => (),
-        }
+    while let Some(tv) = sba.urng.sample() {
+        fs.push(sba.do_iteration_tv(tv)?);
     }
-    fs
+    Ok(fs)
 }
-
-fn do_iteration(
-    script_str: &str,
-    truth_values: BitVec,
-    fs: &mut Vec<(PathBuf, PathBuf)>,
-    md: &mut Metadata,
-    cfg: &Config,
-) -> io::Result<()> {
-    let new_file = cfg.file_provider.iterfile(md)?;
-    let str_with_model = liftio!(dyn_fmt(&script_str, to_strs(&truth_values)))?;
-    fs::write(&new_file, str_with_model)?;
-    fs.push((new_file.to_path_buf(), md.md_path(&cfg.file_provider)));
-    Ok(())
+fn slim_dynfmt_err_msg(e: DFormatParseError) -> String {
+    match e {
+        nom::Err::Incomplete(n) => format!("Incomplete parse on Dynamic Fmt; needed {:?}", n),
+        nom::Err::Error(ec) => format!("Dynamic format parse error of kind {:?}", ec.1),
+        nom::Err::Failure(ec) => format!("Dynamic format parse failure of kind {:?}", ec.1),
+    }
 }
 
 fn report_any_bugs(file: &Path, results: &Vec<RSolve>, fp: &FileProvider) -> bool {
@@ -217,7 +253,50 @@ pub fn strip_and_transform(source_file: &Path) -> io::Result<(Script, Metadata)>
 #[cfg(test)]
 mod test {
     use super::*;
+    use crate::parser::script;
+    use crate::parser::script_from_f_unsanitized;
     use bit_vec::BitVec;
+    use insta::assert_debug_snapshot;
+    use std::collections::HashSet;
+    use tempfile::TempDir;
+
+    #[test]
+    fn bav_stateful() {
+        let script =
+            script("(decl-const BAV1 bool)(assert (< x 5))(assert (= BAV1 (< x 5)))(check-sat)")
+                .unwrap()
+                .1;
+        let (top, mid, bottom) =
+            StatefulBavAssign::split(script, &vec!["BAV1".to_string(), "BAV2".to_string()]);
+        let num_bavs = 2;
+        let urng = RandUniqPermGen::new_definite_seeded(1, num_bavs, 1);
+        let md = Metadata::new_empty();
+        let base = TempDir::new().unwrap();
+        let mut fpdir = base.path().to_path_buf();
+        fpdir.push("test");
+
+        let cfg = Config {
+            file_provider: FileProvider::new(fpdir.to_str().unwrap()),
+            max_iter: 1,
+            rng_seed: 1,
+            stack_size: 1,
+            profiles: HashSet::new(),
+        };
+
+        let mut sba = StatefulBavAssign {
+            top_of_script: top,
+            bav_fmt_string: mid,
+            bottom_of_script: bottom,
+            md: md,
+            urng: urng,
+            cfg: &cfg,
+        };
+
+        let tv = sba.urng.sample().unwrap();
+        let (f, _) = sba.do_iteration_tv(tv).unwrap();
+        let result = fs::read_to_string(f).unwrap();
+        assert_debug_snapshot!(result);
+    }
 
     #[test]
     fn bv_replace() {
