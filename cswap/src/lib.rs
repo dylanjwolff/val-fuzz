@@ -19,9 +19,9 @@ pub mod solver;
 pub mod transforms;
 pub mod utils;
 
-use crate::fuzzer::bav_assign;
 use crate::fuzzer::mutator;
 use crate::fuzzer::solver_fn;
+use crate::fuzzer::StatefulBavAssign;
 
 use crate::utils::StageComplete;
 
@@ -252,10 +252,18 @@ fn bav_assign_worker(
         };
 
         trace!("Starting assignments of {:?} skeletion", filepaths.0);
-        match bav_assign(filepaths.clone(), &cfg) {
-            Ok(mut all_to_add) => {
+
+        match StatefulBavAssign::new(filepaths.clone(), &cfg) {
+            Ok(mut sba) => {
                 trace!("Adding assignments of {:?} skeletion to the Q", filepaths.0);
-                while let Some(mut to_push) = all_to_add.pop() {
+                while let Some(tv) = sba.urng.sample() {
+                    let mut to_push = match sba.do_iteration_tv(tv) {
+                        Ok(v) => v,
+                        Err(e) => {
+                            warn!("Iteration error {}", e);
+                            continue;
+                        }
+                    };
                     while let Err(PushError(reject)) = qout.push(to_push) {
                         to_push = reject;
                         backoff.snooze();

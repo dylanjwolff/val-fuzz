@@ -169,6 +169,16 @@ impl Script {
         }
     }
 
+    pub fn split(mut me: Self, i: usize) -> (Script, Script) {
+        let Script::Commands(cmds) = &mut me;
+        if i > cmds.len() {
+            (me, Script::Commands(vec![]))
+        } else {
+            let after = cmds.split_off(i);
+            (me, Script::Commands(after))
+        }
+    }
+
     pub fn replace(&mut self, i: usize, cmd: Command) {
         let Script::Commands(cmds) = self;
         cmds[i] = rccell!(cmd);
@@ -468,6 +478,17 @@ mod tests {
     use super::*;
     use crate::parser::*;
     use insta::assert_debug_snapshot;
+    #[test]
+    fn split_snap() {
+        let script = Script::Commands(vec![
+            rccell!(Command::Assert(rccell!(SExp::Constant(rccell!(
+                Constant::Bool(true)
+            ))))),
+            rccell!(Command::CheckSat()),
+        ]);
+        let (s1, s2) = Script::split(script, 1);
+        assert_debug_snapshot!((s1.to_string(), s2.to_string()));
+    }
 
     #[test]
     fn sort_display_snap() {
