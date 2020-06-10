@@ -277,6 +277,7 @@ fn bav_assign_worker(
 
     stage.finish();
 }
+
 fn solver_worker(qin: BavAssingedQ, prev_stage: StageCompleteA, cfg: Config) {
     let mut backoff = MyBackoff::new();
 

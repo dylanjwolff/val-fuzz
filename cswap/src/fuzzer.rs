@@ -78,10 +78,8 @@ impl<'a> StatefulBavAssign<'a> {
         filepaths: (PathBuf, PathBuf),
         cfg: &'a Config,
     ) -> io::Result<StatefulBavAssign<'a>> {
-        println!("Start");
         let (script, md) = deserialize_from_f(&filepaths)?;
         trace!("Validating skeleton for {}", md.seed_file);
-        println!("Validating skeleton for {}", md.seed_file);
 
         let e = liftio_e!(Err::<(), &str>("Filename not a str"));
         let empty_skel_fstr = &filepaths.0.to_str().ok_or(e)?;
