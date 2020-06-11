@@ -59,7 +59,7 @@ pub fn exec_single_thread(dirname: &str, cfg: Config) {
 }
 
 pub fn mutator(filepath: PathBuf, file_provider: &FileProvider) -> io::Result<(PathBuf, PathBuf)> {
-    let (script, mut md) = strip_and_transform(&filepath)?;
+    let (script, mut md) = strip_and_transform(&filepath, &file_provider)?;
     let (skelf, mdf) = file_provider.serialize_skel_and_md(&script, &mut md)?;
     Ok((skelf.to_path_buf(), mdf.to_path_buf()))
 }
@@ -242,7 +242,7 @@ fn resub_model(result: &RSolve, filepaths: &(PathBuf, PathBuf), cfg: &Config) {
     }
 }
 
-pub fn strip_and_transform(source_file: &Path) -> io::Result<(Script, Metadata)> {
+pub fn strip_and_transform(source_file: &Path, fp: &FileProvider) -> io::Result<(Script, Metadata)> {
     let mut script = script_from_f(source_file)?;
 
     if script.is_unsupported_logic() {
@@ -252,7 +252,9 @@ pub fn strip_and_transform(source_file: &Path) -> io::Result<(Script, Metadata)>
     let mut md = Metadata::new(source_file);
 
     replace_constants_with_fresh_vars(&mut script, &mut md);
-    // Persist to file
+    let chf = fp.cholesfile(&mut md)?;
+    fs::write(chf, script.to_string())?;
+    
     let ba_script = ba_script(&mut script, &mut md)?;
 
     return Ok((ba_script, md));
