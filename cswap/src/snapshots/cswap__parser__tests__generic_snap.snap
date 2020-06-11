@@ -1,5 +1,5 @@
 ---
-source: src/parser.rs
+source: cswap/src/parser.rs
 expression: "generic(\"line \\n break\")"
 ---
 Ok(

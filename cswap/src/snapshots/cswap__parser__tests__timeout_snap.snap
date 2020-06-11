@@ -1,5 +1,5 @@
 ---
-source: src/parser.rs
+source: cswap/src/parser.rs
 expression: "timeout(\"timeout: sending signal TERM to command ‘z3’\")"
 ---
 Ok(

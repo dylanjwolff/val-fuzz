@@ -1,5 +1,5 @@
 ---
-source: src/parser.rs
+source: cswap/src/parser.rs
 expression: z3_oerror(response)
 ---
 Ok(

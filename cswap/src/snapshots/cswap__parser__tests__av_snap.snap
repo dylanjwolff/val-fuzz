@@ -1,5 +1,5 @@
 ---
-source: src/parser.rs
+source: cswap/src/parser.rs
 expression: "av(\"ASSERTION VIOLATION\n                File: ../src/qe/qsat.cpp\n                Line: 631\n                validate_defs(\\\"check_sat\\\")\n                (C)ontinue, (A)bort, (S)top, (T)hrow exception, Invoke (G)DB\")"
 ---
 Ok(

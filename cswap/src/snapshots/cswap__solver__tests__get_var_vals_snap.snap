@@ -1,6 +1,6 @@
 ---
-source: src/solver.rs
-expression: "r.extract_const_var_vals(vec![\"GEN1\", \"GEN2\", \"BAV3\"])"
+source: cswap/src/solver.rs
+expression: "r.extract_const_var_vals(&vec![\"GEN1\" . to_owned (), \"GEN2\" . to_owned (),\n                               \"BAV3\" . to_owned ()])"
 ---
 [
     (

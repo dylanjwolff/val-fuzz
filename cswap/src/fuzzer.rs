@@ -18,7 +18,7 @@ use std::io;
 use walkdir::WalkDir;
 
 use crate::ast::SExp;
-use crate::transforms::{end_insert_pt, get_bav_assign_fmt_str, to_skel};
+use crate::transforms::{end_insert_pt, get_bav_assign_fmt_str, ba_script, replace_constants_with_fresh_vars};
 
 use crate::liftio;
 use crate::liftio_e;
@@ -250,8 +250,12 @@ pub fn strip_and_transform(source_file: &Path) -> io::Result<(Script, Metadata)>
     }
 
     let mut md = Metadata::new(source_file);
-    to_skel(&mut script, &mut md)?;
-    return Ok((script, md));
+
+    replace_constants_with_fresh_vars(&mut script, &mut md);
+    // Persist to file
+    let ba_script = ba_script(&mut script, &mut md)?;
+
+    return Ok((ba_script, md));
 }
 
 #[cfg(test)]

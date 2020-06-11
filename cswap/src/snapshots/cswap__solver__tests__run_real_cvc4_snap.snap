@@ -1,6 +1,6 @@
 ---
-source: src/solver.rs
-expression: "CVC4_Command_Builder::new().strings_exp().dump_all().check_unsat_cores().run_on(Path::new(\"test/strings20.smt2\"))"
+source: cswap/src/solver.rs
+expression: "CVC4_Command_Builder::new().timeout(Duration::from_secs(3)).strings_exp().incremental().dump_all().check_unsat_cores().run_on(Path::new(\"test/strings20.smt2\"))"
 ---
 Ok(
     Output {
