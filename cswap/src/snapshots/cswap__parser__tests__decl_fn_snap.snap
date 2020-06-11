@@ -1,0 +1,13 @@
+---
+source: cswap/src/parser.rs
+expression: df.unwrap().1
+---
+DeclFn(
+    Token(
+        "x33",
+    ),
+    [],
+    UserDef(
+        "Bool",
+    ),
+)

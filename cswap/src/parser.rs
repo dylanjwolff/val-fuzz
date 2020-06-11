@@ -290,10 +290,11 @@ fn sort(s: &str) -> IResult<&str, Sort> {
     )))(s)
 }
 
-fn naked_decl_fn(s: &str) -> IResult<&str, (Symbol, Vec<Sort>, Sort)> {
+fn naked_decl_fn(s: &str) -> IResult<&str, Command> {
     let args= delimited(char('('),many0(ws!(sort)), char(')'));
     let pre_map = preceded(ws!(tag("declare-fun")), tuple((ws!(symbol), ws!(args), ws!(sort))));
-    map(pre_map, |(name, args, rtype)| (Symbol::Token(name.to_owned()), args, rtype))(s)
+    let types =    map(pre_map, |(name, args, rtype)| (Symbol::Token(name.to_owned()), args, rtype));
+    map(types, |(name, args, rtype)| Command::DeclFn(name, args, rtype))(s)
 }
 
 fn naked_decl_const(s: &str) -> IResult<&str, (&str, Sort)> {
@@ -337,6 +338,7 @@ fn naked_command(s: &str) -> IResult<&str, Command> {
         map(naked_decl_const, |(v, s)| {
             Command::DeclConst(v.to_owned(), rccell!(s))
         }),
+        naked_decl_fn,
     ))(s)
 }
 
@@ -508,8 +510,14 @@ mod tests {
 
     #[test]
     fn decl_fn_snap() {
-        let df = naked_decl_fn("declare-fun t9_invoke_0_1 (Id) Bool");
-        assert_debug_snapshot!(df);
+        let df = command("(declare-fun x33 () Bool)");
+        assert_debug_snapshot!(df.unwrap().1);
+    }
+    
+    #[test]
+    fn decl_fn_with_args_snap() {
+        let df = command("(declare-fun f13 (S7 S6) Real)");
+        assert_debug_snapshot!(df.unwrap().1);
     }
 
     #[test]

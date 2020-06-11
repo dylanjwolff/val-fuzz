@@ -1,0 +1,18 @@
+---
+source: cswap/src/parser.rs
+expression: df.unwrap().1
+---
+DeclFn(
+    Token(
+        "f13",
+    ),
+    [
+        UserDef(
+            "S7",
+        ),
+        UserDef(
+            "S6",
+        ),
+    ],
+    Dec,
+)
