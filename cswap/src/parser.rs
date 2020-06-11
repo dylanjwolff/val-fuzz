@@ -290,6 +290,13 @@ fn sort(s: &str) -> IResult<&str, Sort> {
     )))(s)
 }
 
+fn naked_decl_fn(s: &str) -> IResult<&str, Command> {
+    let args= delimited(char('('),many0(ws!(sort)), char(')'));
+    let pre_map = preceded(ws!(tag("declare-fun")), tuple((ws!(symbol), ws!(args), ws!(sort))));
+    let types =    map(pre_map, |(name, args, rtype)| (Symbol::Token(name.to_owned()), args, rtype));
+    map(types, |(name, args, rtype)| Command::DeclFn(name, args, rtype))(s)
+}
+
 fn naked_decl_const(s: &str) -> IResult<&str, (&str, Sort)> {
     let ws_decl = ws!(tag("declare-const"));
     preceded(ws_decl, tuple((ws!(symbol), ws!(sort))))(s)
@@ -331,6 +338,7 @@ fn naked_command(s: &str) -> IResult<&str, Command> {
         map(naked_decl_const, |(v, s)| {
             Command::DeclConst(v.to_owned(), rccell!(s))
         }),
+        naked_decl_fn,
     ))(s)
 }
 
@@ -499,6 +507,18 @@ mod tests {
     use super::*;
     use insta::assert_debug_snapshot;
     use std::fs;
+
+    #[test]
+    fn decl_fn_snap() {
+        let df = command("(declare-fun x33 () Bool)");
+        assert_debug_snapshot!(df.unwrap().1);
+    }
+    
+    #[test]
+    fn decl_fn_with_args_snap() {
+        let df = command("(declare-fun f13 (S7 S6) Real)");
+        assert_debug_snapshot!(df.unwrap().1);
+    }
 
     #[test]
     fn sort_of_const_special_snap() {

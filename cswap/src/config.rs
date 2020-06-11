@@ -51,6 +51,7 @@ impl Config {
 pub struct FileProvider {
     pub basedir: PathBuf,
     pub skeldir: PathBuf,
+    pub cholesdir: PathBuf,
     pub mddir: PathBuf,
     pub scratchdir: PathBuf,
     pub bugdir: PathBuf,
@@ -59,24 +60,38 @@ pub struct FileProvider {
 impl FileProvider {
     pub fn new(dirname: &str) -> FileProvider {
         let dirpath = Path::new(dirname).to_path_buf();
+        let cholesdir = Self::get_subdir(&dirpath, "choles");
         let skeldir = Self::get_subdir(&dirpath, "skel");
         let mddir = Self::get_subdir(&dirpath, "md");
         let scratchdir = Self::get_subdir(&dirpath, "scratch");
         let bugdir = Self::get_subdir(&dirpath, "bugs");
         fs::create_dir(&dirpath).unwrap();
         fs::create_dir(&skeldir).unwrap();
+        fs::create_dir(&cholesdir).unwrap();
         fs::create_dir(&mddir).unwrap();
         fs::create_dir(&scratchdir).unwrap();
         fs::create_dir(&bugdir).unwrap();
         FileProvider {
             basedir: dirpath,
+            cholesdir:cholesdir,
             skeldir: skeldir,
             mddir: mddir,
             scratchdir: scratchdir,
             bugdir: bugdir,
         }
     }
-
+    
+    pub fn cholesfile<'a>(&self, md: &'a mut Metadata) -> io::Result<PathBuf> {
+        let tfile = Builder::new()
+            .prefix("choles_")
+            .rand_bytes(0)
+            .suffix(&md.seed_file)
+            .tempfile_in(&self.cholesdir)?;
+        let (_, pb) = liftio!(tfile.keep())?;
+        md.choles_file = name(&pb);
+        Ok(pb)
+    }
+    
     pub fn skelfile<'a>(&self, md: &'a mut Metadata) -> io::Result<PathBuf> {
         let tfile = Builder::new()
             .prefix("skel_")
@@ -196,6 +211,7 @@ pub struct Metadata {
     pub constvns: Vec<String>,
     pub seed_file: String,
     pub skeleton_file: String,
+    pub choles_file: String,
     pub metadata_file: String,
 }
 pub fn name(pb: &Path) -> String {
@@ -212,6 +228,7 @@ impl Metadata {
             constvns: vec![],
             seed_file: "".to_owned(),
             skeleton_file: "".to_owned(),
+            choles_file: "".to_owned(),
             metadata_file: "".to_owned(),
         }
     }
@@ -220,6 +237,7 @@ impl Metadata {
             bavns: vec![],
             constvns: vec![],
             seed_file: name(seed),
+            choles_file: "".to_owned(),
             skeleton_file: "".to_owned(),
             metadata_file: "".to_owned(),
         }
@@ -238,6 +256,12 @@ impl Metadata {
     pub fn md_path(&self, fp: &FileProvider) -> PathBuf {
         let mut p = fp.mddir.clone();
         p.push(&self.metadata_file);
+        p
+    }
+    
+    pub fn choles_path(&self, fp: &FileProvider) -> PathBuf {
+        let mut p = fp.cholesdir.clone();
+        p.push(&self.choles_file);
         p
     }
 }

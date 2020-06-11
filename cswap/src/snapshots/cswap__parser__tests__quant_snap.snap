@@ -1,5 +1,5 @@
 ---
-source: src/parser.rs
+source: cswap/src/parser.rs
 expression: "quantifier(\"(forall ((ah Real)) (= ah 4))\")"
 ---
 Ok(

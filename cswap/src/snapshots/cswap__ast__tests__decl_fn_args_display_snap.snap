@@ -1,0 +1,5 @@
+---
+source: cswap/src/ast.rs
+expression: "format!(\"{}\", my_fn)"
+---
+"(declare-fun f (Real Bool) Bool)"

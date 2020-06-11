@@ -36,6 +36,7 @@ pub enum Command {
     Assert(SExpRc),
     GetModel(),
     DeclConst(String, SortRc),
+    DeclFn(Symbol, Vec<Sort>, Sort),
     Generic(String),
 }
 
@@ -255,6 +256,16 @@ impl fmt::Display for Command {
             Command::CheckSatAssuming(sexp) => write!(f, "(check-sat-assuming {})", sexp.borrow()),
             Command::GetModel() => write!(f, "(get-model)"),
             Command::DeclConst(v, s) => write!(f, "(declare-const {} {})", v, s.borrow()),
+            Command::DeclFn(name, args, rtype) => {
+                write!(f, "(declare-fun {} (", name)?;
+                args.iter().enumerate()
+                    .map(|(i, arg)| match i == 0 {
+                        true => write!(f, "{}", arg),
+                        false => write!(f, " {}", arg),
+                    })
+                    .fold(Ok(()), acc_result)?;
+                write!(f, ") {})", rtype)
+            },
             Command::Generic(s) => write!(f, "{}", s),
             Command::Assert(s) => write!(f, "(assert {})", s.borrow()),
         }
@@ -488,6 +499,19 @@ mod tests {
         ]);
         let (s1, s2) = Script::split(script, 1);
         assert_debug_snapshot!((s1.to_string(), s2.to_string()));
+    }
+
+    #[test]
+    fn decl_fn_display_snap() {
+        let my_fn = Command::DeclFn(Symbol::Token("f".to_owned()), vec![], Sort::Bool());
+        assert_debug_snapshot!(format!("{}", my_fn));
+    }
+    
+    #[test]
+    fn decl_fn_args_display_snap() {
+        let args = vec![Sort::Dec(), Sort::Bool()];
+        let my_fn = Command::DeclFn(Symbol::Token("f".to_owned()), args, Sort::Bool());
+        assert_debug_snapshot!(format!("{}", my_fn));
     }
 
     #[test]

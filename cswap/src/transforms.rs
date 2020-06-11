@@ -81,6 +81,12 @@ fn add_ba(script: &mut Script, bavs: Vec<(String, SExp, VarBindings)>) {
         None => cmds.len(),
     };
 
+    let mut end = cmds.split_off(cs_pos);
+    cmds.append(&mut get_boolean_abstraction(bavs));
+    cmds.append(&mut end);
+}
+
+fn get_boolean_abstraction(bavs: Vec<(String, SExp, VarBindings)>) -> Vec<CommandRc> {
     let mut baveq_iter = bavs.into_iter().map(|(vname, sexp, vbs)| {
         let rhs = if vbs.len() > 0 {
             SExp::QForAll(vbs, rccell!(Box::new(sexp)))
@@ -97,10 +103,7 @@ fn add_ba(script: &mut Script, bavs: Vec<(String, SExp, VarBindings)>) {
         )
     });
 
-    //    cmds.insert(cs_pos, rccell!(assert_many(&mut baveq_iter)));
-    let mut end = cmds.split_off(cs_pos);
-    cmds.append(&mut many_assert(&mut baveq_iter));
-    cmds.append(&mut end);
+    many_assert(&mut baveq_iter)
 }
 
 fn many_assert(iter: &mut dyn Iterator<Item = SExp>) -> Vec<CommandRc> {
@@ -145,7 +148,7 @@ pub fn checksat_positions(script: &Script) -> Vec<usize> {
     checksats
 }
 
-pub fn get_bav_assign(bavns: &Vec<String>, ta: BitVec) -> Command {
+fn get_bav_assign(bavns: &Vec<String>, ta: BitVec) -> Command {
     let bavs = bavns.into_iter().zip(ta.into_iter());
     let mut baveq = bavs.into_iter().map(|(vname, bval)| {
         let val = if bval {
@@ -179,19 +182,33 @@ pub fn get_bav_assign_fmt_str(bavns: &Vec<String>) -> Command {
     assert_many(&mut baveq)
 }
 
-pub fn to_skel(script: &mut Script, md: &mut Metadata) -> io::Result<()> {
-    set_logic_all(script);
-
-    let mut vng = VarNameGenerator::new("GEN");
+pub fn replace_constants_with_fresh_vars(script : &mut Script, md : &mut Metadata) {
     let choles = choles(script);
     if !try_all_rcholes(script, &choles, md, is_valid) {
         rcholes(script, &choles, md, is_valid);
     }
+}
 
+pub fn grab_all_decls(script : &Script) -> Vec<CommandRc> {
+    let Script::Commands(cmds) = script;
+    let mut decl_cmds = vec![];
+    for cmd in cmds {
+        match *cmd.borrow() {
+            Command::DeclFn(_, _, _) | Command::DeclConst(_, _) => decl_cmds.push(Rc::clone(cmd)),
+            _ => (),
+        } 
+    }
+    decl_cmds
+}
+
+pub fn to_skel(script: &mut Script, md: &mut Metadata) -> io::Result<()> {
+    set_logic_all(script);
+
+    replace_constants_with_fresh_vars(script, md);
     let mut scopes = BTreeMap::new();
     rl(script, &mut scopes)?;
 
-    vng.basename = "BAV".to_owned();
+    let mut vng = VarNameGenerator::new("BAV");
     let mut bavs = vec![];
     bav(script, &mut vng, &mut bavs)?;
 
@@ -204,6 +221,30 @@ pub fn to_skel(script: &mut Script, md: &mut Metadata) -> io::Result<()> {
     add_ba(script, bavs);
     add_get_model(script);
     Ok(())
+}
+
+pub fn ba_script(script: &mut Script, md: &mut Metadata) -> io::Result<Script> {
+    let mut scopes = BTreeMap::new();
+    rl(script, &mut scopes)?;
+
+    let mut vng = VarNameGenerator::new("BAV");
+    let mut bavs = vec![];
+    bav(script, &mut vng, &mut bavs)?;
+
+    init_vars(script, vng.vars_generated);
+    let mut bavns = bavs
+        .iter()
+        .map(|(name, _, _)| name.clone())
+        .collect::<Vec<String>>();
+    md.bavns.append(&mut bavns);
+
+    let mut decls = grab_all_decls(script);
+    let mut ba = get_boolean_abstraction(bavs);
+    decls.append(&mut ba);
+    decls.push(rccell!(Command::CheckSat()));
+    let mut ba_script = Script::Commands(decls);
+    add_get_model(&mut ba_script);
+    Ok(ba_script)
 }
 
 pub fn add_get_model(script: &mut Script) {
@@ -707,7 +748,22 @@ mod tests {
     use crate::parser::script;
     use crate::parser::sexp;
     use insta::assert_debug_snapshot;
+    use insta::assert_display_snapshot;
 
+    #[test]
+    fn ba_script_snap() {
+        let str_script = "(declare-const x Int)(declare-const y Int)(assert (or (and (> x 3) (< y 7)) (= y x)))";
+        let mut p = script(str_script).unwrap().1;
+        assert_display_snapshot!(ba_script(&mut p, &mut Metadata::new_empty()).unwrap());
+    }
+    
+    #[test]
+    fn grab_all_decls_snap() {
+        let str_script = "(declare-const x Int)(assert (= 3 4))(check-sat)(declare-fun z () Bool)(declare-const y Real)";
+        let mut p = script(str_script).unwrap().1;
+        assert_debug_snapshot!(grab_all_decls(&p));
+    }
+    
     #[test]
     fn all_rcholes_undo_then_inc_snap() {
         let str_script = "(assert (= 3 4))";

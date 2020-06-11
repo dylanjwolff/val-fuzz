@@ -1,5 +1,5 @@
 ---
-source: src/parser.rs
+source: cswap/src/parser.rs
 expression: "iv_model_err(\"(error \\\"line 5 column 10: an invalid model was generated\\\")\")"
 ---
 Ok(
