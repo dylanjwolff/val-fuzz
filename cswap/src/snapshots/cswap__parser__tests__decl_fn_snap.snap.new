@@ -1,0 +1,22 @@
+---
+source: cswap/src/parser.rs
+expression: df
+---
+Ok(
+    (
+        "",
+        (
+            Token(
+                "t9_invoke_0_1",
+            ),
+            [
+                UserDef(
+                    "Id",
+                ),
+            ],
+            UserDef(
+                "Bool",
+            ),
+        ),
+    ),
+)

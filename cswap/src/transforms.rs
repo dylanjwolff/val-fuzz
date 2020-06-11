@@ -81,6 +81,12 @@ fn add_ba(script: &mut Script, bavs: Vec<(String, SExp, VarBindings)>) {
         None => cmds.len(),
     };
 
+    let mut end = cmds.split_off(cs_pos);
+    cmds.append(&mut get_boolean_abstraction(bavs));
+    cmds.append(&mut end);
+}
+
+pub fn get_boolean_abstraction(bavs: Vec<(String, SExp, VarBindings)>) -> Vec<CommandRc> {
     let mut baveq_iter = bavs.into_iter().map(|(vname, sexp, vbs)| {
         let rhs = if vbs.len() > 0 {
             SExp::QForAll(vbs, rccell!(Box::new(sexp)))
@@ -97,10 +103,7 @@ fn add_ba(script: &mut Script, bavs: Vec<(String, SExp, VarBindings)>) {
         )
     });
 
-    //    cmds.insert(cs_pos, rccell!(assert_many(&mut baveq_iter)));
-    let mut end = cmds.split_off(cs_pos);
-    cmds.append(&mut many_assert(&mut baveq_iter));
-    cmds.append(&mut end);
+    many_assert(&mut baveq_iter)
 }
 
 fn many_assert(iter: &mut dyn Iterator<Item = SExp>) -> Vec<CommandRc> {
@@ -179,19 +182,31 @@ pub fn get_bav_assign_fmt_str(bavns: &Vec<String>) -> Command {
     assert_many(&mut baveq)
 }
 
-pub fn to_skel(script: &mut Script, md: &mut Metadata) -> io::Result<()> {
-    set_logic_all(script);
-
-    let mut vng = VarNameGenerator::new("GEN");
+pub fn replace_constants_with_fresh_vars(script : &mut Script, md : &mut Metadata) {
     let choles = choles(script);
     if !try_all_rcholes(script, &choles, md, is_valid) {
         rcholes(script, &choles, md, is_valid);
     }
+}
 
+pub fn grab_all_decls(script : &Script) -> Vec<CommandRc> {
+    let Script::Commands(cmds) = script;
+    let mut decl_cmds = vec![];
+    for cmd in cmds {
+        
+        decl_cmds.push(Rc::clone(cmd));
+    }
+    decl_cmds
+}
+
+pub fn to_skel(script: &mut Script, md: &mut Metadata) -> io::Result<()> {
+    set_logic_all(script);
+
+    replace_constants_with_fresh_vars(script, md);
     let mut scopes = BTreeMap::new();
     rl(script, &mut scopes)?;
 
-    vng.basename = "BAV".to_owned();
+    let mut vng = VarNameGenerator::new("BAV");
     let mut bavs = vec![];
     bav(script, &mut vng, &mut bavs)?;
 

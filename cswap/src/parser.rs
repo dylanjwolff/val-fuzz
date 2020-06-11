@@ -290,6 +290,12 @@ fn sort(s: &str) -> IResult<&str, Sort> {
     )))(s)
 }
 
+fn naked_decl_fn(s: &str) -> IResult<&str, (Symbol, Vec<Sort>, Sort)> {
+    let args= delimited(char('('),many0(ws!(sort)), char(')'));
+    let pre_map = preceded(ws!(tag("declare-fun")), tuple((ws!(symbol), ws!(args), ws!(sort))));
+    map(pre_map, |(name, args, rtype)| (Symbol::Token(name.to_owned()), args, rtype))(s)
+}
+
 fn naked_decl_const(s: &str) -> IResult<&str, (&str, Sort)> {
     let ws_decl = ws!(tag("declare-const"));
     preceded(ws_decl, tuple((ws!(symbol), ws!(sort))))(s)
@@ -499,6 +505,12 @@ mod tests {
     use super::*;
     use insta::assert_debug_snapshot;
     use std::fs;
+
+    #[test]
+    fn decl_fn_snap() {
+        let df = naked_decl_fn("declare-fun t9_invoke_0_1 (Id) Bool");
+        assert_debug_snapshot!(df);
+    }
 
     #[test]
     fn sort_of_const_special_snap() {
