@@ -80,7 +80,7 @@ impl FileProvider {
             bugdir: bugdir,
         }
     }
-
+    
     pub fn cholesfile<'a>(&self, md: &'a mut Metadata) -> io::Result<PathBuf> {
         let tfile = Builder::new()
             .prefix("choles_")
@@ -256,6 +256,12 @@ impl Metadata {
     pub fn md_path(&self, fp: &FileProvider) -> PathBuf {
         let mut p = fp.mddir.clone();
         p.push(&self.metadata_file);
+        p
+    }
+    
+    pub fn choles_path(&self, fp: &FileProvider) -> PathBuf {
+        let mut p = fp.cholesdir.clone();
+        p.push(&self.choles_file);
         p
     }
 }

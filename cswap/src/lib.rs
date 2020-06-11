@@ -152,6 +152,7 @@ fn launch(qs: (InputPPQ, SkeletonQueue), worker_counts: (u8, u8, u8), cfg: Confi
 pub fn from_skels(dirname: &str, worker_counts: (u8, u8), mut cfg: Config) {
     cfg.file_provider.skeldir = Path::new(dirname).to_path_buf();
     cfg.file_provider.mddir = Path::new(dirname).to_path_buf();
+    cfg.file_provider.cholesdir = Path::new(dirname).to_path_buf();
     debug!("Working from skeleton files");
     let q2 = SegQueue::new();
     for entry in WalkDir::new(dirname)

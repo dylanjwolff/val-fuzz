@@ -201,21 +201,20 @@ pub fn solver_fn(filepaths: (PathBuf, PathBuf), cfg: &Config) {
     results
         .iter()
         .filter(|r| r.has_sat())
-        .for_each(|r| resub_model(r, &filepaths, &cfg));
+        .for_each(|r| match resub_model(r, &filepaths, &cfg) {
+            Ok(()) => (),
+            Err(e) => warn!("Resub error {} for file {:?}", e, filepaths.0),
+        } ); 
 
     if !report_any_bugs(filepaths.0.as_path(), &results, &cfg.file_provider) {
         fs::remove_file(&filepaths.0).unwrap_or(());
     }
 }
 
-fn resub_model(result: &RSolve, filepaths: &(PathBuf, PathBuf), cfg: &Config) {
-    let (mut script, md) = match deserialize_from_f(&filepaths) {
-        Ok(deserial) => deserial,
-        Err(e) => {
-            warn!("solver deserial err from {:?}: {}", filepaths, e);
-            return;
-        }
-    };
+fn resub_model(result: &RSolve, filepaths: &(PathBuf, PathBuf), cfg: &Config) -> io::Result<()> {
+    trace!("RESUB! for file {:?}", filepaths.0);
+    let md: Metadata = liftio!(serde_lexpr::from_str(&fs::read_to_string(&filepaths.1)?))?;
+    let mut choles_script = script_from_f_unsanitized(&md.choles_path(&cfg.file_provider))?;
 
     let mut to_replace: Vec<(String, SExp)> = result
         .extract_const_var_vals(&md.constvns)
@@ -224,15 +223,9 @@ fn resub_model(result: &RSolve, filepaths: &(PathBuf, PathBuf), cfg: &Config) {
         .collect();
 
     if to_replace.len() > 0 {
-        rv(&mut script, &mut to_replace);
+        rv(&mut choles_script, &mut to_replace);
 
-        let resubbed_f = match cfg.file_provider.serialize_resub(&script, &md) {
-            Ok(f) => f,
-            Err(e) => {
-                warn!("Resub file name err {}", e);
-                return;
-            }
-        };
+        let resubbed_f = cfg.file_provider.serialize_resub(&choles_script, &md)?;
 
         let results = profiles_solve(resubbed_f.to_str().unwrap_or("defaultname"), &cfg.profiles);
 
@@ -240,6 +233,7 @@ fn resub_model(result: &RSolve, filepaths: &(PathBuf, PathBuf), cfg: &Config) {
             fs::remove_file(&resubbed_f).unwrap_or(());
         }
     }
+    Ok(())
 }
 
 pub fn strip_and_transform(source_file: &Path, fp: &FileProvider) -> io::Result<(Script, Metadata)> {
