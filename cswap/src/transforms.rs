@@ -193,8 +193,10 @@ pub fn grab_all_decls(script : &Script) -> Vec<CommandRc> {
     let Script::Commands(cmds) = script;
     let mut decl_cmds = vec![];
     for cmd in cmds {
-        
-        decl_cmds.push(Rc::clone(cmd));
+        match *cmd.borrow() {
+            Command::DeclFn(_, _, _) | Command::DeclConst(_, _) => decl_cmds.push(Rc::clone(cmd)),
+            _ => (),
+        } 
     }
     decl_cmds
 }
@@ -723,6 +725,13 @@ mod tests {
     use crate::parser::sexp;
     use insta::assert_debug_snapshot;
 
+    #[test]
+    fn grab_all_decls_snap() {
+        let str_script = "(declare-const x Int)(assert (= 3 4))(check-sat)(declare-fun z () Bool)(declare-const y Real)";
+        let mut p = script(str_script).unwrap().1;
+        assert_debug_snapshot!(grab_all_decls(&p));
+    }
+    
     #[test]
     fn all_rcholes_undo_then_inc_snap() {
         let str_script = "(assert (= 3 4))";
