@@ -1,24 +1,19 @@
 ---
 source: cswap/src/parser.rs
-expression: df
+expression: df.unwrap().1
 ---
-Ok(
-    (
-        "",
-        (
-            "declare-datatype",
-            [
-                [
-                    "NodeMobile ",
-                ],
-                [
-                    "(",
-                    "(",
-                    "Rnode",
-                    ")",
-                    ")",
-                ],
-            ],
-        ),
-    ),
+GenericDecl(
+    "declare-datatype",
+    [
+        [
+            "NodeMobile ",
+        ],
+        [
+            "(",
+            "(",
+            "Rnode",
+            ")",
+            ")",
+        ],
+    ],
 )
