@@ -2,6 +2,7 @@ use super::ast::{
     BitVecConst, BoolOp, Command, Constant, FPConst, Logic, SExp, SExpBoxRc, SExpRc, Script, Sort,
     SortRc, Symbol, SymbolRc,
 };
+
 use crate::liftio;
 use nom::branch::alt;
 use nom::bytes::complete::take_until;
@@ -268,7 +269,8 @@ pub fn sexp(s: &str) -> IResult<&str, SExp> {
         map(let_sexp, |(tbs, sexp)| SExp::Let(tbs, sexp)),
         map(existential_q, |(tbs, sexp)| {
             SExp::QExists(tbs, rccell!(Box::new(sexp)))
-        }),map(quantifier, |(tbs, sexp)| {
+        }),
+        map(quantifier, |(tbs, sexp)| {
             SExp::QForAll(tbs, rccell!(Box::new(sexp)))
         }),
         map(rec_sexp, |es| {
@@ -292,11 +294,37 @@ fn sort(s: &str) -> IResult<&str, Sort> {
     )))(s)
 }
 
+fn naked_decl_generic(s: &str) -> IResult<&str, (String, Vec<Vec<String>>)> {
+    let decls = alt((
+        tag("declare-datatype"),
+        tag("declare-datatypes"),
+        tag("declare-sort"),
+        tag("define-fun"),
+        tag("define-fun-rec"),
+        tag("define-funs-rec"),
+        tag("define-sort"),
+    ));
+    let inner = tuple((ws!(decls), many0(ws!(unknown_balanced))));
+    ws_brack_ws!(map(inner, |(decl, rest)| (
+        decl.to_owned(),
+        rest.into_iter()
+            .map(|vin| vin.into_iter().map(|s| s.to_owned()).collect())
+            .collect()
+    )))(s)
+}
+
 fn naked_decl_fn(s: &str) -> IResult<&str, Command> {
-    let args= delimited(char('('),many0(ws!(sort)), char(')'));
-    let pre_map = preceded(ws!(tag("declare-fun")), tuple((ws!(symbol), ws!(args), ws!(sort))));
-    let types =    map(pre_map, |(name, args, rtype)| (Symbol::Token(name.to_owned()), args, rtype));
-    map(types, |(name, args, rtype)| Command::DeclFn(name, args, rtype))(s)
+    let args = delimited(char('('), many0(ws!(sort)), char(')'));
+    let pre_map = preceded(
+        ws!(tag("declare-fun")),
+        tuple((ws!(symbol), ws!(args), ws!(sort))),
+    );
+    let types = map(pre_map, |(name, args, rtype)| {
+        (Symbol::Token(name.to_owned()), args, rtype)
+    });
+    map(types, |(name, args, rtype)| {
+        Command::DeclFn(name, args, rtype)
+    })(s)
 }
 
 fn naked_decl_const(s: &str) -> IResult<&str, (&str, Sort)> {
@@ -515,13 +543,18 @@ mod tests {
     use super::*;
     use insta::assert_debug_snapshot;
     use std::fs;
+    #[test]
+    fn decl_snap() {
+        let df = naked_decl_generic("(declare-datatype NodeMobile ((Rnode)))");
+        assert_debug_snapshot!(df);
+    }
 
     #[test]
     fn decl_fn_snap() {
         let df = command("(declare-fun x33 () Bool)");
         assert_debug_snapshot!(df.unwrap().1);
     }
-    
+
     #[test]
     fn decl_fn_with_args_snap() {
         let df = command("(declare-fun f13 (S7 S6) Real)");
@@ -689,9 +722,12 @@ mod tests {
 
     #[test]
     fn equant_snap() {
-        assert_debug_snapshot!(existential_q("(exists ((x Int)) (and (< (* 3 x) 2) (< 1 (* 2 x))))").unwrap());
+        assert_debug_snapshot!(existential_q(
+            "(exists ((x Int)) (and (< (* 3 x) 2) (< 1 (* 2 x))))"
+        )
+        .unwrap());
     }
-    
+
     #[test]
     fn equant() {
         let r = script("(assert (exists ((ah Real)) (= ah 4)))").unwrap();

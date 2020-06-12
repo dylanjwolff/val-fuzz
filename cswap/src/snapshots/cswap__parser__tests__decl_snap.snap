@@ -1,0 +1,24 @@
+---
+source: cswap/src/parser.rs
+expression: df
+---
+Ok(
+    (
+        "",
+        (
+            "declare-datatype",
+            [
+                [
+                    "NodeMobile ",
+                ],
+                [
+                    "(",
+                    "(",
+                    "Rnode",
+                    ")",
+                    ")",
+                ],
+            ],
+        ),
+    ),
+)
