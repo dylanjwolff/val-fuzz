@@ -27,6 +27,10 @@ impl VarNameGenerator {
         self.vars_generated.push((name.clone(), sort));
         name
     }
+    
+    pub fn store_name(&mut self, base : &Symbol, sort: &Sort) {
+        self.vars_generated.push((base.to_string(), sort.clone()));
+    }
 
     pub fn new(base: &str) -> VarNameGenerator {
         VarNameGenerator {
@@ -640,6 +644,9 @@ fn bav_se(
             Ok(())
         },
         SExp::QExists(vbs, rest) => {
+            for (var, sort) in vbs {
+                vng.store_name(&var.borrow(), &sort.borrow()); // for now, just keep track of EQV here so they can be initialized
+            }
             bav_se(&mut *rest.borrow_mut(), vng, bavs, qvars, timer.clone())?;
             Ok(())
         },
