@@ -276,13 +276,13 @@ fn rl_s(
         return liftio!(Err("Timeout Replacing 'Let' statements"));
     }
 
-    recur_count = recur_count + 1;
-    if recur_count > RECUR_LIMIT {
-        return liftio!(Err("Reached Recursion Limit Replacing 'Let' statements"));
-    }
-
     match sexp {
         SExp::Let(v, rest) => {
+            recur_count = recur_count + 1;
+            if recur_count > RECUR_LIMIT {
+                return liftio!(Err("Reached Recursion Limit Replacing 'Let' statements"));
+            }
+
             // This looks a bit strange, but if we don't explore these first, those expressions are
             // each copied multiple times. By doing the exploration on these originals first, we
             // don't need to later on the copies. We can't add the variable values to the tree yet,
