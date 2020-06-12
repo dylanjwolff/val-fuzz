@@ -9,75 +9,46 @@ expression: r
             RefCell {
                 value: Assert(
                     RefCell {
-                        value: Compound(
+                        value: QExists(
                             [
-                                RefCell {
-                                    value: Symbol(
+                                (
+                                    RefCell {
+                                        value: Var(
+                                            "ah",
+                                        ),
+                                    },
+                                    RefCell {
+                                        value: Dec,
+                                    },
+                                ),
+                            ],
+                            RefCell {
+                                value: BExp(
+                                    RefCell {
+                                        value: Equals,
+                                    },
+                                    [
                                         RefCell {
-                                            value: Token(
-                                                "exists",
+                                            value: Symbol(
+                                                RefCell {
+                                                    value: Token(
+                                                        "ah",
+                                                    ),
+                                                },
                                             ),
                                         },
-                                    ),
-                                },
-                                RefCell {
-                                    value: Compound(
-                                        [
-                                            RefCell {
-                                                value: Compound(
-                                                    [
-                                                        RefCell {
-                                                            value: Symbol(
-                                                                RefCell {
-                                                                    value: Token(
-                                                                        "ah",
-                                                                    ),
-                                                                },
-                                                            ),
-                                                        },
-                                                        RefCell {
-                                                            value: Symbol(
-                                                                RefCell {
-                                                                    value: Token(
-                                                                        "Real",
-                                                                    ),
-                                                                },
-                                                            ),
-                                                        },
-                                                    ],
-                                                ),
-                                            },
-                                        ],
-                                    ),
-                                },
-                                RefCell {
-                                    value: BExp(
                                         RefCell {
-                                            value: Equals,
+                                            value: Constant(
+                                                RefCell {
+                                                    value: UInt(
+                                                        "4",
+                                                    ),
+                                                },
+                                            ),
                                         },
-                                        [
-                                            RefCell {
-                                                value: Symbol(
-                                                    RefCell {
-                                                        value: Token(
-                                                            "ah",
-                                                        ),
-                                                    },
-                                                ),
-                                            },
-                                            RefCell {
-                                                value: Constant(
-                                                    RefCell {
-                                                        value: UInt(
-                                                            "4",
-                                                        ),
-                                                    },
-                                                ),
-                                            },
-                                        ],
-                                    ),
-                                },
-                            ],
+                                    ],
+                                ),
+                            },
                         ),
                     },
                 ),

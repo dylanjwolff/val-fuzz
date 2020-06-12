@@ -266,7 +266,9 @@ pub fn sexp(s: &str) -> IResult<&str, SExp> {
     ws!(alt((
         bool_sexp,
         map(let_sexp, |(tbs, sexp)| SExp::Let(tbs, sexp)),
-        map(quantifier, |(tbs, sexp)| {
+        map(existential_q, |(tbs, sexp)| {
+            SExp::QExists(tbs, rccell!(Box::new(sexp)))
+        }),map(quantifier, |(tbs, sexp)| {
             SExp::QForAll(tbs, rccell!(Box::new(sexp)))
         }),
         map(rec_sexp, |es| {
