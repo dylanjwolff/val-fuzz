@@ -2,6 +2,7 @@ use super::ast::{
     BitVecConst, BoolOp, Command, Constant, FPConst, Logic, SExp, SExpBoxRc, SExpRc, Script, Sort,
     SortRc, Symbol, SymbolRc,
 };
+
 use crate::liftio;
 use nom::branch::alt;
 use nom::bytes::complete::take_until;
@@ -266,6 +267,9 @@ pub fn sexp(s: &str) -> IResult<&str, SExp> {
     ws!(alt((
         bool_sexp,
         map(let_sexp, |(tbs, sexp)| SExp::Let(tbs, sexp)),
+        map(existential_q, |(tbs, sexp)| {
+            SExp::QExists(tbs, rccell!(Box::new(sexp)))
+        }),
         map(quantifier, |(tbs, sexp)| {
             SExp::QForAll(tbs, rccell!(Box::new(sexp)))
         }),
@@ -290,11 +294,37 @@ fn sort(s: &str) -> IResult<&str, Sort> {
     )))(s)
 }
 
+fn naked_decl_generic(s: &str) -> IResult<&str, Command> {
+    let decls = alt((
+        tag("declare-datatype"),
+        tag("declare-datatypes"),
+        tag("declare-sort"),
+        tag("define-fun"),
+        tag("define-fun-rec"),
+        tag("define-funs-rec"),
+        tag("define-sort"),
+    ));
+    let inner = tuple((ws!(decls), many0(ws!(unknown_balanced))));
+    map(inner, |(decl, rest)| Command::GenericDecl(
+        decl.to_owned(),
+        rest.into_iter()
+            .map(|vin| vin.into_iter().map(|s| s.to_owned()).collect())
+            .collect()
+    ))(s)
+}
+
 fn naked_decl_fn(s: &str) -> IResult<&str, Command> {
-    let args= delimited(char('('),many0(ws!(sort)), char(')'));
-    let pre_map = preceded(ws!(tag("declare-fun")), tuple((ws!(symbol), ws!(args), ws!(sort))));
-    let types =    map(pre_map, |(name, args, rtype)| (Symbol::Token(name.to_owned()), args, rtype));
-    map(types, |(name, args, rtype)| Command::DeclFn(name, args, rtype))(s)
+    let args = delimited(char('('), many0(ws!(sort)), char(')'));
+    let pre_map = preceded(
+        ws!(tag("declare-fun")),
+        tuple((ws!(symbol), ws!(args), ws!(sort))),
+    );
+    let types = map(pre_map, |(name, args, rtype)| {
+        (Symbol::Token(name.to_owned()), args, rtype)
+    });
+    map(types, |(name, args, rtype)| {
+        Command::DeclFn(name, args, rtype)
+    })(s)
 }
 
 fn naked_decl_const(s: &str) -> IResult<&str, (&str, Sort)> {
@@ -339,6 +369,7 @@ fn naked_command(s: &str) -> IResult<&str, Command> {
             Command::DeclConst(v.to_owned(), rccell!(s))
         }),
         naked_decl_fn,
+        naked_decl_generic, 
     ))(s)
 }
 
@@ -363,6 +394,12 @@ fn command(s: &str) -> IResult<&str, Command> {
             Command::Generic(v.into_iter().map(|g| g.to_owned()).collect::<String>())
         }),
     ))(s)
+}
+
+pub fn existential_q(s: &str) -> IResult<&str, (Vec<(SymbolRc, SortRc)>, SExp)> {
+    let ws_var_bindings = ws!(brack!(many1(ws!(var_binding))));
+    let naked_quant = preceded(tag("exists"), tuple((ws_var_bindings, sexp)));
+    brack!(naked_quant)(s)
 }
 
 pub fn quantifier(s: &str) -> IResult<&str, (Vec<(SymbolRc, SortRc)>, SExp)> {
@@ -507,13 +544,18 @@ mod tests {
     use super::*;
     use insta::assert_debug_snapshot;
     use std::fs;
+    #[test]
+    fn decl_snap() {
+        let df = command("(declare-datatype NodeMobile ((Rnode)))");
+        assert_debug_snapshot!(df.unwrap().1);
+    }
 
     #[test]
     fn decl_fn_snap() {
         let df = command("(declare-fun x33 () Bool)");
         assert_debug_snapshot!(df.unwrap().1);
     }
-    
+
     #[test]
     fn decl_fn_with_args_snap() {
         let df = command("(declare-fun f13 (S7 S6) Real)");
@@ -677,6 +719,14 @@ mod tests {
     #[test]
     fn quant_snap() {
         assert_debug_snapshot!(quantifier("(forall ((ah Real)) (= ah 4))"));
+    }
+
+    #[test]
+    fn equant_snap() {
+        assert_debug_snapshot!(existential_q(
+            "(exists ((x Int)) (and (< (* 3 x) 2) (< 1 (* 2 x))))"
+        )
+        .unwrap());
     }
 
     #[test]

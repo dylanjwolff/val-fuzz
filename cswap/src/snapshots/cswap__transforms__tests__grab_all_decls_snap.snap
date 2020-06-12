@@ -1,33 +1,9 @@
 ---
 source: cswap/src/transforms.rs
-expression: grab_all_decls(&p)
+expression: "Script::Commands(grab_all_decls(&p))"
 ---
-[
-    RefCell {
-        value: DeclConst(
-            "x",
-            RefCell {
-                value: UInt,
-            },
-        ),
-    },
-    RefCell {
-        value: DeclFn(
-            Token(
-                "z",
-            ),
-            [],
-            UserDef(
-                "Bool",
-            ),
-        ),
-    },
-    RefCell {
-        value: DeclConst(
-            "y",
-            RefCell {
-                value: Dec,
-            },
-        ),
-    },
-]
+(define-sort myset  () (Set (Set (_ BitVec 1))))
+(declare-const x Int)
+(declare-fun z () Bool)
+(declare-const y Real)
+

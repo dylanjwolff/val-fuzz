@@ -1,0 +1,5 @@
+---
+source: cswap/src/transforms.rs
+expression: p.to_string()
+---
+"(set-logic NRA)\n(declare-const GEN2 Real)\n\n(declare-const GEN1 Real)\n\n(assert (= GEN1 GEN2))\n"
