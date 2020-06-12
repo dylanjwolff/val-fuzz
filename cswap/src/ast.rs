@@ -35,6 +35,7 @@ pub enum Command {
     CheckSatAssuming(SExpRc),
     Assert(SExpRc),
     GetModel(),
+    GenericDecl(String, Vec<Vec<String>>),
     DeclConst(String, SortRc),
     DeclFn(Symbol, Vec<Sort>, Sort),
     Generic(String),
@@ -257,16 +258,33 @@ impl fmt::Display for Command {
             Command::CheckSatAssuming(sexp) => write!(f, "(check-sat-assuming {})", sexp.borrow()),
             Command::GetModel() => write!(f, "(get-model)"),
             Command::DeclConst(v, s) => write!(f, "(declare-const {} {})", v, s.borrow()),
+            Command::GenericDecl(name, rest) => {
+                write!(f, "({} ", name)?;
+                rest.iter()
+                    .enumerate()
+                    .map(|(i, chunks)| {
+                        if i != 0 { 
+                            write!(f, " ")?;
+                        }
+                        chunks
+                            .iter()
+                            .map(|s| write!(f, "{}", s))
+                            .fold(Ok(()), acc_result)
+                    })
+                    .fold(Ok(()), acc_result)?;
+                write!(f, ")")
+            }
             Command::DeclFn(name, args, rtype) => {
                 write!(f, "(declare-fun {} (", name)?;
-                args.iter().enumerate()
+                args.iter()
+                    .enumerate()
                     .map(|(i, arg)| match i == 0 {
                         true => write!(f, "{}", arg),
                         false => write!(f, " {}", arg),
                     })
                     .fold(Ok(()), acc_result)?;
                 write!(f, ") {})", rtype)
-            },
+            }
             Command::Generic(s) => write!(f, "{}", s),
             Command::Assert(s) => write!(f, "(assert {})", s.borrow()),
         }
@@ -422,7 +440,7 @@ impl fmt::Display for SExp {
                     .map(|(va, vl)| write!(f, "({} {})", va.borrow(), vl.borrow()))
                     .fold(Ok(()), acc_result)?;
                 write!(f, ") {})", s.borrow())
-            },
+            }
             SExp::QExists(v, s) => {
                 write!(f, "(exists (")?;
                 v.iter()
@@ -497,6 +515,15 @@ mod tests {
     use super::*;
     use crate::parser::*;
     use insta::assert_debug_snapshot;
+    use insta::assert_display_snapshot;
+    #[test]
+    fn decl_generic_display_snap() {
+        let str_script = "(define-fun smt_set_cup ((s1 mySet) (s2 mySet)) mySet (union s1 s2))";
+        let p = script(str_script).unwrap().1;
+
+        assert!(p.to_string().trim() == str_script.trim());
+    }
+    
     #[test]
     fn split_snap() {
         let script = Script::Commands(vec![
@@ -514,7 +541,7 @@ mod tests {
         let my_fn = Command::DeclFn(Symbol::Token("f".to_owned()), vec![], Sort::Bool());
         assert_debug_snapshot!(format!("{}", my_fn));
     }
-    
+
     #[test]
     fn decl_fn_args_display_snap() {
         let args = vec![Sort::Dec(), Sort::Bool()];
