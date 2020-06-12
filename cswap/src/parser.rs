@@ -365,6 +365,12 @@ fn command(s: &str) -> IResult<&str, Command> {
     ))(s)
 }
 
+pub fn existential_q(s: &str) -> IResult<&str, (Vec<(SymbolRc, SortRc)>, SExp)> {
+    let ws_var_bindings = ws!(brack!(many1(ws!(var_binding))));
+    let naked_quant = preceded(tag("exists"), tuple((ws_var_bindings, sexp)));
+    brack!(naked_quant)(s)
+}
+
 pub fn quantifier(s: &str) -> IResult<&str, (Vec<(SymbolRc, SortRc)>, SExp)> {
     let ws_var_bindings = ws!(brack!(many1(ws!(var_binding))));
     let naked_quant = preceded(tag("forall"), tuple((ws_var_bindings, sexp)));
@@ -679,6 +685,11 @@ mod tests {
         assert_debug_snapshot!(quantifier("(forall ((ah Real)) (= ah 4))"));
     }
 
+    #[test]
+    fn equant_snap() {
+        assert_debug_snapshot!(existential_q("(exists ((x Int)) (and (< (* 3 x) 2) (< 1 (* 2 x))))").unwrap());
+    }
+    
     #[test]
     fn equant() {
         let r = script("(assert (exists ((ah Real)) (= ah 4)))").unwrap();

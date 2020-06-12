@@ -58,6 +58,7 @@ pub enum SExp {
     Compound(Vec<SExpRc>),
     Let(Vec<(SymbolRc, SExpRc)>, SExpBoxRc),
     QForAll(Vec<(SymbolRc, SortRc)>, SExpBoxRc),
+    QExists(Vec<(SymbolRc, SortRc)>, SExpBoxRc),
     BExp(BoolOpRc, Vec<SExpRc>),
     Constant(ConstantRc),
     Symbol(SymbolRc),
@@ -417,6 +418,13 @@ impl fmt::Display for SExp {
             }
             SExp::QForAll(v, s) => {
                 write!(f, "(forall (")?;
+                v.iter()
+                    .map(|(va, vl)| write!(f, "({} {})", va.borrow(), vl.borrow()))
+                    .fold(Ok(()), acc_result)?;
+                write!(f, ") {})", s.borrow())
+            },
+            SExp::QExists(v, s) => {
+                write!(f, "(exists (")?;
                 v.iter()
                     .map(|(va, vl)| write!(f, "({} {})", va.borrow(), vl.borrow()))
                     .fold(Ok(()), acc_result)?;

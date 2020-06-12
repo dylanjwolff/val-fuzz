@@ -1,0 +1,130 @@
+---
+source: cswap/src/parser.rs
+expression: "existential_q(\"(exists ((x Int)) (and (< (* 3 x) 2) (< 1 (* 2 x))))\").unwrap()"
+---
+(
+    "",
+    (
+        [
+            (
+                RefCell {
+                    value: Var(
+                        "x",
+                    ),
+                },
+                RefCell {
+                    value: UInt,
+                },
+            ),
+        ],
+        BExp(
+            RefCell {
+                value: And,
+            },
+            [
+                RefCell {
+                    value: BExp(
+                        RefCell {
+                            value: Lt,
+                        },
+                        [
+                            RefCell {
+                                value: Compound(
+                                    [
+                                        RefCell {
+                                            value: Symbol(
+                                                RefCell {
+                                                    value: Token(
+                                                        "*",
+                                                    ),
+                                                },
+                                            ),
+                                        },
+                                        RefCell {
+                                            value: Constant(
+                                                RefCell {
+                                                    value: UInt(
+                                                        "3",
+                                                    ),
+                                                },
+                                            ),
+                                        },
+                                        RefCell {
+                                            value: Symbol(
+                                                RefCell {
+                                                    value: Token(
+                                                        "x",
+                                                    ),
+                                                },
+                                            ),
+                                        },
+                                    ],
+                                ),
+                            },
+                            RefCell {
+                                value: Constant(
+                                    RefCell {
+                                        value: UInt(
+                                            "2",
+                                        ),
+                                    },
+                                ),
+                            },
+                        ],
+                    ),
+                },
+                RefCell {
+                    value: BExp(
+                        RefCell {
+                            value: Lt,
+                        },
+                        [
+                            RefCell {
+                                value: Constant(
+                                    RefCell {
+                                        value: UInt(
+                                            "1",
+                                        ),
+                                    },
+                                ),
+                            },
+                            RefCell {
+                                value: Compound(
+                                    [
+                                        RefCell {
+                                            value: Symbol(
+                                                RefCell {
+                                                    value: Token(
+                                                        "*",
+                                                    ),
+                                                },
+                                            ),
+                                        },
+                                        RefCell {
+                                            value: Constant(
+                                                RefCell {
+                                                    value: UInt(
+                                                        "2",
+                                                    ),
+                                                },
+                                            ),
+                                        },
+                                        RefCell {
+                                            value: Symbol(
+                                                RefCell {
+                                                    value: Token(
+                                                        "x",
+                                                    ),
+                                                },
+                                            ),
+                                        },
+                                    ],
+                                ),
+                            },
+                        ],
+                    ),
+                },
+            ],
+        ),
+    ),
+)

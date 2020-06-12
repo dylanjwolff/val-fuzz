@@ -342,6 +342,7 @@ fn rl_s(
             Ok(())
         }
         SExp::QForAll(_, s) => rl_s(&mut s.borrow_mut(), scoped_vars, timer, recur_count),
+        SExp::QExists(_, s) => rl_s(&mut s.borrow_mut(), scoped_vars, timer, recur_count),
         SExp::Constant(_) => Ok(()),
     }
 }
@@ -387,6 +388,7 @@ fn rv_se(sexp: &mut SExp, to_replace: &Vec<(String, SExp)>) {
             rv_se(&mut *rest.borrow_mut(), to_replace);
         }
         SExp::QForAll(_, rest) => rv_se(&mut *rest.borrow_mut(), to_replace),
+        SExp::QExists(_, rest) => rv_se(&mut *rest.borrow_mut(), to_replace),
         SExp::Symbol(sym) => {
             let name = match &*sym.borrow() {
                 Symbol::Token(n) | Symbol::Var(n) => n,
@@ -399,7 +401,7 @@ fn rv_se(sexp: &mut SExp, to_replace: &Vec<(String, SExp)>) {
                 }
             }
         }
-        _ => (),
+        SExp::Constant(_) => (),
     }
 }
 
@@ -556,7 +558,8 @@ fn choles_rcse(rcse: &Rcse) -> Vec<(Rcse, Sort)> {
             v
         }
         SExp::QForAll(_, rest) => choles_rcse(&Rcse::b(Rc::clone(rest))),
-        _ => vec![],
+        SExp::QExists(_, rest) => choles_rcse(&Rcse::b(Rc::clone(rest))),
+        SExp::Symbol(_) => vec![],
     };
 
     match rcse {
@@ -635,8 +638,12 @@ fn bav_se(
             bav_se(&mut *rest.borrow_mut(), vng, bavs, qvars, timer.clone())?;
             qvars.truncate(qvars.len() - vbs.len());
             Ok(())
-        }
-        _ => Ok(()),
+        },
+        SExp::QExists(vbs, rest) => {
+            bav_se(&mut *rest.borrow_mut(), vng, bavs, qvars, timer.clone())?;
+            Ok(())
+        },
+        SExp::Constant(_) | SExp::Symbol(_) => Ok(()),
     }
 }
 
@@ -657,6 +664,16 @@ mod tests {
     use crate::parser::sexp;
     use insta::assert_debug_snapshot;
     use insta::assert_display_snapshot;
+    
+    #[test]
+    fn ba_script_eqv() {
+        let str_script =
+            "(assert (exists ((a Int)) (< a 4)))";
+        let mut p = script(str_script).unwrap().1;
+       let ba_str = ba_script(&mut p, &mut Metadata::new_empty()).unwrap().to_string();
+
+        assert!(ba_str.contains("declare-const a") || ba_str.contains("declare-fun a") );
+    }
 
     #[test]
     fn ba_script_snap() {
