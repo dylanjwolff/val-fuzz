@@ -119,7 +119,7 @@ fn launch(qs: (InputPPQ, SkeletonQueue), worker_counts: (u8, u8, u8), cfg: Confi
             let mut b = MyBackoff::new();
             loop {
                 b.snooze();
-                info!("QLENS: {} {} {}", qs.0.len() - 1, qs.1.len(), a_baq.len());
+                info!("QLENS: {} {} {}", max(1, qs.0.len()) - 1, qs.1.len(), a_baq.len());
             }
         })
         .unwrap();
