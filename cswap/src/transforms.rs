@@ -182,25 +182,24 @@ pub fn get_bav_assign_fmt_str(bavns: &Vec<String>) -> Command {
     assert_many(&mut baveq)
 }
 
-pub fn replace_constants_with_fresh_vars(script : &mut Script, md : &mut Metadata) {
+pub fn replace_constants_with_fresh_vars(script: &mut Script, md: &mut Metadata) {
     let choles = choles(script);
     if !try_all_rcholes(script, &choles, md, is_valid) {
         rcholes(script, &choles, md, is_valid);
     }
 }
 
-pub fn grab_all_decls(script : &Script) -> Vec<CommandRc> {
+pub fn grab_all_decls(script: &Script) -> Vec<CommandRc> {
     let Script::Commands(cmds) = script;
     let mut decl_cmds = vec![];
     for cmd in cmds {
         match *cmd.borrow() {
             Command::DeclFn(_, _, _) | Command::DeclConst(_, _) => decl_cmds.push(Rc::clone(cmd)),
             _ => (),
-        } 
+        }
     }
     decl_cmds
 }
-
 
 pub fn ba_script(script: &mut Script, md: &mut Metadata) -> io::Result<Script> {
     let mut scopes = BTreeMap::new();
@@ -487,8 +486,30 @@ pub fn rcholes(
             md.constvns.push(name.clone())
         } else {
             rmv_cmds(inits);
-            chole.swap(o);
+            if retry_coerce_hole(script, name.clone(), sort, validator) {
+                md.constvns.push(name.clone())
+            } else {
+                chole.swap(o);
+            }
         }
+    }
+}
+
+fn retry_coerce_hole(
+    script: &mut Script,
+    name: String,
+    sort: &Sort,
+    validator: fn(&Script) -> bool,
+) -> bool {
+    match sort {
+        Sort::UInt() => {
+            let inits = init_vars(script, vec![(name, Sort::Dec())]);
+            validator(script) || {
+                rmv_cmds(inits);
+                false
+            }
+        }
+        _ => false,
     }
 }
 
@@ -639,18 +660,19 @@ mod tests {
 
     #[test]
     fn ba_script_snap() {
-        let str_script = "(declare-const x Int)(declare-const y Int)(assert (or (and (> x 3) (< y 7)) (= y x)))";
+        let str_script =
+            "(declare-const x Int)(declare-const y Int)(assert (or (and (> x 3) (< y 7)) (= y x)))";
         let mut p = script(str_script).unwrap().1;
         assert_display_snapshot!(ba_script(&mut p, &mut Metadata::new_empty()).unwrap());
     }
-    
+
     #[test]
     fn grab_all_decls_snap() {
         let str_script = "(declare-const x Int)(assert (= 3 4))(check-sat)(declare-fun z () Bool)(declare-const y Real)";
         let mut p = script(str_script).unwrap().1;
         assert_debug_snapshot!(grab_all_decls(&p));
     }
-    
+
     #[test]
     fn all_rcholes_undo_then_inc_snap() {
         let str_script = "(assert (= 3 4))";
@@ -664,6 +686,16 @@ mod tests {
         assert_debug_snapshot!(p.to_string());
     }
 
+    #[test]
+    fn inc_rcholes_coerce_snap() {
+        let str_script = "(set-logic NRA)(assert (= 3 4))";
+        let mut p = script(str_script).unwrap().1;
+        let mut md = Metadata::new_empty();
+        let choles = choles(&mut p);
+
+        rcholes(&mut p, &choles, &mut md, is_valid);
+        assert_debug_snapshot!(p.to_string());
+    }
     #[test]
     fn inc_rcholes_undo_snap() {
         let str_script = "(assert (= 3 4))";

@@ -2,4 +2,4 @@
 source: cswap/src/transforms.rs
 expression: p.to_string()
 ---
-"\n\n(assert (= 3 4))\n"
+"\n\n\n\n(assert (= 3 4))\n"
