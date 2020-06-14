@@ -1,0 +1,5 @@
+---
+source: cswap/src/ast.rs
+expression: p.to_string().trim()
+---
+(define-fun smt_set_cup  ((s1 mySet) (s2 mySet)) mySet  (union s1 s2))

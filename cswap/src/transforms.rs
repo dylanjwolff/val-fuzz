@@ -27,8 +27,8 @@ impl VarNameGenerator {
         self.vars_generated.push((name.clone(), sort));
         name
     }
-    
-    pub fn store_name(&mut self, base : &Symbol, sort: &Sort) {
+
+    pub fn store_name(&mut self, base: &Symbol, sort: &Sort) {
         self.vars_generated.push((base.to_string(), sort.clone()));
     }
 
@@ -198,7 +198,9 @@ pub fn grab_all_decls(script: &Script) -> Vec<CommandRc> {
     let mut decl_cmds = vec![];
     for cmd in cmds {
         match *cmd.borrow() {
-            Command::DeclFn(_, _, _) | Command::DeclConst(_, _) | Command::GenericDecl(_, _) => decl_cmds.push(Rc::clone(cmd)),
+            Command::DeclFn(_, _, _) | Command::DeclConst(_, _) | Command::GenericDecl(_, _) => {
+                decl_cmds.push(Rc::clone(cmd))
+            }
             _ => (),
         }
     }
@@ -602,14 +604,20 @@ fn bav_c(
         return liftio!(Err("Timeout creating Boolean Abstraction"));
     }
     match cmd {
-        Command::Assert(sexp) | Command::CheckSatAssuming(sexp) => {
-            bav_se(&mut *sexp.borrow_mut(), vng, bava, qvars, timer.clone())
-        }
+        Command::Assert(sexp) | Command::CheckSatAssuming(sexp) => bav_se(
+            true,
+            &mut *sexp.borrow_mut(),
+            vng,
+            bava,
+            qvars,
+            timer.clone(),
+        ),
         _ => Ok(()),
     }
 }
 
 fn bav_se(
+    is_root: bool,
     sexp: &mut SExp,
     vng: &mut VarNameGenerator,
     bavs: &mut Vec<(String, SExp, VarBindings)>,
@@ -622,34 +630,64 @@ fn bav_se(
 
     match sexp {
         SExp::BExp(bop, sexps) => {
-            let name = vng.get_name(Sort::Bool());
-            let sec = SExp::BExp(bop.clone(), sexps.clone());
-            bavs.push((name, sec, qvars.clone()));
+            if !is_root {
+                let name = vng.get_name(Sort::Bool());
+                let sec = SExp::BExp(bop.clone(), sexps.clone());
+                bavs.push((name, sec, qvars.clone()));
+            }
             for sexp in sexps {
-                bav_se(&mut *sexp.borrow_mut(), vng, bavs, qvars, timer.clone())?;
+                bav_se(
+                    false,
+                    &mut *sexp.borrow_mut(),
+                    vng,
+                    bavs,
+                    qvars,
+                    timer.clone(),
+                )?;
             }
             Ok(())
         }
         SExp::Compound(sexps) => {
             for sexp in sexps {
-                bav_se(&mut *sexp.borrow_mut(), vng, bavs, qvars, timer.clone())?;
+                bav_se(
+                    false,
+                    &mut *sexp.borrow_mut(),
+                    vng,
+                    bavs,
+                    qvars,
+                    timer.clone(),
+                )?;
             }
             Ok(())
         }
         SExp::Let(_, _) => panic!("Let statments should be filtered out!"),
         SExp::QForAll(vbs, rest) => {
             qvars.extend(vbs.clone());
-            bav_se(&mut *rest.borrow_mut(), vng, bavs, qvars, timer.clone())?;
+            bav_se(
+                false,
+                &mut *rest.borrow_mut(),
+                vng,
+                bavs,
+                qvars,
+                timer.clone(),
+            )?;
             qvars.truncate(qvars.len() - vbs.len());
             Ok(())
-        },
+        }
         SExp::QExists(vbs, rest) => {
             for (var, sort) in vbs {
                 vng.store_name(&var.borrow(), &sort.borrow()); // for now, just keep track of EQV here so they can be initialized
             }
-            bav_se(&mut *rest.borrow_mut(), vng, bavs, qvars, timer.clone())?;
+            bav_se(
+                false,
+                &mut *rest.borrow_mut(),
+                vng,
+                bavs,
+                qvars,
+                timer.clone(),
+            )?;
             Ok(())
-        },
+        }
         SExp::Constant(_) | SExp::Symbol(_) => Ok(()),
     }
 }
@@ -671,15 +709,16 @@ mod tests {
     use crate::parser::sexp;
     use insta::assert_debug_snapshot;
     use insta::assert_display_snapshot;
-    
+
     #[test]
     fn ba_script_eqv() {
-        let str_script =
-            "(assert (exists ((a Int)) (< a 4)))";
+        let str_script = "(assert (exists ((a Int)) (< a 4)))";
         let mut p = script(str_script).unwrap().1;
-       let ba_str = ba_script(&mut p, &mut Metadata::new_empty()).unwrap().to_string();
+        let ba_str = ba_script(&mut p, &mut Metadata::new_empty())
+            .unwrap()
+            .to_string();
 
-        assert!(ba_str.contains("declare-const a") || ba_str.contains("declare-fun a") );
+        assert!(ba_str.contains("declare-const a") || ba_str.contains("declare-fun a"));
     }
 
     #[test]
