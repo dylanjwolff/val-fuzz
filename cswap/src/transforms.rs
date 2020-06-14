@@ -604,14 +604,20 @@ fn bav_c(
         return liftio!(Err("Timeout creating Boolean Abstraction"));
     }
     match cmd {
-        Command::Assert(sexp) | Command::CheckSatAssuming(sexp) => {
-            bav_se(&mut *sexp.borrow_mut(), vng, bava, qvars, timer.clone())
-        }
+        Command::Assert(sexp) | Command::CheckSatAssuming(sexp) => bav_se(
+            true,
+            &mut *sexp.borrow_mut(),
+            vng,
+            bava,
+            qvars,
+            timer.clone(),
+        ),
         _ => Ok(()),
     }
 }
 
 fn bav_se(
+    is_root: bool,
     sexp: &mut SExp,
     vng: &mut VarNameGenerator,
     bavs: &mut Vec<(String, SExp, VarBindings)>,
@@ -624,24 +630,47 @@ fn bav_se(
 
     match sexp {
         SExp::BExp(bop, sexps) => {
-            let name = vng.get_name(Sort::Bool());
-            let sec = SExp::BExp(bop.clone(), sexps.clone());
-            bavs.push((name, sec, qvars.clone()));
+            if !is_root {
+                let name = vng.get_name(Sort::Bool());
+                let sec = SExp::BExp(bop.clone(), sexps.clone());
+                bavs.push((name, sec, qvars.clone()));
+            }
             for sexp in sexps {
-                bav_se(&mut *sexp.borrow_mut(), vng, bavs, qvars, timer.clone())?;
+                bav_se(
+                    false,
+                    &mut *sexp.borrow_mut(),
+                    vng,
+                    bavs,
+                    qvars,
+                    timer.clone(),
+                )?;
             }
             Ok(())
         }
         SExp::Compound(sexps) => {
             for sexp in sexps {
-                bav_se(&mut *sexp.borrow_mut(), vng, bavs, qvars, timer.clone())?;
+                bav_se(
+                    false,
+                    &mut *sexp.borrow_mut(),
+                    vng,
+                    bavs,
+                    qvars,
+                    timer.clone(),
+                )?;
             }
             Ok(())
         }
         SExp::Let(_, _) => panic!("Let statments should be filtered out!"),
         SExp::QForAll(vbs, rest) => {
             qvars.extend(vbs.clone());
-            bav_se(&mut *rest.borrow_mut(), vng, bavs, qvars, timer.clone())?;
+            bav_se(
+                false,
+                &mut *rest.borrow_mut(),
+                vng,
+                bavs,
+                qvars,
+                timer.clone(),
+            )?;
             qvars.truncate(qvars.len() - vbs.len());
             Ok(())
         }
@@ -649,7 +678,14 @@ fn bav_se(
             for (var, sort) in vbs {
                 vng.store_name(&var.borrow(), &sort.borrow()); // for now, just keep track of EQV here so they can be initialized
             }
-            bav_se(&mut *rest.borrow_mut(), vng, bavs, qvars, timer.clone())?;
+            bav_se(
+                false,
+                &mut *rest.borrow_mut(),
+                vng,
+                bavs,
+                qvars,
+                timer.clone(),
+            )?;
             Ok(())
         }
         SExp::Constant(_) | SExp::Symbol(_) => Ok(()),
