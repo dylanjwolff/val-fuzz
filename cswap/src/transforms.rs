@@ -27,8 +27,8 @@ impl VarNameGenerator {
         self.vars_generated.push((name.clone(), sort));
         name
     }
-    
-    pub fn store_name(&mut self, base : &Symbol, sort: &Sort) {
+
+    pub fn store_name(&mut self, base: &Symbol, sort: &Sort) {
         self.vars_generated.push((base.to_string(), sort.clone()));
     }
 
@@ -198,7 +198,9 @@ pub fn grab_all_decls(script: &Script) -> Vec<CommandRc> {
     let mut decl_cmds = vec![];
     for cmd in cmds {
         match *cmd.borrow() {
-            Command::DeclFn(_, _, _) | Command::DeclConst(_, _) | Command::GenericDecl(_, _) => decl_cmds.push(Rc::clone(cmd)),
+            Command::DeclFn(_, _, _) | Command::DeclConst(_, _) | Command::GenericDecl(_, _) => {
+                decl_cmds.push(Rc::clone(cmd))
+            }
             _ => (),
         }
     }
@@ -642,14 +644,14 @@ fn bav_se(
             bav_se(&mut *rest.borrow_mut(), vng, bavs, qvars, timer.clone())?;
             qvars.truncate(qvars.len() - vbs.len());
             Ok(())
-        },
+        }
         SExp::QExists(vbs, rest) => {
             for (var, sort) in vbs {
                 vng.store_name(&var.borrow(), &sort.borrow()); // for now, just keep track of EQV here so they can be initialized
             }
             bav_se(&mut *rest.borrow_mut(), vng, bavs, qvars, timer.clone())?;
             Ok(())
-        },
+        }
         SExp::Constant(_) | SExp::Symbol(_) => Ok(()),
     }
 }
@@ -671,15 +673,16 @@ mod tests {
     use crate::parser::sexp;
     use insta::assert_debug_snapshot;
     use insta::assert_display_snapshot;
-    
+
     #[test]
     fn ba_script_eqv() {
-        let str_script =
-            "(assert (exists ((a Int)) (< a 4)))";
+        let str_script = "(assert (exists ((a Int)) (< a 4)))";
         let mut p = script(str_script).unwrap().1;
-       let ba_str = ba_script(&mut p, &mut Metadata::new_empty()).unwrap().to_string();
+        let ba_str = ba_script(&mut p, &mut Metadata::new_empty())
+            .unwrap()
+            .to_string();
 
-        assert!(ba_str.contains("declare-const a") || ba_str.contains("declare-fun a") );
+        assert!(ba_str.contains("declare-const a") || ba_str.contains("declare-fun a"));
     }
 
     #[test]

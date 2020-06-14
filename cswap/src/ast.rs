@@ -263,7 +263,7 @@ impl fmt::Display for Command {
                 rest.iter()
                     .enumerate()
                     .map(|(i, chunks)| {
-                        if i != 0 { 
+                        if i != 0 {
                             write!(f, " ")?;
                         }
                         chunks
@@ -521,9 +521,9 @@ mod tests {
         let str_script = "(define-fun smt_set_cup ((s1 mySet) (s2 mySet)) mySet (union s1 s2))";
         let p = script(str_script).unwrap().1;
 
-        assert!(p.to_string().trim() == str_script.trim());
+        assert_display_snapshot!(p.to_string().trim());
     }
-    
+
     #[test]
     fn split_snap() {
         let script = Script::Commands(vec![
