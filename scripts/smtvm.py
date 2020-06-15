@@ -46,7 +46,8 @@ try:
             else:
                 commit = sys.argv[3]
             z3(commit)
-            os.system("cp bin/z3-" + commit + " /usr/local/bin/z3")
+            os.system("rm ~/bin/z3")
+            os.system("ln -s " + os.getcwd() + "/bin/z3-" + commit + " ~/bin/z3")
         elif sys.argv[2] == "tip":
             z3(tip("z3"))
         else:
@@ -59,7 +60,8 @@ try:
             else:
                 commit = sys.argv[3]
             cvc4(commit)
-            os.system("cp bin/cvc4-" + commit + " /usr/local/bin/cvc4")
+            os.system("rm ~/bin/cvc4")
+            os.system("ln -s " + os.getcwd() + "/bin/cvc4-" + commit + " ~/bin/cvc4")
         elif sys.argv[2] == "tip":
             cvc4(tip("cvc4"))
         else:
