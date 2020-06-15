@@ -136,7 +136,7 @@ pub struct CVC4_Command_Builder {
 impl CVC4_Command_Builder {
     fn new() -> Self {
         CVC4_Command_Builder {
-            cmd: vec!["timeout", "6s", "cvc4"]
+            cmd: vec!["timeout", "-v", "6s", "cvc4"]
                 .into_iter()
                 .map(|s| s.to_owned())
                 .collect(),
@@ -144,7 +144,7 @@ impl CVC4_Command_Builder {
     }
 
     fn timeout(&mut self, duration: Duration) -> Self {
-        self.cmd[1] = format!("{}s", duration.as_secs());
+        self.cmd[2] = format!("{}s", duration.as_secs());
         self.clone()
     }
 
@@ -210,7 +210,7 @@ pub struct Z3_Command_Builder {
 impl Z3_Command_Builder {
     fn new() -> Self {
         Z3_Command_Builder {
-            cmd: vec!["timeout", "6s", "z3", "model_validate=true"]
+            cmd: vec!["timeout", "-v", "6s", "z3", "model_validate=true"]
                 .into_iter()
                 .map(|s| s.to_owned())
                 .collect(),
@@ -218,7 +218,7 @@ impl Z3_Command_Builder {
     }
 
     fn timeout(&mut self, duration: Duration) -> Self {
-        self.cmd[1] = format!("{}s", duration.as_secs());
+        self.cmd[2] = format!("{}s", duration.as_secs());
         self.clone()
     }
 
