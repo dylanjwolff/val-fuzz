@@ -18,6 +18,7 @@ use std::hash::Hasher;
 #[derive(Debug, Clone)]
 pub struct Config {
     pub file_provider: FileProvider,
+    pub remove_files: bool,
     pub max_iter: u32,
     pub rng_seed: u64,
     pub stack_size: usize,
@@ -73,14 +74,14 @@ impl FileProvider {
         fs::create_dir(&bugdir).unwrap();
         FileProvider {
             basedir: dirpath,
-            cholesdir:cholesdir,
+            cholesdir: cholesdir,
             skeldir: skeldir,
             mddir: mddir,
             scratchdir: scratchdir,
             bugdir: bugdir,
         }
     }
-    
+
     pub fn cholesfile<'a>(&self, md: &'a mut Metadata) -> io::Result<PathBuf> {
         let tfile = Builder::new()
             .prefix("choles_")
@@ -91,7 +92,7 @@ impl FileProvider {
         md.choles_file = name(&pb);
         Ok(pb)
     }
-    
+
     pub fn skelfile<'a>(&self, md: &'a mut Metadata) -> io::Result<PathBuf> {
         let tfile = Builder::new()
             .prefix("skel_")
@@ -258,7 +259,7 @@ impl Metadata {
         p.push(&self.metadata_file);
         p
     }
-    
+
     pub fn choles_path(&self, fp: &FileProvider) -> PathBuf {
         let mut p = fp.cholesdir.clone();
         p.push(&self.choles_file);

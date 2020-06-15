@@ -23,6 +23,7 @@ use cswap::solver::profiles_to_string;
 use cswap::solver::ProfileIndex;
 use std::collections::HashSet;
 
+const KEEP_FILES: &'static str = "keep-files";
 const STACK_SIZE: &'static str = "stack-size";
 const DIR: &'static str = "Seed/Skeleton Directory";
 const FROM_SKELS: &'static str = "from-skels";
@@ -83,6 +84,11 @@ fn main() {
                 .help("List the profiles availaible for use with the -p option"),
         )
         .arg(
+            Arg::with_name(KEEP_FILES)
+                .short("k")
+                .help("Keeps intermediate / non-bug inducing generated files"),
+        )
+        .arg(
             Arg::with_name(NO_MULTITHREAD)
                 .short("n")
                 .help("Run the fuzzer in a single process/thread for debugging"),
@@ -134,6 +140,7 @@ fn main() {
         rng_seed: seed,
         max_iter: max_iter,
         stack_size: stack_size,
+        remove_files: !matches.is_present(KEEP_FILES),
         profiles,
     };
 

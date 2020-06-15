@@ -92,8 +92,10 @@ impl<'a> StatefulBavAssign<'a> {
         report_any_bugs(&filepaths.0, &results, &cfg.file_provider);
 
         if results.iter().all(|r| r.has_unrecoverable_error()) {
-            fs::remove_file(&filepaths.0).unwrap_or(());
-            fs::remove_file(&filepaths.1).unwrap_or(());
+            if cfg.remove_files {
+                fs::remove_file(&filepaths.0).unwrap_or(());
+                fs::remove_file(&filepaths.1).unwrap_or(());
+            }
             return liftio!(Err(format!("All error on file {:?}", filepaths.0)));
         }
 
@@ -222,7 +224,9 @@ pub fn solver_fn(filepaths: (PathBuf, PathBuf), cfg: &Config) {
         });
 
     if !report_any_bugs(filepaths.0.as_path(), &results, &cfg.file_provider) {
-        fs::remove_file(&filepaths.0).unwrap_or(());
+        if cfg.remove_files {
+            fs::remove_file(&filepaths.0).unwrap_or(());
+        }
     }
 }
 
@@ -245,7 +249,9 @@ fn resub_model(result: &RSolve, filepaths: &(PathBuf, PathBuf), cfg: &Config) ->
         let results = profiles_solve(resubbed_f.to_str().unwrap_or("defaultname"), &cfg.profiles);
 
         if !report_any_bugs(&resubbed_f, &results, &cfg.file_provider) {
-            fs::remove_file(&resubbed_f).unwrap_or(());
+            if cfg.remove_files {
+                fs::remove_file(&resubbed_f).unwrap_or(());
+            }
         }
     }
     Ok(())
@@ -301,6 +307,7 @@ mod test {
             file_provider: FileProvider::new(fpdir.to_str().unwrap()),
             max_iter: 1,
             rng_seed: 1,
+            remove_files: true,
             stack_size: 1,
             profiles: HashSet::new(),
         };
