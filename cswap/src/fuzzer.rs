@@ -4,6 +4,7 @@ use crate::config::FileProvider;
 use crate::config::Metadata;
 use crate::parser::script_from_f;
 use crate::parser::script_from_f_unsanitized;
+use crate::solver::check_valid_solve;
 use crate::solver::profiles_solve;
 use crate::solver::RSolve;
 use crate::transforms::rv;
@@ -18,7 +19,9 @@ use std::io;
 use walkdir::WalkDir;
 
 use crate::ast::SExp;
-use crate::transforms::{end_insert_pt, get_bav_assign_fmt_str, ba_script, replace_constants_with_fresh_vars};
+use crate::transforms::{
+    ba_script, end_insert_pt, get_bav_assign_fmt_str, replace_constants_with_fresh_vars,
+};
 
 use crate::liftio;
 use crate::liftio_e;
@@ -84,7 +87,7 @@ impl<'a> StatefulBavAssign<'a> {
         let e = liftio_e!(Err::<(), &str>("Filename not a str"));
         let empty_skel_fstr = &filepaths.0.to_str().ok_or(e)?;
 
-        let results = profiles_solve(empty_skel_fstr, &cfg.profiles);
+        let results = check_valid_solve(empty_skel_fstr);
 
         report_any_bugs(&filepaths.0, &results, &cfg.file_provider);
 
@@ -195,8 +198,20 @@ fn deserialize_from_f(
     Ok((script, md))
 }
 
+use crate::solver::ProfileIndex;
+use std::collections::HashSet;
+lazy_static! {
+    static ref simple_profile: HashSet<ProfileIndex> =
+        vec![ProfileIndex::Z3(0), ProfileIndex::CVC4(1)]
+            .into_iter()
+            .collect();
+}
+
 pub fn solver_fn(filepaths: (PathBuf, PathBuf), cfg: &Config) {
-    let results = profiles_solve(filepaths.0.to_str().unwrap_or("defaultname"), &cfg.profiles);
+    let results = profiles_solve(
+        filepaths.0.to_str().unwrap_or("defaultname"),
+        &simple_profile,
+    );
 
     results
         .iter()
@@ -204,7 +219,7 @@ pub fn solver_fn(filepaths: (PathBuf, PathBuf), cfg: &Config) {
         .for_each(|r| match resub_model(r, &filepaths, &cfg) {
             Ok(()) => (),
             Err(e) => warn!("Resub error {} for file {:?}", e, filepaths.0),
-        } ); 
+        });
 
     if !report_any_bugs(filepaths.0.as_path(), &results, &cfg.file_provider) {
         fs::remove_file(&filepaths.0).unwrap_or(());
@@ -236,7 +251,10 @@ fn resub_model(result: &RSolve, filepaths: &(PathBuf, PathBuf), cfg: &Config) ->
     Ok(())
 }
 
-pub fn strip_and_transform(source_file: &Path, fp: &FileProvider) -> io::Result<(Script, Metadata)> {
+pub fn strip_and_transform(
+    source_file: &Path,
+    fp: &FileProvider,
+) -> io::Result<(Script, Metadata)> {
     let mut script = script_from_f(source_file)?;
 
     if script.is_unsupported_logic() {
@@ -248,7 +266,7 @@ pub fn strip_and_transform(source_file: &Path, fp: &FileProvider) -> io::Result<
     replace_constants_with_fresh_vars(&mut script, &mut md);
     let chf = fp.cholesfile(&mut md)?;
     fs::write(chf, script.to_string())?;
-    
+
     let ba_script = ba_script(&mut script, &mut md)?;
 
     return Ok((ba_script, md));
