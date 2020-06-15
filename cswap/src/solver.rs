@@ -41,18 +41,12 @@ const UNIMPL: &str = "Unimplemented code";
 const NON_BUG_ERRORS: [&str; 2] = [SIGTERM_TO, UNIMPL];
 
 lazy_static! {
-    pub static ref Z3_PROFILES: [Z3_Command_Builder; 7] = [
+    pub static ref Z3_PROFILES: [Z3_Command_Builder; 5] = [
         Z3_Command_Builder::new(),
+        Z3_Command_Builder::new().ematching(false),
+        Z3_Command_Builder::new().ematching(false).flat_rw(false),
         Z3_Command_Builder::new().z3str3(),
-        Z3_Command_Builder::new().threads3(),
-        Z3_Command_Builder::new().threads3().z3str3(),
-        Z3_Command_Builder::new().threads3().ematching(false),
         Z3_Command_Builder::new()
-            .threads3()
-            .ematching(false)
-            .z3str3(),
-        Z3_Command_Builder::new()
-            .threads3()
             .ematching(false)
             .flat_rw(false)
             .z3str3(),
