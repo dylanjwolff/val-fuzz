@@ -617,7 +617,7 @@ fn bav_c(
 }
 
 fn bav_se(
-    is_root: bool,
+    _is_root: bool,
     sexp: &mut SExp,
     vng: &mut VarNameGenerator,
     bavs: &mut Vec<(String, SExp, VarBindings)>,
@@ -630,12 +630,11 @@ fn bav_se(
 
     match sexp {
         SExp::BExp(bop, sexps) => {
-            if !is_root {
-                let name = vng.get_name(Sort::Bool());
-                let sec = SExp::BExp(bop.clone(), sexps.clone());
-                bavs.push((name, sec, qvars.clone()));
-            }
+            let sec = SExp::BExp(bop.clone(), sexps.clone());
+            let pre_qvars = qvars.clone();
+            let before_exploration_num_bavs = bavs.len();
             for sexp in sexps {
+                println!("iter bavs {:?}", bavs);
                 bav_se(
                     false,
                     &mut *sexp.borrow_mut(),
@@ -644,6 +643,10 @@ fn bav_se(
                     qvars,
                     timer.clone(),
                 )?;
+            }
+            if bavs.len() <= before_exploration_num_bavs {
+                let name = vng.get_name(Sort::Bool());
+                bavs.push((name, sec, pre_qvars));
             }
             Ok(())
         }
@@ -724,7 +727,7 @@ mod tests {
     #[test]
     fn ba_script_snap() {
         let str_script =
-            "(declare-const x Int)(declare-const y Int)(assert (or (and (> x 3) (< y 7)) (= y x)))";
+            "(declare-const x Int)(declare-const y Int)(assert (or (and (> x 3) (< y 7)) (= y x)))(assert (distinct y x))";
         let mut p = script(str_script).unwrap().1;
         assert_display_snapshot!(ba_script(&mut p, &mut Metadata::new_empty()).unwrap());
     }
