@@ -131,20 +131,19 @@ impl ProfileIndex {
 #[derive(Debug, Eq, PartialEq, Clone)]
 pub struct CVC4_Command_Builder {
     cmd: Vec<String>,
+    to: Duration,
 }
 
 impl CVC4_Command_Builder {
     fn new() -> Self {
         CVC4_Command_Builder {
-            cmd: vec!["timeout", "-v", "6s", "cvc4"]
-                .into_iter()
-                .map(|s| s.to_owned())
-                .collect(),
+            cmd: vec!["cvc4"].into_iter().map(|s| s.to_owned()).collect(),
+            to: Duration::from_secs(6),
         }
     }
 
     fn timeout(&mut self, duration: Duration) -> Self {
-        self.cmd[2] = format!("{}s", duration.as_secs());
+        self.to = duration;
         self.clone()
     }
 
@@ -195,30 +194,32 @@ impl CVC4_Command_Builder {
             .dump_unsat_cores_full()
     }
 
-    fn run_on(&self, target: &Path) -> Result<std::process::Output, std::io::Error> {
+    fn run_on(&self, target: &Path) -> RSolve {
         let mut cmd = self.cmd.clone();
         cmd.push(target.to_str().unwrap().to_owned());
-        process::Command::new(&self.cmd[0]).args(&cmd[1..]).output()
+        solve_intern(cmd, target, Solver::CVC4(self.clone()), self.to)
     }
 }
 
 #[derive(Debug, Eq, PartialEq, Clone)]
 pub struct Z3_Command_Builder {
     cmd: Vec<String>,
+    to: Duration,
 }
 
 impl Z3_Command_Builder {
     fn new() -> Self {
         Z3_Command_Builder {
-            cmd: vec!["timeout", "-v", "6s", "z3", "model_validate=true"]
+            cmd: vec!["z3", "model_validate=true"]
                 .into_iter()
                 .map(|s| s.to_owned())
                 .collect(),
+            to: Duration::from_secs(6),
         }
     }
 
     fn timeout(&mut self, duration: Duration) -> Self {
-        self.cmd[2] = format!("{}s", duration.as_secs());
+        self.to = duration;
         self.clone()
     }
 
@@ -250,10 +251,48 @@ impl Z3_Command_Builder {
         self.clone()
     }
 
-    fn run_on(&self, target: &Path) -> Result<std::process::Output, std::io::Error> {
+    fn run_on(&self, target: &Path) -> RSolve {
         let mut cmd = self.cmd.clone();
         cmd.push(target.to_str().unwrap().to_owned());
-        process::Command::new(&self.cmd[0]).args(&cmd[1..]).output()
+        solve_intern(cmd, target, Solver::Z3(self.clone()), self.to)
+    }
+}
+
+fn solve_intern(cmd: Vec<String>, target: &Path, solver: Solver, timeout: Duration) -> RSolve {
+    let cfg = PopenConfig {
+        stdout: Redirection::Pipe,
+        stderr: Redirection::Pipe,
+        detached: true,
+        ..Default::default()
+    };
+
+    let mut pcss = match Popen::create(&cmd[..], cfg) {
+        Ok(r) => r,
+        _ => return RSolve::process_error(),
+    };
+
+    let to_res = pcss.wait_timeout(timeout);
+    match to_res {
+        Ok(None) => {
+            pcss.kill().unwrap_or(()); // We tried to kill it already, can't take more action, so ignore
+            return RSolve::timeout(solver);
+        }
+        Ok(Some(ExitStatus::Exited(s))) => (), // exited
+        Ok(Some(ExitStatus::Signaled(s))) => {
+            if s == SIGSEGV {
+                return RSolve::segv(solver);
+            }
+        }
+        _ => (), // should not happen
+    }
+
+    let r = pcss.communicate(None);
+    match r {
+        Ok((Some(o), Some(e))) => RSolve::move_new(solver, o, e),
+        Ok((Some(o), _)) => RSolve::move_new(solver, o, "".to_owned()),
+        Ok((_, Some(e))) => RSolve::move_new(solver, "".to_owned(), e),
+        Ok((None, None)) => RSolve::move_new(solver, "".to_owned(), "".to_owned()),
+        Err(e) => RSolve::process_error(), // process error
     }
 }
 
@@ -285,6 +324,8 @@ impl fmt::Display for Solver {
 
 #[derive(Debug, Eq, PartialEq, Clone)]
 pub struct RSolve {
+    was_timeout: bool,
+    was_segv: bool,
     stdout: String,
     stderr: String,
     lines: Vec<ResultLine>,
@@ -302,8 +343,32 @@ impl fmt::Display for RSolve {
 }
 
 impl RSolve {
+    pub fn segv(solver: Solver) -> Self {
+        RSolve {
+            was_timeout: false,
+            was_segv: true,
+            stdout: "".to_owned(),
+            stderr: "Segmentation Fault!".to_owned(),
+            lines: vec![ResultLine::Error("Segmentation Fault!".to_owned())],
+            solver: solver,
+        }
+    }
+
+    pub fn timeout(solver: Solver) -> Self {
+        RSolve {
+            was_timeout: true,
+            was_segv: false,
+            stdout: "".to_owned(),
+            stderr: "Timeout!".to_owned(),
+            lines: vec![ResultLine::Error("Timeout!".to_owned())],
+            solver: solver,
+        }
+    }
+
     pub fn process_error() -> Self {
         RSolve {
+            was_timeout: false,
+            was_segv: false,
             stdout: "".to_owned(),
             stderr: "".to_owned(),
             lines: vec![ResultLine::Error("Process Error".to_owned())],
@@ -315,6 +380,8 @@ impl RSolve {
         let mut v = z3o(&stdout).unwrap().1;
         v.extend(z3o(&stderr).unwrap().1);
         RSolve {
+            was_timeout: false,
+            was_segv: false,
             // Following should never panic, as parser should never throw an error
             lines: {
                 let mut v = z3o(&stdout).unwrap().1;
@@ -331,6 +398,8 @@ impl RSolve {
         let mut v = z3o(&stdout).unwrap().1;
         v.extend(z3o(&stderr).unwrap().1);
         RSolve {
+            was_timeout: false,
+            was_segv: false,
             stdout: stdout.to_owned(),
             stderr: stderr.to_owned(),
             // Following should never panic, as parser should never throw an error
@@ -356,7 +425,7 @@ impl RSolve {
 
     pub fn has_bug_error(&self) -> bool {
         for bug_error in BUG_ERRORS.iter() {
-            if (self.stdout.contains(bug_error) || self.stderr.contains(bug_error))
+            if (self.was_segv || self.stdout.contains(bug_error) || self.stderr.contains(bug_error))
                 && !self.bug_is_negated(bug_error)
             {
                 return true;
@@ -465,39 +534,13 @@ impl RSolve {
 }
 
 pub fn solve_cvc4(cvc4_cmd: &CVC4_Command_Builder, target: &Path) -> RSolve {
-    let cvc4_res = cvc4_cmd.run_on(target);
-    let cvc4mrs = cvc4_res.map(|out| {
-        let stderr = from_utf8(&out.stderr[..]).unwrap_or("");
-        let stdout = from_utf8(&out.stdout[..]).unwrap_or("");
-        let success = out.status.success();
-        (success, stderr.to_owned(), stdout.to_owned())
-    });
-
-    match cvc4mrs {
-        Ok((_cvc4_succ, cvc4_out, cvc4_err)) => {
-            RSolve::move_new(Solver::CVC4(cvc4_cmd.clone()), cvc4_out, cvc4_err)
-        }
-        Err(_) => RSolve::process_error(),
-    }
+    cvc4_cmd.run_on(target)
 }
 
 pub fn solve_z3(z3_command: &Z3_Command_Builder, target: &Path) -> RSolve {
-    let z3_res = z3_command.run_on(target);
-
-    let z3mrs = z3_res.map(|out| {
-        let stderr = from_utf8(&out.stderr[..]).unwrap_or("");
-        let stdout = from_utf8(&out.stdout[..]).unwrap_or("");
-        let success = out.status.success();
-        (success, stderr.to_owned(), stdout.to_owned())
-    });
-
-    match z3mrs {
-        Ok((_z3_succ, z3_out, z3_err)) => {
-            RSolve::move_new(Solver::Z3(z3_command.clone()), z3_out, z3_err)
-        }
-        Err(_) => RSolve::process_error(),
-    }
+    z3_command.run_on(target)
 }
+
 pub fn solve(filename: &str) -> Vec<RSolve> {
     let filepath = Path::new(filename);
 
@@ -556,13 +599,32 @@ pub fn check_valid_solve_as_temp(script: &Script) -> Result<Vec<RSolve>, String>
     Ok(results)
 }
 
+use subprocess::ExitStatus;
+use subprocess::Popen;
+use subprocess::PopenConfig;
+use subprocess::Redirection;
+
+pub const SIGSEGV: u8 = 11;
+
 #[cfg(test)]
 mod tests {
     use super::*;
     use insta::assert_debug_snapshot;
 
     #[test]
-    fn tempfile_solve_snap() {
+    fn segfaulter() {
+        let r = solve_intern(
+            vec!["test/segfaulter".to_owned()],
+            Path::new(""),
+            Solver::NONE,
+            Duration::from_secs(5),
+        );
+        println!("{:?}", r);
+        assert!(r.has_bug_error());
+    }
+
+    #[test]
+    fn tempfile_solve() {
         let s = script("(assert (exists ((ah Real)) (= ah 4)))(check-sat)")
             .unwrap()
             .1;
@@ -594,9 +656,8 @@ mod tests {
             .timeout(Duration::from_secs(3))
             .ematching(false)
             .flat_rw(false)
-            .threads3()
             .z3str3()
-            .run_on(Path::new("test/strings20.smt2")));
+            .run_on(Path::new("test/prp-13-24.smt2")));
     }
 
     #[test]

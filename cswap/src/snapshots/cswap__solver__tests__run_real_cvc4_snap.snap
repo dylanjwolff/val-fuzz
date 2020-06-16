@@ -2,14 +2,44 @@
 source: cswap/src/solver.rs
 expression: "CVC4_Command_Builder::new().timeout(Duration::from_secs(3)).strings_exp().incremental().dump_all().check_unsat_cores().run_on(Path::new(\"test/strings20.smt2\"))"
 ---
-Ok(
-    Output {
-        status: ExitStatus(
-            ExitStatus(
-                0,
-            ),
+RSolve {
+    was_timeout: false,
+    was_segv: false,
+    stdout: "sat\n(model\n(define-fun s () String \"\\\"\")\n)\n(model\n(define-fun s () String \"\\\"\")\n)\n",
+    stderr: "",
+    lines: [
+        Sat,
+        Generic(
+            "(model",
         ),
-        stdout: "sat\n(model\n(define-fun s () String \"\\\"\")\n)\n(model\n(define-fun s () String \"\\\"\")\n)\n",
-        stderr: "",
-    },
-)
+        Generic(
+            "(define-fun s () String \"\\\"\")",
+        ),
+        Generic(
+            ")",
+        ),
+        Generic(
+            "(model",
+        ),
+        Generic(
+            "(define-fun s () String \"\\\"\")",
+        ),
+        Generic(
+            ")",
+        ),
+    ],
+    solver: CVC4(
+        CVC4_Command_Builder {
+            cmd: [
+                "cvc4",
+                "--strings-exp",
+                "--incremental",
+                "--dump-models",
+                "--dump-unsat-cores",
+                "--dump-unsat-cores-full",
+                "--check-unsat-cores",
+            ],
+            to: 3s,
+        },
+    ),
+}

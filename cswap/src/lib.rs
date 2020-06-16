@@ -5,6 +5,7 @@ extern crate rand_core;
 extern crate rand_xoshiro;
 extern crate serde;
 extern crate serde_lexpr;
+extern crate subprocess;
 extern crate tempfile;
 extern crate walkdir;
 #[macro_use]
@@ -119,7 +120,12 @@ fn launch(qs: (InputPPQ, SkeletonQueue), worker_counts: (u8, u8, u8), cfg: Confi
             let mut b = MyBackoff::new();
             loop {
                 b.snooze();
-                info!("QLENS: {} {} {}", max(1, qs.0.len()) - 1, qs.1.len(), a_baq.len());
+                info!(
+                    "QLENS: {} {} {}",
+                    max(1, qs.0.len()) - 1,
+                    qs.1.len(),
+                    a_baq.len()
+                );
             }
         })
         .unwrap();
