@@ -105,14 +105,14 @@ pub fn profiles_solve(filename: &str, pis: &HashSet<ProfileIndex>) -> Vec<RSolve
         .zip(0..CVC4_PROFILES.len() - 1)
         .filter(|(_, i)| pis.contains(&ProfileIndex::CVC4(*i)))
         .map(|(p, _)| p)
-        .map(|profile| solve_cvc4(profile, &filepath));
+        .map(|profile| profile.run_on(&filepath));
 
     let mr_z3 = Z3_PROFILES
         .iter()
         .zip(0..Z3_PROFILES.len() - 1)
         .filter(|(_, i)| pis.contains(&ProfileIndex::Z3(*i)))
         .map(|(p, _)| p)
-        .map(|profile| solve_z3(profile, &filepath));
+        .map(|profile| profile.run_on(&filepath));
 
     mr_cvc4.chain(mr_z3).collect()
 }
@@ -197,7 +197,7 @@ impl CVC4_Command_Builder {
     fn run_on(&self, target: &Path) -> RSolve {
         let mut cmd = self.cmd.clone();
         cmd.push(target.to_str().unwrap().to_owned());
-        solve_intern(cmd, target, Solver::CVC4(self.clone()), self.to)
+        solve_intern(cmd, Solver::CVC4(self.clone()))
     }
 }
 
@@ -254,11 +254,11 @@ impl Z3_Command_Builder {
     fn run_on(&self, target: &Path) -> RSolve {
         let mut cmd = self.cmd.clone();
         cmd.push(target.to_str().unwrap().to_owned());
-        solve_intern(cmd, target, Solver::Z3(self.clone()), self.to)
+        solve_intern(cmd, Solver::Z3(self.clone()))
     }
 }
 
-fn solve_intern(cmd: Vec<String>, target: &Path, solver: Solver, timeout: Duration) -> RSolve {
+fn solve_intern(cmd: Vec<String>, solver: Solver) -> RSolve {
     let cfg = PopenConfig {
         stdout: Redirection::Pipe,
         stderr: Redirection::Pipe,
@@ -271,7 +271,7 @@ fn solve_intern(cmd: Vec<String>, target: &Path, solver: Solver, timeout: Durati
         _ => return RSolve::process_error(),
     };
 
-    let to_res = pcss.wait_timeout(timeout);
+    let to_res = pcss.wait_timeout(solver.get_timeout());
     match to_res {
         Ok(None) => {
             pcss.kill().unwrap_or(()); // We tried to kill it already, can't take more action, so ignore
@@ -311,7 +311,15 @@ impl Solver {
             Self::NONE => "NONE".to_owned(),
         }
     }
+    pub fn get_timeout(&self) -> Duration {
+        match self {
+            Self::Z3(z3cb) => z3cb.to,
+            Self::CVC4(cvc4cb) => cvc4cb.to,
+            Self::NONE => Duration::from_secs(2),
+        }
+    }
 }
+
 impl fmt::Display for Solver {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         match self {
@@ -533,24 +541,14 @@ impl RSolve {
     }
 }
 
-pub fn solve_cvc4(cvc4_cmd: &CVC4_Command_Builder, target: &Path) -> RSolve {
-    cvc4_cmd.run_on(target)
-}
-
-pub fn solve_z3(z3_command: &Z3_Command_Builder, target: &Path) -> RSolve {
-    z3_command.run_on(target)
-}
-
 pub fn solve(filename: &str) -> Vec<RSolve> {
     let filepath = Path::new(filename);
 
     let mr_cvc4 = CVC4_PROFILES
         .iter()
-        .map(|profile| solve_cvc4(profile, &filepath));
+        .map(|profile| profile.run_on(&filepath));
 
-    let mr_z3 = Z3_PROFILES
-        .iter()
-        .map(|profile| solve_z3(profile, &filepath));
+    let mr_z3 = Z3_PROFILES.iter().map(|profile| profile.run_on(&filepath));
 
     mr_cvc4.chain(mr_z3).collect()
 }
@@ -558,16 +556,13 @@ pub fn solve(filename: &str) -> Vec<RSolve> {
 pub fn check_valid_solve(filename: &str) -> Vec<RSolve> {
     let filepath = Path::new(filename);
     vec![
-        solve_z3(
-            &Z3_Command_Builder::new().timeout(Duration::from_secs(1)),
-            filepath,
-        ),
-        solve_cvc4(
-            &CVC4_Command_Builder::new()
-                .timeout(Duration::from_secs(1))
-                .incremental(),
-            filepath,
-        ),
+        Z3_Command_Builder::new()
+            .timeout(Duration::from_secs(1))
+            .run_on(&filepath),
+        CVC4_Command_Builder::new()
+            .timeout(Duration::from_secs(1))
+            .incremental()
+            .run_on(&filepath),
     ]
 }
 
@@ -584,16 +579,13 @@ pub fn check_valid_solve_as_temp(script: &Script) -> Result<Vec<RSolve>, String>
     let filepath = tfile.path();
 
     let results = vec![
-        solve_z3(
-            &Z3_Command_Builder::new().timeout(Duration::from_secs(1)),
-            filepath,
-        ),
-        solve_cvc4(
-            &CVC4_Command_Builder::new()
-                .timeout(Duration::from_secs(1))
-                .incremental(),
-            filepath,
-        ),
+        Z3_Command_Builder::new()
+            .timeout(Duration::from_secs(1))
+            .run_on(filepath),
+        CVC4_Command_Builder::new()
+            .timeout(Duration::from_secs(1))
+            .incremental()
+            .run_on(filepath),
     ];
 
     Ok(results)
@@ -613,12 +605,7 @@ mod tests {
 
     #[test]
     fn segfaulter() {
-        let r = solve_intern(
-            vec!["test/segfaulter".to_owned()],
-            Path::new(""),
-            Solver::NONE,
-            Duration::from_secs(5),
-        );
+        let r = solve_intern(vec!["test/segfaulter".to_owned()], Solver::NONE);
         println!("{:?}", r);
         assert!(r.has_bug_error());
     }
