@@ -634,7 +634,6 @@ fn bav_se(
             let pre_qvars = qvars.clone();
             let before_exploration_num_bavs = bavs.len();
             for sexp in sexps {
-                println!("iter bavs {:?}", bavs);
                 bav_se(
                     false,
                     &mut *sexp.borrow_mut(),

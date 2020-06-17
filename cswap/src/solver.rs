@@ -41,10 +41,14 @@ const UNIMPL: &str = "Unimplemented code";
 const NON_BUG_ERRORS: [&str; 2] = [SIGTERM_TO, UNIMPL];
 
 lazy_static! {
-    pub static ref Z3_PROFILES: [Z3_Command_Builder; 5] = [
+    pub static ref Z3_PROFILES: [Z3_Command_Builder; 6] = [
         Z3_Command_Builder::new(),
         Z3_Command_Builder::new().ematching(false),
         Z3_Command_Builder::new().ematching(false).flat_rw(false),
+        Z3_Command_Builder::new()
+            .ematching(false)
+            .flat_rw(false)
+            .udiv2mul(),
         Z3_Command_Builder::new().z3str3(),
         Z3_Command_Builder::new()
             .ematching(false)
@@ -229,6 +233,11 @@ impl Z3_Command_Builder {
         } else {
             self.cmd.push("smt.ematching=true".to_owned());
         }
+        self.clone()
+    }
+
+    fn udiv2mul(&mut self) -> Self {
+        self.cmd.push("rewriter.udiv2mul=true".to_owned());
         self.clone()
     }
 
@@ -606,7 +615,6 @@ mod tests {
     #[test]
     fn segfaulter() {
         let r = solve_intern(vec!["test/segfaulter".to_owned()], Solver::NONE);
-        println!("{:?}", r);
         assert!(r.has_bug_error());
     }
 
