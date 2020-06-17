@@ -94,6 +94,7 @@ fn main() {
             );
         }
 
+        let mut ret_val = 1;
         if results.iter().any(|r| r.has_bug_error()) {
             if log_level == 1 {
                 results
@@ -104,18 +105,20 @@ fn main() {
             if let Some(crs) = maybe_cr_script {
                 print_creduce(&results, crs, infile_name);
             }
-            0
-        } else if !RSolve::differential_test(&results).is_ok() {
+            ret_val = 0;
+        }
+
+        if !RSolve::differential_test(&results).is_ok() {
             if log_level == 1 {
                 println!("SOUNDNESS ERROR in {}", infile_name);
             }
             if let Some(crs) = maybe_cr_script {
                 print_creduce(&results, crs, infile_name);
             }
-            0
-        } else {
-            1
+            ret_val = 0
         }
+
+        ret_val
     };
     std::process::exit(ecode);
 }
