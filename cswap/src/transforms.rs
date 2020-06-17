@@ -697,7 +697,9 @@ fn bav_se(
 
 fn is_valid(s: &Script) -> bool {
     match check_valid_solve_as_temp(s) {
-        Ok(responses) => responses.iter().any(|r| !r.has_unrecoverable_error()),
+        Ok(responses) => responses
+            .iter()
+            .any(|r| !r.has_unrecoverable_error() || r.has_bug_error()),
         Err(e) => {
             warn!("validator error!: {}", e);
             false
