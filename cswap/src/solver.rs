@@ -459,7 +459,10 @@ impl RSolve {
                 _ => None,
             })
             // any error line that has no non-fatal errors is a fatal error
-            .any(|s| NON_FATAL_ERRORS.iter().all(|e| !s.contains(e)))
+            .any(|s| {
+                NON_FATAL_ERRORS.iter().all(|e| !s.contains(e))
+                    && BUG_ERRORS.iter().all(|e| !s.contains(e))
+            })
     }
 
     pub fn was_timeout(&self) -> bool {
@@ -611,6 +614,16 @@ pub const SIGSEGV: u8 = 11;
 mod tests {
     use super::*;
     use insta::assert_debug_snapshot;
+
+    #[test]
+    fn unrec_not_bug() {
+        let r = RSolve::new(
+            Solver::NONE,
+            "sat\n(error \"line 3 column 10: an invalid model was generated\")\n",
+            "",
+        );
+        assert!(!r.has_unrecoverable_error());
+    }
 
     #[test]
     fn segfaulter() {
