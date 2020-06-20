@@ -8,6 +8,7 @@ use nom::{bytes::complete::tag, IResult};
 use rand::Rng;
 use rand_xoshiro::rand_core::SeedableRng;
 use rand_xoshiro::Xoshiro256Plus;
+use std::cmp::min;
 use std::collections::BTreeSet;
 use std::sync::atomic::AtomicBool;
 use std::sync::atomic::Ordering;
@@ -125,9 +126,36 @@ pub struct RandUniqPermGen {
     max: u32,
     use_max: bool,
     use_retries: bool,
+    window_index: usize,
+    window_size: usize,
 }
 
 impl RandUniqPermGen {
+    pub fn new_windowed(seed: u64, numbits: usize, maxiter: u32, window: usize) -> Self {
+        let buf = BitVec::from_elem(numbits, false).to_bytes();
+        let seen = BTreeSet::new();
+        let rng = Xoshiro256Plus::seed_from_u64(seed);
+
+        let true_max = if (maxiter as f64).log2() < (numbits as f64) {
+            maxiter
+        } else {
+            (numbits as f64).exp2() as u32
+        };
+
+        RandUniqPermGen {
+            rng: rng,
+            numbits: numbits,
+            buf: buf,
+            seen: seen,
+            retries: 0,
+            max: true_max,
+            use_max: true,
+            use_retries: false,
+            window_index: 0,
+            window_size: window,
+        }
+    }
+
     pub fn new_definite_seeded(seed: u64, numbits: usize, maxiter: u32) -> Self {
         let buf = BitVec::from_elem(numbits, false).to_bytes();
         let seen = BTreeSet::new();
@@ -148,6 +176,8 @@ impl RandUniqPermGen {
             max: true_max,
             use_max: true,
             use_retries: false,
+            window_index: 0,
+            window_size: 0,
         }
     }
 
@@ -157,6 +187,47 @@ impl RandUniqPermGen {
 
     pub fn get_count(&self) -> u32 {
         self.seen.len() as u32
+    }
+
+    #[allow(unused)]
+    pub fn sample_window(&mut self) -> Option<BitVec> {
+        if self.max <= self.seen.len() as u32 {
+            return None;
+        }
+
+        let mut window_seen = BTreeSet::new();
+        let mut win_buf = BitVec::from_elem(self.window_size, false).to_bytes();
+        let mut win = BitVec::from_bytes(&win_buf[..]);
+
+        loop {
+            self.rng.fill(&mut win_buf[..]);
+            win = BitVec::from_bytes(&win_buf[..]);
+            win.truncate(self.window_size);
+            if let None = window_seen.get(&(self.window_index, &win)) {
+                window_seen.insert(&(self.window_index, &win));
+                break;
+            }
+        }
+
+        let mask = BitVec::from_elem(self.window_size, true)
+            .iter()
+            .enumerate()
+            .map(|(i, v)| {
+                if self.window_index <= i && i < self.window_index + self.window_size {
+                    win[i - self.window_index]
+                } else {
+                    v
+                }
+            })
+            .collect::<BitVec>();
+
+        self.rng.fill(&mut self.buf[..]);
+        let mut bv = BitVec::from_bytes(&self.buf[..]);
+        bv.truncate(self.numbits);
+
+        bv.intersect(&mask);
+
+        Some(bv)
     }
 
     #[allow(unused)]
