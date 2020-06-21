@@ -9,6 +9,7 @@ use rand::Rng;
 use rand_xoshiro::rand_core::SeedableRng;
 use rand_xoshiro::Xoshiro256Plus;
 use std::cmp::min;
+use std::collections::BTreeMap;
 use std::collections::BTreeSet;
 use std::sync::atomic::AtomicBool;
 use std::sync::atomic::Ordering;
@@ -122,18 +123,19 @@ pub struct RandUniqPermGen {
     numbits: usize,
     buf: Vec<u8>,
     seen: BTreeSet<BitVec>,
-    retries: u16,
+    seen_masked: BTreeMap<BitVec, BTreeSet<BitVec>>,
+    retries: u32,
     max: u32,
     use_max: bool,
     use_retries: bool,
-    window_index: usize,
-    window_size: usize,
+    mask_size: usize,
 }
 
 impl RandUniqPermGen {
-    pub fn new_windowed(seed: u64, numbits: usize, maxiter: u32, window: usize) -> Self {
+    pub fn new_mask(seed: u64, numbits: usize, maxiter: u32, mask_size: usize) -> Self {
         let buf = BitVec::from_elem(numbits, false).to_bytes();
         let seen = BTreeSet::new();
+        let seen_masked = BTreeMap::new();
         let rng = Xoshiro256Plus::seed_from_u64(seed);
 
         let true_max = if (maxiter as f64).log2() < (numbits as f64) {
@@ -147,18 +149,19 @@ impl RandUniqPermGen {
             numbits: numbits,
             buf: buf,
             seen: seen,
-            retries: 0,
+            seen_masked: seen_masked,
+            retries: 2 * true_max,
             max: true_max,
             use_max: true,
-            use_retries: false,
-            window_index: 0,
-            window_size: window,
+            use_retries: true,
+            mask_size: mask_size,
         }
     }
 
     pub fn new_definite_seeded(seed: u64, numbits: usize, maxiter: u32) -> Self {
         let buf = BitVec::from_elem(numbits, false).to_bytes();
         let seen = BTreeSet::new();
+        let seen_masked = BTreeMap::new();
         let rng = Xoshiro256Plus::seed_from_u64(seed);
 
         let true_max = if (maxiter as f64).log2() < (numbits as f64) {
@@ -172,12 +175,12 @@ impl RandUniqPermGen {
             numbits: numbits,
             buf: buf,
             seen: seen,
+            seen_masked: seen_masked,
             retries: 0,
             max: true_max,
             use_max: true,
             use_retries: false,
-            window_index: 0,
-            window_size: 0,
+            mask_size: numbits,
         }
     }
 
@@ -189,45 +192,81 @@ impl RandUniqPermGen {
         self.seen.len() as u32
     }
 
+    pub fn mask(&mut self) -> Option<BitVec> {
+        assert!(self.mask_size <= self.numbits, "mask larger than bits");
+
+        let mut attempt = 0;
+        while !self.use_retries || (self.use_retries && attempt < self.retries) {
+            if self.mask_size >= self.numbits / 2 {
+                let mut mask = BitVec::from_elem(self.numbits, true);
+                let mut true_bits = self.numbits;
+                while true_bits != self.mask_size {
+                    let i = self.rng.gen_range(0, self.numbits);
+                    if mask[i] {
+                        mask.set(i, false);
+                        true_bits = true_bits - 1;
+                    }
+                }
+                if (Self::get_or_insert(&mut self.seen_masked, &mask).len() as f64).log2()
+                    < self.mask_size as f64
+                {
+                    return Some(mask);
+                }
+            } else {
+                let mut mask = BitVec::from_elem(self.numbits, false);
+                let mut true_bits = 0;
+
+                while true_bits < self.mask_size {
+                    let i = self.rng.gen_range(0, self.numbits);
+                    if !mask[i] {
+                        mask.set(i, true);
+                        true_bits = true_bits + 1;
+                    }
+                }
+                if (Self::get_or_insert(&mut self.seen_masked, &mask).len() as f64).log2()
+                    < self.mask_size as f64
+                {
+                    return Some(mask);
+                }
+            }
+            attempt = attempt + 1;
+        }
+        None
+    }
+
+    fn get_or_insert<'a, K, T>(m: &'a mut BTreeMap<K, BTreeSet<T>>, key: &K) -> &'a mut BTreeSet<T>
+    where
+        K: Ord,
+        K: Clone,
+        T: Ord,
+    {
+        if !m.contains_key(key) {
+            m.insert(key.clone(), BTreeSet::new());
+        }
+        m.get_mut(key).unwrap()
+    }
+
     #[allow(unused)]
-    pub fn sample_window(&mut self) -> Option<BitVec> {
-        if self.max <= self.seen.len() as u32 {
+    pub fn sample_and_mask(&mut self) -> Option<(BitVec, BitVec)> {
+        if self.max <= self.seen.len() as u32 || self.max <= self.seen_masked.len() as u32 {
             return None;
         }
 
-        let mut window_seen = BTreeSet::new();
-        let mut win_buf = BitVec::from_elem(self.window_size, false).to_bytes();
-        let mut win = BitVec::from_bytes(&win_buf[..]);
-
-        loop {
-            self.rng.fill(&mut win_buf[..]);
-            win = BitVec::from_bytes(&win_buf[..]);
-            win.truncate(self.window_size);
-            if let None = window_seen.get(&(self.window_index, &win)) {
-                window_seen.insert(&(self.window_index, &win));
-                break;
+        let mask = self.mask()?;
+        let mut is_new = false;
+        let mut attempt = 0;
+        while !self.use_retries || (self.use_retries && attempt < self.retries) {
+            self.rng.fill(&mut self.buf[..]);
+            let mut bv = BitVec::from_bytes(&self.buf[..]);
+            bv.truncate(self.mask_size);
+            is_new = Self::get_or_insert(&mut self.seen_masked, &mask).insert(bv.clone());
+            if is_new {
+                return Some((bv, mask));
             }
+            attempt = attempt + 1;
         }
 
-        let mask = BitVec::from_elem(self.window_size, true)
-            .iter()
-            .enumerate()
-            .map(|(i, v)| {
-                if self.window_index <= i && i < self.window_index + self.window_size {
-                    win[i - self.window_index]
-                } else {
-                    v
-                }
-            })
-            .collect::<BitVec>();
-
-        self.rng.fill(&mut self.buf[..]);
-        let mut bv = BitVec::from_bytes(&self.buf[..]);
-        bv.truncate(self.numbits);
-
-        bv.intersect(&mask);
-
-        Some(bv)
+        None
     }
 
     #[allow(unused)]
@@ -319,6 +358,19 @@ pub fn to_strs(bv: &BitVec) -> Vec<&'static str> {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use insta::assert_debug_snapshot;
+
+    #[test]
+    fn mask() {
+        let mut ru = RandUniqPermGen::new_mask(1, 2, 100, 1);
+        let mut ress = vec![];
+        ress.push(ru.sample_and_mask());
+        ress.push(ru.sample_and_mask());
+        ress.push(ru.sample_and_mask());
+        ress.push(ru.sample_and_mask());
+        ress.push(ru.sample_and_mask());
+        assert_debug_snapshot!(ress);
+    }
 
     #[test]
     fn dfmt() {

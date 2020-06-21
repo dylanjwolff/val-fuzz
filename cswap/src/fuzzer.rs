@@ -69,7 +69,6 @@ pub fn mutator(filepath: PathBuf, file_provider: &FileProvider) -> io::Result<(P
 
 pub struct StatefulBavAssign<'a> {
     top_of_script: Box<String>,
-    bav_fmt_string: Box<String>,
     bottom_of_script: Box<String>,
     md: Metadata,
     pub urng: RandUniqPermGen,
@@ -99,7 +98,7 @@ impl<'a> StatefulBavAssign<'a> {
             return liftio!(Err(format!("All error on file {:?}", filepaths.0)));
         }
 
-        let (top, fmt_str, bottom) = Self::split(script, &md.bavns);
+        let (top, bottom) = Self::split(script, &md.bavns);
         let num_bavs = md.bavns.len();
 
         let urng = RandUniqPermGen::new_definite_seeded(
@@ -110,7 +109,6 @@ impl<'a> StatefulBavAssign<'a> {
 
         Ok(StatefulBavAssign {
             top_of_script: top,
-            bav_fmt_string: fmt_str,
             bottom_of_script: bottom,
             md: md,
             urng: urng,
@@ -118,26 +116,42 @@ impl<'a> StatefulBavAssign<'a> {
         })
     }
 
-    fn split(script: Script, bavns: &Vec<String>) -> (Box<String>, Box<String>, Box<String>) {
+    fn split(script: Script, bavns: &Vec<String>) -> (Box<String>, Box<String>) {
         let eip = end_insert_pt(&script);
         let (top, bottom) = Script::split(script, eip);
-        let fmt_str = Box::new(format!("{}\n", get_bav_assign_fmt_str(bavns)));
-        (
-            Box::new(top.to_string()),
-            fmt_str,
-            Box::new(bottom.to_string()),
-        )
+        (Box::new(top.to_string()), Box::new(bottom.to_string()))
     }
 
-    pub fn do_iteration_tv(&mut self, truth_values: BitVec) -> io::Result<(PathBuf, PathBuf)> {
+    pub fn do_iteration_tv(
+        &mut self,
+        truth_values: BitVec,
+        mask: BitVec,
+    ) -> io::Result<(PathBuf, PathBuf)> {
         let new_file: PathBuf = self.cfg.file_provider.iterfile(&self.md)?;
         let mut f = OpenOptions::new()
             .create(true)
             .append(true)
             .open(&new_file)?;
 
-        let str_with_model = liftio!(dyn_fmt(&self.bav_fmt_string, to_strs(&truth_values))
-            .map_err(|e| slim_dynfmt_err_msg(e)))?;
+        let bav_fmt_string = get_bav_assign_fmt_str(
+            &self
+                .md
+                .bavns
+                .iter()
+                .zip(mask.iter())
+                .filter_map(|(v, m)| if m { Some(v.clone()) } else { None })
+                .collect(),
+        )
+        .to_string();
+        // switching to many asserts might be better here
+
+        assert!(
+            mask.iter().fold(0, |a, b| if b { a + 1 } else { a }) == truth_values.len(),
+            "Mask size != num truth vals"
+        );
+        let str_with_model =
+            liftio!(dyn_fmt(&bav_fmt_string, to_strs(&truth_values))
+                .map_err(|e| slim_dynfmt_err_msg(e)))?;
 
         f.write_all(self.top_of_script.as_bytes())?;
         f.write_all(str_with_model.as_bytes())?;
@@ -294,7 +308,7 @@ mod test {
             script("(decl-const BAV1 bool)(assert (< x 5))(assert (= BAV1 (< x 5)))(check-sat)")
                 .unwrap()
                 .1;
-        let (top, mid, bottom) =
+        let (top, bottom) =
             StatefulBavAssign::split(script, &vec!["BAV1".to_string(), "BAV2".to_string()]);
         let num_bavs = 2;
         let urng = RandUniqPermGen::new_definite_seeded(1, num_bavs, 1);
@@ -314,7 +328,6 @@ mod test {
 
         let mut sba = StatefulBavAssign {
             top_of_script: top,
-            bav_fmt_string: mid,
             bottom_of_script: bottom,
             md: md,
             urng: urng,
