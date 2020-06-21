@@ -8,6 +8,7 @@ use nom::{bytes::complete::tag, IResult};
 use rand::Rng;
 use rand_xoshiro::rand_core::SeedableRng;
 use rand_xoshiro::Xoshiro256Plus;
+use std::cmp::max;
 use std::cmp::min;
 use std::collections::BTreeMap;
 use std::collections::BTreeSet;
@@ -122,7 +123,6 @@ pub struct RandUniqPermGen {
     rng: Xoshiro256Plus,
     numbits: usize,
     buf: Vec<u8>,
-    seen: BTreeSet<BitVec>,
     seen_masked: BTreeMap<BitVec, BTreeSet<BitVec>>,
     retries: u32,
     max: u32,
@@ -132,9 +132,13 @@ pub struct RandUniqPermGen {
 }
 
 impl RandUniqPermGen {
-    pub fn new_mask(seed: u64, numbits: usize, maxiter: u32, mask_size: usize) -> Self {
+    pub fn new_masked_with_retries(
+        seed: u64,
+        numbits: usize,
+        maxiter: u32,
+        mask_size: usize,
+    ) -> Self {
         let buf = BitVec::from_elem(numbits, false).to_bytes();
-        let seen = BTreeSet::new();
         let seen_masked = BTreeMap::new();
         let rng = Xoshiro256Plus::seed_from_u64(seed);
 
@@ -148,7 +152,6 @@ impl RandUniqPermGen {
             rng: rng,
             numbits: numbits,
             buf: buf,
-            seen: seen,
             seen_masked: seen_masked,
             retries: 2 * true_max,
             max: true_max,
@@ -160,7 +163,6 @@ impl RandUniqPermGen {
 
     pub fn new_definite_seeded(seed: u64, numbits: usize, maxiter: u32) -> Self {
         let buf = BitVec::from_elem(numbits, false).to_bytes();
-        let seen = BTreeSet::new();
         let seen_masked = BTreeMap::new();
         let rng = Xoshiro256Plus::seed_from_u64(seed);
 
@@ -174,7 +176,6 @@ impl RandUniqPermGen {
             rng: rng,
             numbits: numbits,
             buf: buf,
-            seen: seen,
             seen_masked: seen_masked,
             retries: 0,
             max: true_max,
@@ -188,15 +189,22 @@ impl RandUniqPermGen {
         Self::new_definite_seeded(0, numbits, maxiter)
     }
 
-    pub fn get_count(&self) -> u32 {
-        self.seen.len() as u32
+    fn num_seen(&self) -> usize {
+        self.seen_masked.values().fold(0, |a, set| set.len() + a)
     }
 
     pub fn mask(&mut self) -> Option<BitVec> {
+        if self.mask_size != self.numbits {
+            assert!(self.use_retries, "must use retries with mask");
+        }
+
         assert!(self.mask_size <= self.numbits, "mask larger than bits");
+        if self.use_max && self.max <= self.num_seen() as u32 {
+            return None;
+        }
 
         let mut attempt = 0;
-        while !self.use_retries || (self.use_retries && attempt < self.retries) {
+        while self.use_max || (self.use_retries && attempt < self.retries) {
             if self.mask_size >= self.numbits / 2 {
                 let mut mask = BitVec::from_elem(self.numbits, true);
                 let mut true_bits = self.numbits;
@@ -248,7 +256,7 @@ impl RandUniqPermGen {
 
     #[allow(unused)]
     pub fn sample_and_mask(&mut self) -> Option<(BitVec, BitVec)> {
-        if self.max <= self.seen.len() as u32 || self.max <= self.seen_masked.len() as u32 {
+        if self.use_max && self.max <= self.num_seen() as u32 {
             return None;
         }
 
@@ -271,24 +279,7 @@ impl RandUniqPermGen {
 
     #[allow(unused)]
     pub fn sample(&mut self) -> Option<BitVec> {
-        if self.max <= self.seen.len() as u32 {
-            return None;
-        }
-
-        let mut is_new = false;
-        let mut attempt = 0;
-        while true || (self.use_retries && attempt < self.retries) {
-            self.rng.fill(&mut self.buf[..]);
-            let mut bv = BitVec::from_bytes(&self.buf[..]);
-            bv.truncate(self.numbits);
-            is_new = self.seen.insert(bv.clone());
-            if is_new {
-                return Some(bv);
-            }
-            attempt = attempt + 1;
-        }
-
-        None
+        self.sample_and_mask().map(|(s, _)| s)
     }
 }
 
@@ -362,7 +353,7 @@ mod tests {
 
     #[test]
     fn mask() {
-        let mut ru = RandUniqPermGen::new_mask(1, 2, 100, 1);
+        let mut ru = RandUniqPermGen::new_masked_with_retries(1, 2, 100, 1);
         let mut ress = vec![];
         ress.push(ru.sample_and_mask());
         ress.push(ru.sample_and_mask());
