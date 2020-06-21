@@ -338,7 +338,6 @@ mod test {
         };
 
         let (tv, mask) = sba.urng.sample_and_mask().unwrap();
-        println!("{:?} {:?}", tv, mask);
         let (f, _) = sba.do_iteration_tv(tv, mask).unwrap();
         let result = fs::read_to_string(f).unwrap();
         assert_debug_snapshot!(result);

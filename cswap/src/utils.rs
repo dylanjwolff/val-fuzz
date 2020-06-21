@@ -205,37 +205,22 @@ impl RandUniqPermGen {
 
         let mut attempt = 0;
         while self.use_max || (self.use_retries && attempt < self.retries) {
-            if self.mask_size >= self.numbits / 2 {
-                let mut mask = BitVec::from_elem(self.numbits, true);
-                let mut true_bits = self.numbits;
-                while true_bits != self.mask_size {
-                    let i = self.rng.gen_range(0, self.numbits);
-                    if mask[i] {
-                        mask.set(i, false);
-                        true_bits = true_bits - 1;
-                    }
+            // if the mask is filling more than half full, we will empty from full
+            // Otherwise fill from empty
+            let desired = !(self.mask_size >= self.numbits / 2);
+            let mut mask = BitVec::from_elem(self.numbits, !desired);
+            let mut num_bits_in_desired_state = 0;
+            while num_bits_in_desired_state != min(self.mask_size, self.numbits - self.mask_size) {
+                let i = self.rng.gen_range(0, self.numbits);
+                if mask[i] != desired {
+                    mask.set(i, desired);
+                    num_bits_in_desired_state = num_bits_in_desired_state + 1;
                 }
-                if (Self::get_or_insert(&mut self.seen_masked, &mask).len() as f64).log2()
-                    < self.mask_size as f64
-                {
-                    return Some(mask);
-                }
-            } else {
-                let mut mask = BitVec::from_elem(self.numbits, false);
-                let mut true_bits = 0;
-
-                while true_bits < self.mask_size {
-                    let i = self.rng.gen_range(0, self.numbits);
-                    if !mask[i] {
-                        mask.set(i, true);
-                        true_bits = true_bits + 1;
-                    }
-                }
-                if (Self::get_or_insert(&mut self.seen_masked, &mask).len() as f64).log2()
-                    < self.mask_size as f64
-                {
-                    return Some(mask);
-                }
+            }
+            if (Self::get_or_insert(&mut self.seen_masked, &mask).len() as f64).log2()
+                < self.mask_size as f64
+            {
+                return Some(mask);
             }
             attempt = attempt + 1;
         }
