@@ -141,6 +141,7 @@ fn main() {
         max_iter: max_iter,
         stack_size: stack_size,
         remove_files: !matches.is_present(KEEP_FILES),
+        mask_size: 1,
         profiles,
     };
 

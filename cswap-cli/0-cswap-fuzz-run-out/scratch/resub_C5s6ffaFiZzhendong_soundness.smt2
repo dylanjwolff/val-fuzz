@@ -1,0 +1,34 @@
+(set-logic ALL)
+
+
+
+
+
+
+
+(declare-fun a () Real)
+(declare-fun b () Real)
+(declare-fun c () Real)
+(declare-fun d () Real)
+(declare-fun h () Real)
+(declare-fun e () Real)
+(declare-fun f () Real)
+(declare-fun o () Real)
+(declare-fun g () Real)
+(declare-fun p () Real)
+(declare-fun i () Real)
+(declare-fun j () Real)
+(declare-fun k () Real)
+(declare-fun l () Real)
+(declare-fun m () Real)
+(declare-fun n () Real)
+(declare-fun ac () Real)
+(declare-fun ad () Real)
+(declare-fun ae () Real)
+(declare-fun af () Real)
+(assert (forall ((ah Real)) (distinct (or (and (= g 0.0) (< (- (/ (* e e) 0)) i)) (<= e (/ h k))) (not (=> (<= ah l) (and (= n (* f ah) o) (>= (- ah o) k)))))))
+(assert (exists ((ai Real)) (=> (or (<= (+ (/ (+ 0.0 ac) (- a e)) (- d p)) 0 ae 0.0) (<= 0.0 k)) (= b 0.0))))
+(assert (= a (* m f af)))
+(assert (distinct c (/ j ad)))
+(check-sat)
+(get-model)

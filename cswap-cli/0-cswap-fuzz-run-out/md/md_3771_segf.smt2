@@ -1,0 +1,1 @@
+((bavns "BAV1" "BAV2" "BAV3") (constvns "GEN1" "GEN2" "GEN3" "GEN4") (seed_file . "3771_segf.smt2") (skeleton_file . "skel_3771_segf.smt2") (choles_file . "choles_3771_segf.smt2") (metadata_file . "md_3771_segf.smt2"))

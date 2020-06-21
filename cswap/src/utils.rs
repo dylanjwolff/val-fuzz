@@ -198,6 +198,9 @@ impl RandUniqPermGen {
             assert!(self.use_retries, "must use retries with mask");
         }
 
+        if self.numbits == 0 {
+            return None;
+        }
         assert!(self.mask_size <= self.numbits, "mask larger than bits");
         if self.use_max && self.max <= self.num_seen() as u32 {
             return None;
@@ -210,7 +213,12 @@ impl RandUniqPermGen {
             let desired = !(self.mask_size >= self.numbits / 2);
             let mut mask = BitVec::from_elem(self.numbits, !desired);
             let mut num_bits_in_desired_state = 0;
-            while num_bits_in_desired_state != min(self.mask_size, self.numbits - self.mask_size) {
+            let desired_state_has_this_many_desired_bits = if desired {
+                self.mask_size
+            } else {
+                self.numbits - self.mask_size
+            };
+            while num_bits_in_desired_state != desired_state_has_this_many_desired_bits {
                 let i = self.rng.gen_range(0, self.numbits);
                 if mask[i] != desired {
                     mask.set(i, desired);
@@ -335,6 +343,12 @@ pub fn to_strs(bv: &BitVec) -> Vec<&'static str> {
 mod tests {
     use super::*;
     use insta::assert_debug_snapshot;
+
+    #[test]
+    fn mask3() {
+        let mut ru = RandUniqPermGen::new_masked_with_retries(1, 3, 100, 1);
+        assert_debug_snapshot!(ru.sample_and_mask().unwrap());
+    }
 
     #[test]
     fn mask() {

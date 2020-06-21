@@ -1,0 +1,8 @@
+---
+source: cswap/src/utils.rs
+expression: ru.sample_and_mask().unwrap()
+---
+(
+    0,
+    010,
+)

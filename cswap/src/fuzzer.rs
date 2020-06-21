@@ -101,10 +101,11 @@ impl<'a> StatefulBavAssign<'a> {
         let (top, bottom) = Self::split(script, &md.bavns);
         let num_bavs = md.bavns.len();
 
-        let urng = RandUniqPermGen::new_definite_seeded(
+        let urng = RandUniqPermGen::new_masked_with_retries(
             cfg.get_specific_seed(&md.seed_file),
             num_bavs,
             cfg.max_iter,
+            cfg.mask_size,
         );
 
         Ok(StatefulBavAssign {
@@ -145,7 +146,12 @@ impl<'a> StatefulBavAssign<'a> {
 
         assert!(
             filtered_bavns.len() == truth_values.len(),
-            "fmt str size != num truth vals"
+            format!(
+                "fmt str size {:?} != {:?} num truth vals from mask {:?}",
+                bav_fmt_string,
+                truth_values.len(),
+                mask,
+            )
         );
         assert!(
             mask.iter().fold(0, |a, b| if b { a + 1 } else { a }) == truth_values.len(),
@@ -327,6 +333,7 @@ mod test {
             remove_files: true,
             stack_size: 1,
             profiles: HashSet::new(),
+            mask_size: 1,
         };
 
         let mut sba = StatefulBavAssign {

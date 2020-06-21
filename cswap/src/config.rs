@@ -23,6 +23,7 @@ pub struct Config {
     pub rng_seed: u64,
     pub stack_size: usize,
     pub profiles: HashSet<ProfileIndex>,
+    pub mask_size: usize,
 }
 
 #[macro_export]
