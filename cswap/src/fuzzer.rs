@@ -133,18 +133,20 @@ impl<'a> StatefulBavAssign<'a> {
             .append(true)
             .open(&new_file)?;
 
-        let bav_fmt_string = get_bav_assign_fmt_str(
-            &self
-                .md
-                .bavns
-                .iter()
-                .zip(mask.iter())
-                .filter_map(|(v, m)| if m { Some(v.clone()) } else { None })
-                .collect(),
-        )
-        .to_string();
-        // switching to many asserts might be better here
+        let filtered_bavns = &self
+            .md
+            .bavns
+            .iter()
+            .zip(mask.iter())
+            .filter_map(|(v, m)| if m { Some(v.clone()) } else { None })
+            .collect();
 
+        let bav_fmt_string = format!("{}\n", get_bav_assign_fmt_str(filtered_bavns));
+
+        assert!(
+            filtered_bavns.len() == truth_values.len(),
+            "fmt str size != num truth vals"
+        );
         assert!(
             mask.iter().fold(0, |a, b| if b { a + 1 } else { a }) == truth_values.len(),
             "Mask size != num truth vals"
@@ -170,8 +172,8 @@ fn group_bav_assign(
 ) -> io::Result<Vec<(PathBuf, PathBuf)>> {
     let mut sba = StatefulBavAssign::new(filepaths, cfg)?;
     let mut fs = vec![];
-    while let Some(tv) = sba.urng.sample() {
-        fs.push(sba.do_iteration_tv(tv)?);
+    while let Some((tv, mask)) = sba.urng.sample_and_mask() {
+        fs.push(sba.do_iteration_tv(tv, mask)?);
     }
     Ok(fs)
 }
@@ -308,11 +310,12 @@ mod test {
             script("(decl-const BAV1 bool)(assert (< x 5))(assert (= BAV1 (< x 5)))(check-sat)")
                 .unwrap()
                 .1;
-        let (top, bottom) =
-            StatefulBavAssign::split(script, &vec!["BAV1".to_string(), "BAV2".to_string()]);
+        let bavns = vec!["BAV1".to_string(), "BAV2".to_string()];
+        let (top, bottom) = StatefulBavAssign::split(script, &bavns);
         let num_bavs = 2;
         let urng = RandUniqPermGen::new_definite_seeded(1, num_bavs, 1);
-        let md = Metadata::new_empty();
+        let mut md = Metadata::new_empty();
+        md.bavns = bavns;
         let base = TempDir::new().unwrap();
         let mut fpdir = base.path().to_path_buf();
         fpdir.push("test");
@@ -334,8 +337,9 @@ mod test {
             cfg: &cfg,
         };
 
-        let tv = sba.urng.sample().unwrap();
-        let (f, _) = sba.do_iteration_tv(tv).unwrap();
+        let (tv, mask) = sba.urng.sample_and_mask().unwrap();
+        println!("{:?} {:?}", tv, mask);
+        let (f, _) = sba.do_iteration_tv(tv, mask).unwrap();
         let result = fs::read_to_string(f).unwrap();
         assert_debug_snapshot!(result);
     }
