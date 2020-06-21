@@ -207,7 +207,7 @@ impl RandUniqPermGen {
         }
 
         let mut attempt = 0;
-        while self.use_max || (self.use_retries && attempt < self.retries) {
+        while (!self.use_retries && self.use_max) || (self.use_retries && attempt < self.retries) {
             // if the mask is filling more than half full, we will empty from full
             // Otherwise fill from empty
             let desired = !(self.mask_size >= self.numbits / 2);
@@ -256,7 +256,7 @@ impl RandUniqPermGen {
         let mask = self.mask()?;
         let mut is_new = false;
         let mut attempt = 0;
-        while !self.use_retries || (self.use_retries && attempt < self.retries) {
+        while (!self.use_retries && self.use_max) || (self.use_retries && attempt < self.retries) {
             self.rng.fill(&mut self.buf[..]);
             let mut bv = BitVec::from_bytes(&self.buf[..]);
             bv.truncate(self.mask_size);
