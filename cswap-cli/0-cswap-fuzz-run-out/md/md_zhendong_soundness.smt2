@@ -1,1 +1,0 @@
-((bavns "BAV1" "BAV2" "BAV3" "BAV4" "BAV5" "BAV6" "BAV7" "BAV8" "BAV9" "BAV10" "BAV11") (constvns "GEN1" "GEN2" "GEN3" "GEN4" "GEN5" "GEN6" "GEN7") (seed_file . "zhendong_soundness.smt2") (skeleton_file . "skel_zhendong_soundness.smt2") (choles_file . "choles_zhendong_soundness.smt2") (metadata_file . "md_zhendong_soundness.smt2"))

@@ -1,1 +1,0 @@
-((bavns) (constvns) (seed_file . "3984.segf.smt2") (skeleton_file . "skel_3984.segf.smt2") (choles_file . "choles_3984.segf.smt2") (metadata_file . "md_3984.segf.smt2"))

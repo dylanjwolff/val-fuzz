@@ -1,6 +1,0 @@
-(declare-const GEN1 Int)
-(declare-const GEN2 String)
-(declare-fun i () Int)
-(assert (< i GEN1))
-(assert (= (int.to.str i) GEN2))
-(check-sat)

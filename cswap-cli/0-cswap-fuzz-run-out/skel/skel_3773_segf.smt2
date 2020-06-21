@@ -1,5 +1,0 @@
-(declare-const BAV1 Bool)
-(declare-fun a () String)
-(assert (= BAV1 (distinct (str.++ a "ab") (str.++ "ab" a))))
-(check-sat)
-(get-model)
