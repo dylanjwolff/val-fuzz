@@ -410,7 +410,7 @@ impl fmt::Display for SExp {
                 vbs.iter()
                     .map(|(v, s)| write!(f, "({} {})", v.borrow(), s.borrow()))
                     .fold(Ok(()), acc_result)?;
-                write!(f, " {})", s.borrow())
+                write!(f, ") {})", s.borrow())
             }
             SExp::Compound(v) => {
                 write!(f, "(")?;
