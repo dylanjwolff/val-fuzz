@@ -241,8 +241,7 @@ pub fn add_get_model(script: &mut Script) {
 }
 
 pub fn rl(script: &mut Script, scoped_vars: &mut BTreeMap<String, Vec<SExp>>) -> io::Result<()> {
-    let timer = Timer::new();
-    timer.start(Duration::from_secs(5));
+    let timer = Timer::new_started(Duration::from_secs(5));
     match script {
         Script::Commands(cmds) => {
             for cmd in cmds.iter_mut() {
@@ -476,8 +475,7 @@ pub fn rcholes(
     md: &mut Metadata,
     validator: fn(&Script) -> bool,
 ) {
-    let timer = Timer::new();
-    timer.start(Duration::from_secs(60));
+    let timer = Timer::new_started(Duration::from_secs(60));
     let mut vng = VarNameGenerator::new("GEN");
     for (chole, sort) in choles {
         if timer.is_done() {
@@ -909,7 +907,7 @@ mod tests {
             vec![(rccell!(v.clone()), rccell!(e))],
             rccell!(Box::new(SExp::Symbol(rccell!(v)))),
         );
-        let timer = Timer::new();
+        let timer = Timer::new_started(Duration::from_secs(100));
         rl_s(&mut sexp, &mut BTreeMap::new(), &timer, 0);
         assert_eq!(sexp, expected);
     }

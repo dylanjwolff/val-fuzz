@@ -10,6 +10,7 @@ use rand_xoshiro::rand_core::SeedableRng;
 use rand_xoshiro::Xoshiro256Plus;
 use std::cmp::max;
 use std::cmp::min;
+use std::cmp::Ord;
 use std::collections::BTreeMap;
 use std::collections::BTreeSet;
 use std::sync::atomic::AtomicBool;
@@ -18,6 +19,7 @@ use std::sync::Arc;
 use std::sync::Mutex;
 use std::thread;
 use std::time::Duration;
+use std::time::SystemTime;
 
 pub struct MyBackoff {
     current_wait: Duration,
@@ -49,45 +51,39 @@ impl MyBackoff {
     }
 }
 
+#[derive(Clone)]
 pub struct Timer {
-    done: Arc<AtomicBool>,
+    start: SystemTime,
+    time_to_wait: Duration,
 }
 
 impl Timer {
     pub fn new_started(time: Duration) -> Self {
-        let t = Timer {
-            done: Arc::new(AtomicBool::new(false)),
-        };
-        t.start(time);
-        t
-    }
-
-    pub fn new() -> Self {
         Timer {
-            done: Arc::new(AtomicBool::new(false)),
+            start: SystemTime::now(),
+            time_to_wait: time,
         }
     }
 
-    pub fn clone(&self) -> Self {
-        Timer {
-            done: Arc::clone(&self.done),
-        }
-    }
-
-    pub fn start(&self, time: Duration) {
-        let t_b = Arc::clone(&self.done);
-        thread::spawn(move || {
-            thread::sleep(time);
-            t_b.store(true, Ordering::Relaxed)
-        });
+    pub fn start(&mut self, time: Duration) {
+        self.start = SystemTime::now();
+        self.time_to_wait = time;
     }
 
     pub fn is_done(&self) -> bool {
-        self.done.load(Ordering::Relaxed)
+        let elapsed = match SystemTime::now().duration_since(self.start) {
+            Ok(elapsed) => elapsed,
+            Err(_) => return false,
+        };
+
+        match elapsed.cmp(&self.time_to_wait) {
+            std::cmp::Ordering::Greater => true,
+            _ => false,
+        }
     }
 
-    pub fn reset(&self) {
-        self.done.store(false, Ordering::Relaxed);
+    pub fn reset(&mut self) {
+        self.start = SystemTime::now();
     }
 }
 
@@ -377,8 +373,7 @@ mod tests {
 
     #[test]
     fn timer_test() {
-        let timer = Timer::new();
-        timer.start(Duration::from_millis(200));
+        let timer = Timer::new_started(Duration::from_millis(200));
         thread::sleep(Duration::from_millis(100));
         assert!(!timer.is_done());
         thread::sleep(Duration::from_millis(200));
