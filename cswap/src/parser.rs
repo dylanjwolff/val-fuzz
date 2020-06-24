@@ -299,9 +299,9 @@ fn naked_decl_generic(s: &str) -> IResult<&str, Command> {
         tag("declare-datatypes"),
         tag("declare-datatype"),
         tag("declare-sort"),
-        tag("define-fun"),
-        tag("define-fun-rec"),
         tag("define-funs-rec"),
+        tag("define-fun-rec"),
+        tag("define-fun"),
         tag("define-sort"),
     ));
     let inner = tuple((ws!(decls), many0(ws!(unknown_balanced))));
