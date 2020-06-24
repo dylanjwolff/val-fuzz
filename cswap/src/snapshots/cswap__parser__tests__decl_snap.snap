@@ -3,7 +3,7 @@ source: cswap/src/parser.rs
 expression: df.unwrap().1
 ---
 GenericDecl(
-    "declare-datatype",
+    "declare-datatypes",
     [
         [
             "NodeMobile ",

@@ -296,8 +296,8 @@ fn sort(s: &str) -> IResult<&str, Sort> {
 
 fn naked_decl_generic(s: &str) -> IResult<&str, Command> {
     let decls = alt((
-        tag("declare-datatype"),
         tag("declare-datatypes"),
+        tag("declare-datatype"),
         tag("declare-sort"),
         tag("define-fun"),
         tag("define-fun-rec"),
@@ -305,12 +305,14 @@ fn naked_decl_generic(s: &str) -> IResult<&str, Command> {
         tag("define-sort"),
     ));
     let inner = tuple((ws!(decls), many0(ws!(unknown_balanced))));
-    map(inner, |(decl, rest)| Command::GenericDecl(
-        decl.to_owned(),
-        rest.into_iter()
-            .map(|vin| vin.into_iter().map(|s| s.to_owned()).collect())
-            .collect()
-    ))(s)
+    map(inner, |(decl, rest)| {
+        Command::GenericDecl(
+            decl.to_owned(),
+            rest.into_iter()
+                .map(|vin| vin.into_iter().map(|s| s.to_owned()).collect())
+                .collect(),
+        )
+    })(s)
 }
 
 fn naked_decl_fn(s: &str) -> IResult<&str, Command> {
@@ -369,7 +371,7 @@ fn naked_command(s: &str) -> IResult<&str, Command> {
             Command::DeclConst(v.to_owned(), rccell!(s))
         }),
         naked_decl_fn,
-        naked_decl_generic, 
+        naked_decl_generic,
     ))(s)
 }
 
@@ -546,7 +548,7 @@ mod tests {
     use std::fs;
     #[test]
     fn decl_snap() {
-        let df = command("(declare-datatype NodeMobile ((Rnode)))");
+        let df = command("(declare-datatypes NodeMobile ((Rnode)))");
         assert_debug_snapshot!(df.unwrap().1);
     }
 
