@@ -65,7 +65,7 @@ pub enum SExp {
     Symbol(SymbolRc),
 }
 
-#[derive(Serialize, Deserialize, Debug, Eq, PartialEq, Clone)]
+#[derive(Serialize, Deserialize, Debug, Eq, PartialEq, Clone, Ord, PartialOrd)]
 pub enum Symbol {
     Var(String), // Currently, it is hard to detect all variables, so some Tokens may also be
     // variables too

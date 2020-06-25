@@ -9,6 +9,7 @@ use bit_vec::BitVec;
 use log::warn;
 use std::cell::RefCell;
 use std::collections::BTreeMap;
+use std::collections::HashMap;
 use std::io;
 use std::iter::once;
 use std::rc::Rc;
@@ -611,6 +612,62 @@ fn bav_c(
             timer.clone(),
         ),
         _ => Ok(()),
+    }
+}
+
+struct QV {
+    uqvars: VarBindings,
+    replacer: BTreeMap<SymbolRc, Vec<SymbolRc>>,
+    vng: VarNameGenerator,
+}
+
+impl QV {
+    pub fn new() -> Self {
+        QV {
+            uqvars: vec![],
+            replacer: BTreeMap::new(),
+            vng: VarNameGenerator::new("QUAL_REPLACE"),
+        }
+    }
+
+    pub fn add_existential(&mut self, name: SymbolRc, sort: SortRc) {
+        if !self.replacer.contains_key(&name) {
+            self.replacer.insert(Rc::clone(&name), vec![]);
+        }
+
+        self.replacer
+            .get_mut(&name)
+            .unwrap()
+            .push(rccell!(Symbol::Token(
+                self.vng.get_name(sort.borrow().clone())
+            )));
+    }
+
+    pub fn add_universal(&mut self, name: SymbolRc, sort: SortRc) {
+        self.uqvars.push((Rc::clone(&name), Rc::clone(&sort)));
+    }
+
+    pub fn add_universals(&mut self, vbs: VarBindings) {
+        self.uqvars.extend(vbs);
+    }
+
+    pub fn replace_if_necessary(&self, name: &mut SymbolRc) {
+        self.replacer
+            .get(name)
+            .and_then(|v| v[..].last())
+            .map(|rpmt| *name = Rc::clone(rpmt));
+    }
+
+    pub fn pop_n_universal(&mut self, n_to_pop: usize) {
+        self.uqvars.truncate(self.uqvars.len() - n_to_pop);
+    }
+
+    pub fn pop_e(&mut self, to_pop: &SymbolRc) {
+        self.replacer.get_mut(to_pop).and_then(|v| v.pop());
+    }
+
+    pub fn pop_all_e(&mut self, to_pop: &Vec<SymbolRc>) {
+        to_pop.iter().map(|tp| self.pop_e(tp));
     }
 }
 
