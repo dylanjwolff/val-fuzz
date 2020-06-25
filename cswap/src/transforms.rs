@@ -15,6 +15,7 @@ use std::iter::once;
 use std::rc::Rc;
 use std::time::Duration;
 
+#[derive(Debug, Clone)]
 pub struct VarNameGenerator {
     basename: String,
     counter: u32,
@@ -579,7 +580,7 @@ pub fn bav(
     bava: &mut Vec<(String, SExp, VarBindings)>,
 ) -> io::Result<()> {
     let timer = Timer::new_started(Duration::from_secs(30));
-    let mut qvars = vec![];
+    let mut qvars = QualedVars::new();
     match script {
         Script::Commands(cmds) => {
             for cmd in cmds.iter_mut() {
@@ -596,7 +597,7 @@ fn bav_c(
     cmd: &mut Command,
     vng: &mut VarNameGenerator,
     bava: &mut Vec<(String, SExp, VarBindings)>,
-    qvars: &mut VarBindings,
+    qvars: &mut QualedVars,
     timer: Timer,
 ) -> io::Result<()> {
     if timer.is_done() {
@@ -615,46 +616,55 @@ fn bav_c(
     }
 }
 
-struct QV {
+#[derive(Debug, Clone)]
+struct QualedVars {
     uqvars: VarBindings,
     replacer: BTreeMap<SymbolRc, Vec<SymbolRc>>,
     vng: VarNameGenerator,
 }
 
-impl QV {
+impl QualedVars {
     pub fn new() -> Self {
-        QV {
+        QualedVars {
             uqvars: vec![],
             replacer: BTreeMap::new(),
             vng: VarNameGenerator::new("QUAL_REPLACE"),
         }
     }
 
-    pub fn add_existential(&mut self, name: SymbolRc, sort: SortRc) {
-        if !self.replacer.contains_key(&name) {
-            self.replacer.insert(Rc::clone(&name), vec![]);
+    pub fn add_existential(&mut self, name: &SymbolRc, sort: &SortRc) {
+        if !self.replacer.contains_key(name) {
+            self.replacer.insert(Rc::clone(name), vec![]);
         }
 
         self.replacer
-            .get_mut(&name)
+            .get_mut(name)
             .unwrap()
             .push(rccell!(Symbol::Token(
                 self.vng.get_name(sort.borrow().clone())
             )));
     }
 
-    pub fn add_universal(&mut self, name: SymbolRc, sort: SortRc) {
-        self.uqvars.push((Rc::clone(&name), Rc::clone(&sort)));
+    pub fn add_existentials(&mut self, vbs: &VarBindings) {
+        vbs.iter().for_each(|(n, s)| self.add_existential(n, s));
     }
 
-    pub fn add_universals(&mut self, vbs: VarBindings) {
-        self.uqvars.extend(vbs);
+    pub fn add_universal(&mut self, name: &SymbolRc, sort: &SortRc) {
+        self.uqvars.push((Rc::clone(name), Rc::clone(sort)));
+    }
+
+    pub fn add_universals(&mut self, vbs: &VarBindings) {
+        vbs.iter().for_each(|(n, s)| self.add_universal(n, s));
     }
 
     pub fn replace_if_necessary(&self, name: &mut SymbolRc) {
+        println!("{:?} vs {:?}", name, self.replacer);
         self.replacer
             .get(name)
-            .and_then(|v| v[..].last())
+            .and_then(|v| {
+                println!("match");
+                v[..].last()
+            })
             .map(|rpmt| *name = Rc::clone(rpmt));
     }
 
@@ -666,8 +676,8 @@ impl QV {
         self.replacer.get_mut(to_pop).and_then(|v| v.pop());
     }
 
-    pub fn pop_all_e(&mut self, to_pop: &Vec<SymbolRc>) {
-        to_pop.iter().map(|tp| self.pop_e(tp));
+    pub fn pop_all_e(&mut self, to_pop: &VarBindings) {
+        to_pop.iter().for_each(|(ntp, _)| self.pop_e(ntp));
     }
 }
 
@@ -676,7 +686,7 @@ fn bav_se(
     sexp: &mut SExp,
     vng: &mut VarNameGenerator,
     bavs: &mut Vec<(String, SExp, VarBindings)>,
-    qvars: &mut VarBindings,
+    qvars: &mut QualedVars,
     timer: Timer,
 ) -> io::Result<()> {
     if timer.is_done() {
@@ -686,7 +696,7 @@ fn bav_se(
     match sexp {
         SExp::BExp(bop, sexps) => {
             let sec = SExp::BExp(bop.clone(), sexps.clone());
-            let pre_qvars = qvars.clone();
+            let pre_uqvars = qvars.uqvars.clone();
             let before_exploration_num_bavs = bavs.len();
             for sexp in sexps {
                 bav_se(
@@ -700,7 +710,7 @@ fn bav_se(
             }
             if bavs.len() <= before_exploration_num_bavs {
                 let name = vng.get_name(Sort::Bool());
-                bavs.push((name, sec, pre_qvars));
+                bavs.push((name, sec, pre_uqvars));
             }
             Ok(())
         }
@@ -719,7 +729,8 @@ fn bav_se(
         }
         SExp::Let(_, _) => panic!("Let statments should be filtered out!"),
         SExp::QForAll(vbs, rest) => {
-            qvars.extend(vbs.clone());
+            let num_vbs = vbs.len();
+            qvars.add_universals(vbs);
             bav_se(
                 false,
                 &mut *rest.borrow_mut(),
@@ -728,13 +739,13 @@ fn bav_se(
                 qvars,
                 timer.clone(),
             )?;
-            qvars.truncate(qvars.len() - vbs.len());
+            qvars.pop_n_universal(num_vbs);
             Ok(())
         }
         SExp::QExists(vbs, rest) => {
-            for (var, sort) in vbs {
-                vng.store_name(&var.borrow(), &sort.borrow()); // for now, just keep track of EQV here so they can be initialized
-            }
+            println!("addin {:?}", vbs);
+            qvars.add_existentials(vbs);
+            println!("QDBG {:?}", qvars);
             bav_se(
                 false,
                 &mut *rest.borrow_mut(),
@@ -743,9 +754,15 @@ fn bav_se(
                 qvars,
                 timer.clone(),
             )?;
+            qvars.pop_all_e(vbs);
             Ok(())
         }
-        SExp::Constant(_) | SExp::Symbol(_) => Ok(()),
+        SExp::Constant(_) => Ok(()),
+        SExp::Symbol(s) => {
+            println!("rs");
+            qvars.replace_if_necessary(s);
+            Ok(())
+        }
     }
 }
 
@@ -768,6 +785,18 @@ mod tests {
     use crate::parser::sexp;
     use insta::assert_debug_snapshot;
     use insta::assert_display_snapshot;
+
+    #[test]
+    fn double_eq_snap() {
+        let str_script =
+            "(assert (exists ((a Int)) (< a 4)))(assert (exists ((a String)) (= a \"\")))";
+        let mut p = script(str_script).unwrap().1;
+        let ba_str = ba_script(&mut p, &mut Metadata::new_empty())
+            .unwrap()
+            .to_string();
+
+        assert_display_snapshot!(ba_str);
+    }
 
     #[test]
     fn ba_script_eqv() {
