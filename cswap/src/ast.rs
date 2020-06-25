@@ -65,24 +65,9 @@ pub enum SExp {
     Symbol(SymbolRc),
 }
 
-#[derive(Serialize, Deserialize, Debug, Eq, Clone, Ord, PartialOrd)]
+#[derive(Serialize, PartialEq, PartialOrd, Ord, Deserialize, Debug, Clone, Eq)]
 pub enum Symbol {
-    Var(String), // Currently, it is hard to detect all variables, so some Tokens may also be
-    // variables too
     Token(String),
-}
-
-impl PartialEq for Symbol {
-    fn eq(&self, other: &Self) -> bool {
-        let a = match self {
-            Symbol::Var(s) | Symbol::Token(s) => s,
-        };
-        let b = match other {
-            Symbol::Var(s) | Symbol::Token(s) => s,
-        };
-        println!("{} == {} is {}", a, b, a == b);
-        a == b
-    }
 }
 
 #[derive(Serialize, Deserialize, Debug, Eq, PartialEq, Clone)]
@@ -468,7 +453,7 @@ impl fmt::Display for SExp {
 impl fmt::Display for Symbol {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         match self {
-            Symbol::Var(s) | Symbol::Token(s) => write!(f, "{}", s),
+            Symbol::Token(s) | Symbol::Token(s) => write!(f, "{}", s),
         }
     }
 }

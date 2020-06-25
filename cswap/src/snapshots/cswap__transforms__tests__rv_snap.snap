@@ -11,7 +11,7 @@ Commands(
                         [
                             (
                                 RefCell {
-                                    value: Var(
+                                    value: Token(
                                         "x",
                                     ),
                                 },

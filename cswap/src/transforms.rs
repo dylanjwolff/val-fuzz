@@ -41,6 +41,10 @@ impl VarNameGenerator {
             vars_generated: vec![],
         }
     }
+
+    pub fn merge_generated(&mut self, other: Self) {
+        self.vars_generated.extend(other.vars_generated);
+    }
 }
 
 fn set_logic_all(script: &mut Script) {
@@ -103,7 +107,7 @@ fn get_boolean_abstraction(bavs: Vec<(String, SExp, VarBindings)>) -> Vec<Comman
         SExp::BExp(
             rccell!(BoolOp::Equals()),
             vec![
-                rccell!(SExp::Symbol(rccell!(Symbol::Var(vname)))),
+                rccell!(SExp::Symbol(rccell!(Symbol::Token(vname)))),
                 rccell!(rhs),
             ],
         )
@@ -165,7 +169,7 @@ fn get_bav_assign(bavns: &Vec<String>, ta: BitVec) -> Command {
         SExp::BExp(
             rccell!(BoolOp::Equals()),
             vec![
-                rccell!(SExp::Symbol(rccell!(Symbol::Var(vname.clone())))),
+                rccell!(SExp::Symbol(rccell!(Symbol::Token(vname.clone())))),
                 rccell!(val),
             ],
         )
@@ -179,7 +183,7 @@ pub fn get_bav_assign_fmt_str(bavns: &Vec<String>) -> Command {
         SExp::BExp(
             rccell!(BoolOp::Equals()),
             vec![
-                rccell!(SExp::Symbol(rccell!(Symbol::Var(vname.clone())))),
+                rccell!(SExp::Symbol(rccell!(Symbol::Token(vname.clone())))),
                 rccell!(SExp::Symbol(rccell!(Symbol::Token("{}".to_owned())))),
             ],
         )
@@ -398,7 +402,7 @@ fn rv_se(sexp: &mut SExp, to_replace: &Vec<(String, SExp)>) {
         SExp::QExists(_, rest) => rv_se(&mut *rest.borrow_mut(), to_replace),
         SExp::Symbol(sym) => {
             let name = match &*sym.borrow() {
-                Symbol::Token(n) | Symbol::Var(n) => n,
+                Symbol::Token(n) | Symbol::Token(n) => n,
             }
             .clone();
             for (to_be_rep, val) in to_replace {
@@ -453,7 +457,7 @@ pub fn try_all_rcholes(
     for (chole, sort) in choles.iter() {
         ogvs.push(chole.clone_v());
         let name = vng.get_name(sort.clone());
-        chole.swap(SExp::Symbol(rccell!(Symbol::Var(name.clone()))));
+        chole.swap(SExp::Symbol(rccell!(Symbol::Token(name.clone()))));
         names.push(name);
     }
 
@@ -487,7 +491,7 @@ pub fn rcholes(
 
         let o = chole.clone_v();
         let name = vng.get_name(sort.clone());
-        chole.swap(SExp::Symbol(rccell!(Symbol::Var(name.clone()))));
+        chole.swap(SExp::Symbol(rccell!(Symbol::Token(name.clone()))));
         let inits = init_vars(script, vec![vng.vars_generated.pop().unwrap()]);
 
         if validator(script) {
@@ -588,6 +592,7 @@ pub fn bav(
             }
         }
     };
+    vng.merge_generated(qvars.vng);
     Ok(())
 }
 
@@ -658,13 +663,9 @@ impl QualedVars {
     }
 
     pub fn replace_if_necessary(&self, name: &mut SymbolRc) {
-        println!("{:?} vs {:?}", name, self.replacer);
         self.replacer
             .get(name)
-            .and_then(|v| {
-                println!("match");
-                v[..].last()
-            })
+            .and_then(|v| v[..].last())
             .map(|rpmt| *name = Rc::clone(rpmt));
     }
 
@@ -743,9 +744,7 @@ fn bav_se(
             Ok(())
         }
         SExp::QExists(vbs, rest) => {
-            println!("addin {:?}", vbs);
             qvars.add_existentials(vbs);
-            println!("QDBG {:?}", qvars);
             bav_se(
                 false,
                 &mut *rest.borrow_mut(),
@@ -759,7 +758,6 @@ fn bav_se(
         }
         SExp::Constant(_) => Ok(()),
         SExp::Symbol(s) => {
-            println!("rs");
             qvars.replace_if_necessary(s);
             Ok(())
         }
@@ -806,7 +804,7 @@ mod tests {
             .unwrap()
             .to_string();
 
-        assert!(ba_str.contains("declare-const a") || ba_str.contains("declare-fun a"));
+        assert!(ba_str.contains("declare-const QUAL") || ba_str.contains("declare-fun QUAL"));
     }
 
     #[test]
@@ -986,7 +984,7 @@ mod tests {
 
     #[test]
     fn qc_rls() {
-        let v = Symbol::Var("x".to_owned());
+        let v = Symbol::Token("x".to_owned());
         let e = SExp::Symbol(rccell!(Symbol::Token("changed".to_owned())));
         let expected = e.clone();
         let mut sexp = SExp::Let(

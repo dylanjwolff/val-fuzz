@@ -1,0 +1,13 @@
+---
+source: cswap/src/transforms.rs
+expression: ba_str
+---
+(declare-const BAV1 Bool)
+(declare-const BAV2 Bool)
+(declare-const QUAL_REPLACE1 Int)
+(declare-const QUAL_REPLACE2 String)
+(assert (= BAV1 (< QUAL_REPLACE1 4)))
+(assert (= BAV2 (= QUAL_REPLACE2 "")))
+(check-sat)
+(get-model)
+

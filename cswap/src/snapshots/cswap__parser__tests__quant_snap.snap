@@ -9,7 +9,7 @@ Ok(
             [
                 (
                     RefCell {
-                        value: Var(
+                        value: Token(
                             "ah",
                         ),
                     },

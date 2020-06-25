@@ -239,7 +239,7 @@ fn bool_sexp(s: &str) -> IResult<&str, SExp> {
 }
 
 fn var_binding(s: &str) -> IResult<&str, (SymbolRc, SortRc)> {
-    let mapped_symbol = map(symbol, |s| Symbol::Var(s.to_owned()));
+    let mapped_symbol = map(symbol, |s| Symbol::Token(s.to_owned()));
     map(
         brack!(tuple((ws!(mapped_symbol), ws!(sort)))),
         |(sy, se)| (rccell!(sy), rccell!(se)),
@@ -247,7 +247,7 @@ fn var_binding(s: &str) -> IResult<&str, (SymbolRc, SortRc)> {
 }
 
 fn let_sexp(s: &str) -> IResult<&str, (Vec<(SymbolRc, SExpRc)>, SExpBoxRc)> {
-    let mapped_symbol = map(symbol, |s| Symbol::Var(s.to_owned()));
+    let mapped_symbol = map(symbol, |s| Symbol::Token(s.to_owned()));
     let var_binding = brack!(tuple((ws!(mapped_symbol), ws!(sexp))));
     let var_bs = brack!(many1(ws!(var_binding)));
     let inner = preceded(tag("let"), tuple((ws!(var_bs), ws!(sexp))));

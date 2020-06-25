@@ -8,7 +8,7 @@ expression: "existential_q(\"(exists ((x Int)) (and (< (* 3 x) 2) (< 1 (* 2 x)))
         [
             (
                 RefCell {
-                    value: Var(
+                    value: Token(
                         "x",
                     ),
                 },

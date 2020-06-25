@@ -13,7 +13,7 @@ Ok(
                 [
                     (
                         RefCell {
-                            value: Var(
+                            value: Token(
                                 "BOUND_VARIABLE_397",
                             ),
                         },

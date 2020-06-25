@@ -12,7 +12,7 @@ Ok(
             [
                 (
                     RefCell {
-                        value: Var(
+                        value: Token(
                             "a",
                         ),
                     },
@@ -22,7 +22,7 @@ Ok(
                 ),
                 (
                     RefCell {
-                        value: Var(
+                        value: Token(
                             "b",
                         ),
                     },
