@@ -346,7 +346,7 @@ fn rl_s(
             }
         }
 
-        SExp::Compound(v) | SExp::BExp(_, v) => {
+        SExp::Compound(v) | SExp::BExp(_, v) | SExp::NExp(_, v) => {
             for e in v {
                 rl_s(&mut *e.borrow_mut(), scoped_vars, timer, recur_count)?
             }
@@ -387,7 +387,7 @@ fn rv_c(cmd: &mut Command, to_replace: &Vec<(String, SExp)>) {
 
 fn rv_se(sexp: &mut SExp, to_replace: &Vec<(String, SExp)>) {
     match sexp {
-        SExp::Compound(sexps) | SExp::BExp(_, sexps) => {
+        SExp::Compound(sexps) | SExp::BExp(_, sexps) | SExp::NExp(_, sexps) => {
             for sexp in sexps {
                 rv_se(&mut *sexp.borrow_mut(), to_replace)
             }
@@ -552,7 +552,7 @@ fn choles_rcse(rcse: &Rcse) -> Vec<(Rcse, Sort)> {
             let sort = c.borrow().sort();
             vec![(rcse.clone(), sort)]
         }
-        SExp::Compound(sexps) | SExp::BExp(_, sexps) => {
+        SExp::Compound(sexps) | SExp::BExp(_, sexps) | SExp::NExp(_, sexps) => {
             let mut v = vec![];
             for sexp in sexps {
                 v.extend(choles_rcse(&Rcse::nb(Rc::clone(sexp))));
@@ -715,7 +715,7 @@ fn bav_se(
             }
             Ok(())
         }
-        SExp::Compound(sexps) => {
+        SExp::Compound(sexps) | SExp::NExp(_, sexps) => {
             for sexp in sexps {
                 bav_se(
                     false,

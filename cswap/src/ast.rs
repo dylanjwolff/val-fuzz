@@ -61,6 +61,7 @@ pub enum SExp {
     QForAll(Vec<(SymbolRc, SortRc)>, SExpBoxRc),
     QExists(Vec<(SymbolRc, SortRc)>, SExpBoxRc),
     BExp(BoolOpRc, Vec<SExpRc>),
+    NExp(NumOp, Vec<SExpRc>),
     Constant(ConstantRc),
     Symbol(SymbolRc),
 }
@@ -106,6 +107,22 @@ pub enum BoolOp {
     Strsuff(),
     Strcont(),
     Strisdig(),
+}
+
+#[derive(Serialize, Deserialize, Debug, Eq, PartialEq, Clone)]
+pub enum NumOp {
+    Sub(),
+    Add(),
+    Mul(),
+    Div(),
+    FpToReal(),
+    FpToInt(),
+    IntDiv(),
+    Mod(),
+    StrLen(),
+    StrToCode(),
+    StrToInt(),
+    StrIndexOf(),
 }
 
 #[derive(Serialize, Deserialize, Debug, Eq, PartialEq, Clone)]
@@ -432,6 +449,17 @@ impl fmt::Display for SExp {
                     .fold(Ok(()), acc_result)?;
                 write!(f, ")")
             }
+            SExp::NExp(o, v) => {
+                write!(f, "({} ", o)?;
+                v.iter()
+                    .enumerate()
+                    .map(|(i, sexp)| match i == 0 {
+                        true => write!(f, "{}", sexp.borrow()),
+                        false => write!(f, " {}", sexp.borrow()),
+                    })
+                    .fold(Ok(()), acc_result)?;
+                write!(f, ")")
+            }
             SExp::QForAll(v, s) => {
                 write!(f, "(forall (")?;
                 v.iter()
@@ -454,6 +482,25 @@ impl fmt::Display for Symbol {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         match self {
             Symbol::Token(s) | Symbol::Token(s) => write!(f, "{}", s),
+        }
+    }
+}
+
+impl fmt::Display for NumOp {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        match self {
+            NumOp::Sub() => write!(f, "-"),
+            NumOp::Add() => write!(f, "+"),
+            NumOp::Mul() => write!(f, "*"),
+            NumOp::Div() => write!(f, "/"),
+            NumOp::FpToReal() => write!(f, "fp.to_real"),
+            NumOp::FpToInt() => write!(f, "fp.to_int"),
+            NumOp::IntDiv() => write!(f, "div"),
+            NumOp::Mod() => write!(f, "mod"),
+            NumOp::StrLen() => write!(f, "str.len"),
+            NumOp::StrToCode() => write!(f, "str.to_code"),
+            NumOp::StrToInt() => write!(f, "str.to_int"),
+            NumOp::StrIndexOf() => write!(f, "str.indexof"),
         }
     }
 }

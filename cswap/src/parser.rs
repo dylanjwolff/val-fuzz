@@ -1,6 +1,6 @@
 use super::ast::{
-    BitVecConst, BoolOp, Command, Constant, FPConst, Logic, SExp, SExpBoxRc, SExpRc, Script, Sort,
-    SortRc, Symbol, SymbolRc,
+    BitVecConst, BoolOp, Command, Constant, FPConst, Logic, NumOp, SExp, SExpBoxRc, SExpRc, Script,
+    Sort, SortRc, Symbol, SymbolRc,
 };
 
 use crate::liftio;
@@ -150,6 +150,33 @@ fn constant(s: &str) -> IResult<&str, Constant> {
 
 fn symbol(s: &str) -> IResult<&str, &str> {
     take_while1(|c: char| !c.is_whitespace() && !(c == '(') && !(c == ')'))(s)
+}
+
+fn num_op(s: &str) -> IResult<&str, NumOp> {
+    let naked_numop_tags = alt((
+        map(tag("-"), |_| NumOp::Sub()),
+        map(tag("+"), |_| NumOp::Add()),
+        map(tag("*"), |_| NumOp::Mul()),
+        map(tag("/"), |_| NumOp::Div()),
+        map(tag("fp.to_real"), |_| NumOp::FpToReal()),
+        map(tag("fp.to_int"), |_| NumOp::FpToInt()),
+        map(tag("div"), |_| NumOp::IntDiv()),
+        map(tag("mod"), |_| NumOp::Mod()),
+        map(tag("str.len"), |_| NumOp::StrLen()),
+        map(tag("str.to_code"), |_| NumOp::StrToCode()),
+        map(tag("str.to_int"), |_| NumOp::StrToInt()),
+        map(tag("str.indexof"), |_| NumOp::StrIndexOf()),
+    ));
+
+    ws!(naked_numop_tags)(s)
+}
+
+fn num_sexp(s: &str) -> IResult<&str, SExp> {
+    let inner = map(tuple((num_op, many1(sexp))), |(o, v)| {
+        SExp::NExp(o, v.into_iter().map(|s| rccell!(s)).collect())
+    });
+
+    brack!(inner)(s)
 }
 
 fn bool_fp_ops(s: &str) -> IResult<&str, BoolOp> {
