@@ -98,7 +98,7 @@ impl<'a> StatefulBavAssign<'a> {
             return liftio!(Err(format!("All error on file {:?}", filepaths.0)));
         }
 
-        let (top, bottom) = Self::split(script, &md.bavns);
+        let (top, bottom) = Self::split(script);
         let num_bavs = md.bavns.len();
 
         let urng = RandUniqPermGen::new_masked_with_retries(
@@ -117,7 +117,7 @@ impl<'a> StatefulBavAssign<'a> {
         })
     }
 
-    fn split(script: Script, bavns: &Vec<String>) -> (Box<String>, Box<String>) {
+    fn split(script: Script) -> (Box<String>, Box<String>) {
         let eip = end_insert_pt(&script);
         let (top, bottom) = Script::split(script, eip);
         (Box::new(top.to_string()), Box::new(bottom.to_string()))
@@ -303,6 +303,7 @@ pub fn strip_and_transform(
 #[cfg(test)]
 mod test {
     use super::*;
+    use crate::ast::Sort;
     use crate::parser::script;
     use crate::parser::script_from_f_unsanitized;
     use bit_vec::BitVec;
@@ -316,8 +317,11 @@ mod test {
             script("(decl-const BAV1 bool)(assert (< x 5))(assert (= BAV1 (< x 5)))(check-sat)")
                 .unwrap()
                 .1;
-        let bavns = vec!["BAV1".to_string(), "BAV2".to_string()];
-        let (top, bottom) = StatefulBavAssign::split(script, &bavns);
+        let bavns = vec![
+            ("BAV1".to_string(), Sort::Bool()),
+            ("BAV2".to_string(), Sort::Bool()),
+        ];
+        let (top, bottom) = StatefulBavAssign::split(script);
         let num_bavs = 2;
         let urng = RandUniqPermGen::new_definite_seeded(1, num_bavs, 1);
         let mut md = Metadata::new_empty();
@@ -352,7 +356,7 @@ mod test {
 
     #[test]
     fn bv_replace() {
-        let fmt_str = get_bav_assign_fmt_str(&vec!["BAV1".to_owned()]).to_string();
+        let fmt_str = get_bav_assign_fmt_str(&vec![("BAV1".to_owned(), Sort::Bool())]).to_string();
 
         let bv = BitVec::from_elem(1, true);
         assert_eq!(

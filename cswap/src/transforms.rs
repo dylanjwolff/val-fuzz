@@ -178,8 +178,8 @@ fn get_bav_assign(bavns: &Vec<String>, ta: BitVec) -> Command {
     assert_many(&mut baveq)
 }
 
-pub fn get_bav_assign_fmt_str(bavns: &Vec<String>) -> Command {
-    let mut baveq = bavns.into_iter().map(|vname| {
+pub fn get_bav_assign_fmt_str(bavns: &Vec<(String, Sort)>) -> Command {
+    let mut baveq = bavns.into_iter().map(|(vname, _vsort)| {
         SExp::BExp(
             rccell!(BoolOp::Equals()),
             vec![
@@ -221,11 +221,12 @@ pub fn ba_script(script: &mut Script, md: &mut Metadata) -> io::Result<Script> {
     let mut bavs = vec![];
     bav(script, &mut vng, &mut bavs)?;
 
-    init_vars(script, vng.vars_generated);
-    let mut bavns = bavs
-        .iter()
-        .map(|(name, _, _)| name.clone())
-        .collect::<Vec<String>>();
+    init_vars(script, vng.vars_generated.clone());
+    let mut bavns = vng
+        .vars_generated
+        .into_iter()
+        .filter(|(name, sort)| !name.contains("REPL"))
+        .collect();
     md.bavns.append(&mut bavns);
 
     let mut decls = grab_all_decls(script);
@@ -696,7 +697,7 @@ fn bav_se(
 
     match sexp {
         SExp::BExp(bop, sexps) => {
-            let sec = SExp::BExp(bop.clone(), sexps.clone());
+            let sec = SExp::BExp(Rc::clone(bop), sexps.clone());
             let pre_uqvars = qvars.uqvars.clone();
             let before_exploration_num_bavs = bavs.len();
             for sexp in sexps {
@@ -953,7 +954,11 @@ mod tests {
     fn bav_fmt_str() {
         assert_debug_snapshot!(
             "{:?}",
-            get_bav_assign_fmt_str(&vec!["BAV1".to_owned(), "BAV2".to_owned()]).to_string()
+            get_bav_assign_fmt_str(&vec![
+                ("BAV1".to_owned(), Sort::Bool()),
+                ("BAV2".to_owned(), Sort::Bool())
+            ])
+            .to_string()
         );
     }
 
