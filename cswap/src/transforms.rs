@@ -710,13 +710,37 @@ fn bav_se(
                     timer.clone(),
                 )?;
             }
-            if bavs.len() <= before_exploration_num_bavs {
-                let name = vng.get_name(Sort::Bool());
-                bavs.push((name, sec, pre_uqvars));
-            }
+            // NOTE removing "leaf optimization" temporarily as it's unclear how that should
+            // interact with abstract domains
+            // if bavs.len() <= before_exploration_num_bavs {
+            let name = vng.get_name(Sort::Bool());
+            bavs.push((name, sec, pre_uqvars));
+            // }
             Ok(())
         }
-        SExp::Compound(sexps) | SExp::NExp(_, sexps) => {
+        SExp::NExp(nop, sexps) => {
+            let sec = SExp::NExp(nop.clone(), sexps.clone());
+            let pre_uqvars = qvars.uqvars.clone();
+            let before_exploration_num_bavs = bavs.len();
+            for sexp in sexps {
+                bav_se(
+                    false,
+                    &mut *sexp.borrow_mut(),
+                    vng,
+                    bavs,
+                    qvars,
+                    timer.clone(),
+                )?;
+            }
+            // NOTE removing "leaf optimization" temporarily as it's unclear how that should
+            // interact with abstract domains
+            // if bavs.len() <= before_exploration_num_bavs {
+            let name = vng.get_name(Sort::Dec());
+            bavs.push((name, sec, pre_uqvars));
+            // }
+            Ok(())
+        }
+        SExp::Compound(sexps) => {
             for sexp in sexps {
                 bav_se(
                     false,
@@ -784,6 +808,17 @@ mod tests {
     use crate::parser::sexp;
     use insta::assert_debug_snapshot;
     use insta::assert_display_snapshot;
+
+    #[test]
+    fn num_op_ba_script_snap() {
+        let str_script = "(assert (< (+ 4 3) x))";
+        let mut p = script(str_script).unwrap().1;
+        let ba_str = ba_script(&mut p, &mut Metadata::new_empty())
+            .unwrap()
+            .to_string();
+
+        assert_display_snapshot!(ba_str);
+    }
 
     #[test]
     fn double_eq_snap() {

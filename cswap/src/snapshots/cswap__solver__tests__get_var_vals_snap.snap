@@ -7,17 +7,9 @@ expression: "r.extract_const_var_vals(&vec![\"GEN1\" . to_owned (), \"GEN2\" . t
         Token(
             "GEN1",
         ),
-        Compound(
+        NExp(
+            Sub,
             [
-                RefCell {
-                    value: Symbol(
-                        RefCell {
-                            value: Token(
-                                "-",
-                            ),
-                        },
-                    ),
-                },
                 RefCell {
                     value: Constant(
                         RefCell {

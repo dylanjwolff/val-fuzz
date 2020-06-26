@@ -57,17 +57,9 @@ Ok(
                         ),
                         [],
                         Dec,
-                        Compound(
+                        NExp(
+                            Sub,
                             [
-                                RefCell {
-                                    value: Symbol(
-                                        RefCell {
-                                            value: Token(
-                                                "-",
-                                            ),
-                                        },
-                                    ),
-                                },
                                 RefCell {
                                     value: Constant(
                                         RefCell {

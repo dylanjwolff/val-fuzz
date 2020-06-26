@@ -293,6 +293,7 @@ pub fn sexp(s: &str) -> IResult<&str, SExp> {
     let rec_sexp = brack!(many1(sexp));
     ws!(alt((
         bool_sexp,
+        num_sexp,
         map(let_sexp, |(tbs, sexp)| SExp::Let(tbs, sexp)),
         map(existential_q, |(tbs, sexp)| {
             SExp::QExists(tbs, rccell!(Box::new(sexp)))

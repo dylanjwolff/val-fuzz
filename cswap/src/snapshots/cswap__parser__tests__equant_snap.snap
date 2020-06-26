@@ -29,17 +29,9 @@ expression: "existential_q(\"(exists ((x Int)) (and (< (* 3 x) 2) (< 1 (* 2 x)))
                         },
                         [
                             RefCell {
-                                value: Compound(
+                                value: NExp(
+                                    Mul,
                                     [
-                                        RefCell {
-                                            value: Symbol(
-                                                RefCell {
-                                                    value: Token(
-                                                        "*",
-                                                    ),
-                                                },
-                                            ),
-                                        },
                                         RefCell {
                                             value: Constant(
                                                 RefCell {
@@ -89,17 +81,9 @@ expression: "existential_q(\"(exists ((x Int)) (and (< (* 3 x) 2) (< 1 (* 2 x)))
                                 ),
                             },
                             RefCell {
-                                value: Compound(
+                                value: NExp(
+                                    Mul,
                                     [
-                                        RefCell {
-                                            value: Symbol(
-                                                RefCell {
-                                                    value: Token(
-                                                        "*",
-                                                    ),
-                                                },
-                                            ),
-                                        },
                                         RefCell {
                                             value: Constant(
                                                 RefCell {

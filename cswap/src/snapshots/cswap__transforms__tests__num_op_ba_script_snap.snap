@@ -1,0 +1,11 @@
+---
+source: cswap/src/transforms.rs
+expression: ba_str
+---
+(declare-const BAV1 Real)
+(declare-const BAV2 Bool)
+(assert (= BAV1 (+ 4 3)))
+(assert (= BAV2 (< (+ 4 3) x)))
+(check-sat)
+(get-model)
+

@@ -61,17 +61,9 @@ Ok(
                                         ),
                                     },
                                     RefCell {
-                                        value: Compound(
+                                        value: NExp(
+                                            Sub,
                                             [
-                                                RefCell {
-                                                    value: Symbol(
-                                                        RefCell {
-                                                            value: Token(
-                                                                "-",
-                                                            ),
-                                                        },
-                                                    ),
-                                                },
                                                 RefCell {
                                                     value: Constant(
                                                         RefCell {
@@ -168,17 +160,9 @@ Ok(
                 ),
                 [],
                 UInt,
-                Compound(
+                NExp(
+                    Sub,
                     [
-                        RefCell {
-                            value: Symbol(
-                                RefCell {
-                                    value: Token(
-                                        "-",
-                                    ),
-                                },
-                            ),
-                        },
                         RefCell {
                             value: Constant(
                                 RefCell {
