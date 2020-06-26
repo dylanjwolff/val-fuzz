@@ -1,3 +1,4 @@
+use crate::ast::CommandRc;
 use crate::ast::Script;
 use crate::config::Config;
 use crate::config::FileProvider;
@@ -134,21 +135,18 @@ impl<'a> StatefulBavAssign<'a> {
             .append(true)
             .open(&new_file)?;
 
-        let filtered_bavns = &self
-            .md
-            .bavns
-            .iter()
+        let bav_unenforced = get_bav_assign_fmt_str(&self.md.bavns);
+        let bav_uef_filtered = bav_unenforced
+            .into_iter()
             .zip(mask.iter())
-            .filter_map(|(v, m)| if m { Some(v.clone()) } else { None })
-            .collect();
+            .filter_map(|(cmd, mbit)| if mbit { Some(cmd) } else { None })
+            .collect::<Vec<CommandRc>>();
 
-        let bav_fmt_string = format!(
-            "{}\n",
-            Script::Commands(get_bav_assign_fmt_str(filtered_bavns))
-        );
+        let num_remaining = bav_uef_filtered.len();
+        let bav_fmt_string = Script::Commands(bav_uef_filtered).to_string();
 
         assert!(
-            filtered_bavns.len() == truth_values.len(),
+            num_remaining == truth_values.len(),
             format!(
                 "fmt str size {:?} != {:?} num truth vals from mask {:?}",
                 bav_fmt_string,
@@ -311,6 +309,7 @@ mod test {
     use crate::parser::script_from_f_unsanitized;
     use bit_vec::BitVec;
     use insta::assert_debug_snapshot;
+    use insta::assert_display_snapshot;
     use std::collections::HashSet;
     use tempfile::TempDir;
 
@@ -354,7 +353,7 @@ mod test {
         let (tv, mask) = sba.urng.sample_and_mask().unwrap();
         let (f, _) = sba.do_iteration_tv(tv, mask).unwrap();
         let result = fs::read_to_string(f).unwrap();
-        assert_debug_snapshot!(result);
+        assert_display_snapshot!(result);
     }
 
     #[test]
@@ -367,7 +366,7 @@ mod test {
 
         let bv = BitVec::from_elem(1, true);
         assert_eq!(
-            dyn_fmt(&fmt_str, to_strs(&bv)).unwrap(),
+            dyn_fmt(&fmt_str, to_strs(&bv)).unwrap().trim(),
             "(assert (= BAV1 true))"
         );
     }

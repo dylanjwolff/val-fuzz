@@ -2,4 +2,10 @@
 source: cswap/src/fuzzer.rs
 expression: result
 ---
-"(decl-const BAV1 bool)\n(assert (< x 5))\n(assert (= BAV1 (< x 5)))\n(assert (= BAV1 false))\n(assert (= BAV2 true))\n\n(check-sat)\n"
+(decl-const BAV1 bool)
+(assert (< x 5))
+(assert (= BAV1 (< x 5)))
+(assert (= BAV1 false))
+(assert (= BAV2 true))
+(check-sat)
+

@@ -4,4 +4,6 @@ expression: "Script::Commands(get_bav_assign_fmt_str(&vec![(\"BAV1\" . to_owned 
 ---
 (assert (= BAV1 {}))
 (assert (= (= BAV2 0) {}))
+(assert (= (< BAV2 0) {}))
+(assert (= (> BAV2 0) {}))
 

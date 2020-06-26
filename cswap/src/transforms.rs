@@ -178,29 +178,37 @@ fn get_bav_assign(bavns: &Vec<String>, ta: BitVec) -> Command {
     assert_many(&mut baveq)
 }
 
+fn rel_0(name: String, relative: BoolOp) -> SExp {
+    SExp::BExp(
+        rccell!(BoolOp::Equals()),
+        vec![
+            rccell!(SExp::BExp(
+                rccell!(relative),
+                vec![
+                    rccell!(SExp::Symbol(rccell!(Symbol::Token(name)))),
+                    rccell!(SExp::Constant(rccell!(Constant::Dec("0".to_owned()))))
+                ]
+            )),
+            rccell!(SExp::Symbol(rccell!(Symbol::Token("{}".to_owned())))),
+        ],
+    )
+}
+
 // Change this to return a vec of SExp that can then be trimmed down / filtered according to how many switches we flip at a time
 pub fn get_bav_assign_fmt_str(bavns: &Vec<(String, Sort)>) -> Vec<CommandRc> {
-    let mut baveq = bavns.into_iter().map(|(vname, vsort)| match vsort {
-        Sort::Bool() => SExp::BExp(
+    let mut baveq = bavns.into_iter().flat_map(|(vname, vsort)| match vsort {
+        Sort::Bool() => vec![SExp::BExp(
             rccell!(BoolOp::Equals()),
             vec![
                 rccell!(SExp::Symbol(rccell!(Symbol::Token(vname.clone())))),
                 rccell!(SExp::Symbol(rccell!(Symbol::Token("{}".to_owned())))),
             ],
-        ),
-        Sort::Dec() => SExp::BExp(
-            rccell!(BoolOp::Equals()),
-            vec![
-                rccell!(SExp::BExp(
-                    rccell!(BoolOp::Equals()),
-                    vec![
-                        rccell!(SExp::Symbol(rccell!(Symbol::Token(vname.clone())))),
-                        rccell!(SExp::Constant(rccell!(Constant::Dec("0".to_owned()))))
-                    ]
-                )),
-                rccell!(SExp::Symbol(rccell!(Symbol::Token("{}".to_owned())))),
-            ],
-        ),
+        )],
+        Sort::Dec() => vec![
+            rel_0(vname.clone(), BoolOp::Equals()),
+            rel_0(vname.clone(), BoolOp::Lt()),
+            rel_0(vname.clone(), BoolOp::Gt()),
+        ],
         _ => panic!("Unreachable brangch"),
     });
 
