@@ -200,6 +200,7 @@ fn bool_fp_ops(s: &str) -> IResult<&str, BoolOp> {
 
 fn bool_str_ops(s: &str) -> IResult<&str, BoolOp> {
     let naked_bop_tags = alt((
+        map(tag("str.<="), |_| BoolOp::Strlte()),
         map(tag("str.<"), |_| BoolOp::Strlt()),
         map(tag("str.in_re"), |_| BoolOp::Strre()),
         map(tag("str.prefixof"), |_| BoolOp::Strpref()),

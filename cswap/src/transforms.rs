@@ -98,19 +98,18 @@ fn add_ba(script: &mut Script, bavs: Vec<(String, SExp, VarBindings)>) {
 
 fn get_boolean_abstraction(bavs: Vec<(String, SExp, VarBindings)>) -> Vec<CommandRc> {
     let mut baveq_iter = bavs.into_iter().map(|(vname, sexp, vbs)| {
-        let rhs = if vbs.len() > 0 {
-            SExp::QForAll(vbs, rccell!(Box::new(sexp)))
-        } else {
-            sexp
-        };
-
-        SExp::BExp(
+        let rhs = SExp::BExp(
             rccell!(BoolOp::Equals()),
             vec![
                 rccell!(SExp::Symbol(rccell!(Symbol::Token(vname)))),
-                rccell!(rhs),
+                rccell!(sexp),
             ],
-        )
+        );
+        if vbs.len() > 0 {
+            SExp::QForAll(vbs, rccell!(Box::new(rhs)))
+        } else {
+            rhs
+        }
     });
 
     many_assert(&mut baveq_iter)
@@ -1017,7 +1016,7 @@ mod tests {
     }
 
     #[test]
-    fn bav_qual() {
+    fn bav_qual_snap() {
         let str_script = "(assert (forall ((x Real)) (= x 4)))";
         let mut p = script(str_script).unwrap().1;
 
@@ -1029,16 +1028,7 @@ mod tests {
         let Script::Commands(cmds) = p;
 
         let assertion_cmd = cmds.last().unwrap();
-        match &*assertion_cmd.borrow() {
-            Command::Assert(s) => match &*s.borrow() {
-                SExp::BExp(_v, rest) => match &*rest[1].borrow() {
-                    SExp::QForAll(v, _rest) => assert!(v.len() > 0),
-                    _ => panic!("inner should be qual"),
-                },
-                _ => panic!("Assert should be BExp"),
-            },
-            _ => panic!("No assert!"),
-        };
+        assert_display_snapshot!(assertion_cmd.borrow())
     }
 
     #[test]
