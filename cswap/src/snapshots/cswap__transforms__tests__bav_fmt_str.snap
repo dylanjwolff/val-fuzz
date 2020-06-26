@@ -1,0 +1,5 @@
+---
+source: cswap/src/transforms.rs
+expression: "get_bav_assign_fmt_str(&vec![(\"BAV1\" . to_owned (), Sort :: Bool ()),\n                             (\"BAV2\" . to_owned (), Sort :: Dec ())])"
+---
+(assert (and (= BAV1 {}) (= (= BAV2 0) {})))

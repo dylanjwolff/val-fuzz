@@ -1,4 +1,4 @@
-use crate::ast::{AstNode, BoolOp, Command, Logic, SExp, Script, Sort, Symbol};
+use crate::ast::{AstNode, BoolOp, Command, Constant, Logic, SExp, Script, Sort, Symbol};
 use crate::ast::{CommandRc, SExpRc, SortRc, SymbolRc};
 
 use crate::liftio;
@@ -178,15 +178,30 @@ fn get_bav_assign(bavns: &Vec<String>, ta: BitVec) -> Command {
     assert_many(&mut baveq)
 }
 
+// Change this to return a vec of SExp that can then be trimmed down / filtered according to how many switches we flip at a time
 pub fn get_bav_assign_fmt_str(bavns: &Vec<(String, Sort)>) -> Command {
-    let mut baveq = bavns.into_iter().map(|(vname, _vsort)| {
-        SExp::BExp(
+    let mut baveq = bavns.into_iter().map(|(vname, vsort)| match vsort {
+        Sort::Bool() => SExp::BExp(
             rccell!(BoolOp::Equals()),
             vec![
                 rccell!(SExp::Symbol(rccell!(Symbol::Token(vname.clone())))),
                 rccell!(SExp::Symbol(rccell!(Symbol::Token("{}".to_owned())))),
             ],
-        )
+        ),
+        Sort::Dec() => SExp::BExp(
+            rccell!(BoolOp::Equals()),
+            vec![
+                rccell!(SExp::BExp(
+                    rccell!(BoolOp::Equals()),
+                    vec![
+                        rccell!(SExp::Symbol(rccell!(Symbol::Token(vname.clone())))),
+                        rccell!(SExp::Constant(rccell!(Constant::Dec("0".to_owned()))))
+                    ]
+                )),
+                rccell!(SExp::Symbol(rccell!(Symbol::Token("{}".to_owned())))),
+            ],
+        ),
+        _ => panic!("Unreachable brangch"),
     });
 
     assert_many(&mut baveq)
@@ -987,14 +1002,10 @@ mod tests {
 
     #[test]
     fn bav_fmt_str() {
-        assert_debug_snapshot!(
-            "{:?}",
-            get_bav_assign_fmt_str(&vec![
-                ("BAV1".to_owned(), Sort::Bool()),
-                ("BAV2".to_owned(), Sort::Bool())
-            ])
-            .to_string()
-        );
+        assert_display_snapshot!(get_bav_assign_fmt_str(&vec![
+            ("BAV1".to_owned(), Sort::Bool()),
+            ("BAV2".to_owned(), Sort::Dec())
+        ]));
     }
 
     #[test]
