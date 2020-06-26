@@ -142,7 +142,10 @@ impl<'a> StatefulBavAssign<'a> {
             .filter_map(|(v, m)| if m { Some(v.clone()) } else { None })
             .collect();
 
-        let bav_fmt_string = format!("{}\n", get_bav_assign_fmt_str(filtered_bavns));
+        let bav_fmt_string = format!(
+            "{}\n",
+            Script::Commands(get_bav_assign_fmt_str(filtered_bavns))
+        );
 
         assert!(
             filtered_bavns.len() == truth_values.len(),
@@ -356,7 +359,11 @@ mod test {
 
     #[test]
     fn bv_replace() {
-        let fmt_str = get_bav_assign_fmt_str(&vec![("BAV1".to_owned(), Sort::Bool())]).to_string();
+        let fmt_str = Script::Commands(get_bav_assign_fmt_str(&vec![(
+            "BAV1".to_owned(),
+            Sort::Bool(),
+        )]))
+        .to_string();
 
         let bv = BitVec::from_elem(1, true);
         assert_eq!(

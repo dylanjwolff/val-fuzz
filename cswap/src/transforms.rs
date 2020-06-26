@@ -179,7 +179,7 @@ fn get_bav_assign(bavns: &Vec<String>, ta: BitVec) -> Command {
 }
 
 // Change this to return a vec of SExp that can then be trimmed down / filtered according to how many switches we flip at a time
-pub fn get_bav_assign_fmt_str(bavns: &Vec<(String, Sort)>) -> Command {
+pub fn get_bav_assign_fmt_str(bavns: &Vec<(String, Sort)>) -> Vec<CommandRc> {
     let mut baveq = bavns.into_iter().map(|(vname, vsort)| match vsort {
         Sort::Bool() => SExp::BExp(
             rccell!(BoolOp::Equals()),
@@ -204,7 +204,7 @@ pub fn get_bav_assign_fmt_str(bavns: &Vec<(String, Sort)>) -> Command {
         _ => panic!("Unreachable brangch"),
     });
 
-    assert_many(&mut baveq)
+    many_assert(&mut baveq)
 }
 
 pub fn replace_constants_with_fresh_vars(script: &mut Script, md: &mut Metadata) {
@@ -1002,10 +1002,10 @@ mod tests {
 
     #[test]
     fn bav_fmt_str() {
-        assert_display_snapshot!(get_bav_assign_fmt_str(&vec![
+        assert_display_snapshot!(Script::Commands(get_bav_assign_fmt_str(&vec![
             ("BAV1".to_owned(), Sort::Bool()),
             ("BAV2".to_owned(), Sort::Dec())
-        ]));
+        ])));
     }
 
     #[test]
