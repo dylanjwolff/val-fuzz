@@ -168,8 +168,8 @@ fn str_op(s: &str) -> IResult<&str, StrOp> {
 }
 
 fn str_sexp(s: &str) -> IResult<&str, SExp> {
-    let inner = map(tuple((num_op, many1(sexp))), |(o, v)| {
-        SExp::NExp(o, v.into_iter().map(|s| rccell!(s)).collect())
+    let inner = map(tuple((str_op, many1(sexp))), |(o, v)| {
+        SExp::StrExp(o, v.into_iter().map(|s| rccell!(s)).collect())
     });
 
     brack!(inner)(s)
@@ -318,6 +318,7 @@ pub fn sexp(s: &str) -> IResult<&str, SExp> {
     ws!(alt((
         bool_sexp,
         num_sexp,
+        str_sexp,
         map(let_sexp, |(tbs, sexp)| SExp::Let(tbs, sexp)),
         map(existential_q, |(tbs, sexp)| {
             SExp::QExists(tbs, rccell!(Box::new(sexp)))
