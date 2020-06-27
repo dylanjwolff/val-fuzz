@@ -1,6 +1,6 @@
 use super::ast::{
     BitVecConst, BoolOp, Command, Constant, FPConst, Logic, NumOp, SExp, SExpBoxRc, SExpRc, Script,
-    Sort, SortRc, Symbol, SymbolRc,
+    Sort, SortRc, StrOp, Symbol, SymbolRc,
 };
 
 use crate::liftio;
@@ -150,6 +150,29 @@ fn constant(s: &str) -> IResult<&str, Constant> {
 
 fn symbol(s: &str) -> IResult<&str, &str> {
     take_while1(|c: char| !c.is_whitespace() && !(c == '(') && !(c == ')'))(s)
+}
+
+fn str_op(s: &str) -> IResult<&str, StrOp> {
+    let naked_strop_tags = alt((
+        map(tag("str.++"), |_| StrOp::Strcat()),
+        map(tag("str.at"), |_| StrOp::StrAt()),
+        map(tag("str.from_code"), |_| StrOp::StrFromCode()),
+        map(tag("str.substr"), |_| StrOp::Substr()),
+        map(tag("str.replace"), |_| StrOp::StrReplace()),
+        map(tag("str.replace_all"), |_| StrOp::StrReplaceAll()),
+        map(tag("str.replace_re"), |_| StrOp::StrReplaceRe()),
+        map(tag("str.replace_re_all"), |_| StrOp::StrReplaceReAll()),
+    ));
+
+    ws!(naked_strop_tags)(s)
+}
+
+fn str_sexp(s: &str) -> IResult<&str, SExp> {
+    let inner = map(tuple((num_op, many1(sexp))), |(o, v)| {
+        SExp::NExp(o, v.into_iter().map(|s| rccell!(s)).collect())
+    });
+
+    brack!(inner)(s)
 }
 
 fn num_op(s: &str) -> IResult<&str, NumOp> {

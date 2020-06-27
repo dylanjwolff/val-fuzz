@@ -177,6 +177,22 @@ fn get_bav_assign(bavns: &Vec<String>, ta: BitVec) -> Command {
     assert_many(&mut baveq)
 }
 
+fn eq_emptystr(name: String) -> SExp {
+    SExp::BExp(
+        rccell!(BoolOp::Equals()),
+        vec![
+            rccell!(SExp::BExp(
+                rccell!(BoolOp::Equals()),
+                vec![
+                    rccell!(SExp::Symbol(rccell!(Symbol::Token(name)))),
+                    rccell!(SExp::Constant(rccell!(Constant::Dec("\"\"".to_owned()))))
+                ]
+            )),
+            rccell!(SExp::Symbol(rccell!(Symbol::Token("{}".to_owned())))),
+        ],
+    )
+}
+
 fn rel_0(name: String, relative: BoolOp) -> SExp {
     SExp::BExp(
         rccell!(BoolOp::Equals()),
@@ -208,6 +224,7 @@ pub fn get_bav_assign_fmt_str(bavns: &Vec<(String, Sort)>) -> Vec<CommandRc> {
             rel_0(vname.clone(), BoolOp::Lt()),
             rel_0(vname.clone(), BoolOp::Gt()),
         ],
+        Sort::Str() => vec![eq_emptystr(vname.clone())],
         _ => panic!("Unreachable brangch"),
     });
 
@@ -369,7 +386,7 @@ fn rl_s(
             }
         }
 
-        SExp::Compound(v) | SExp::BExp(_, v) | SExp::NExp(_, v) => {
+        SExp::Compound(v) | SExp::BExp(_, v) | SExp::NExp(_, v) | SExp::StrExp(_, v) => {
             for e in v {
                 rl_s(&mut *e.borrow_mut(), scoped_vars, timer, recur_count)?
             }
@@ -410,7 +427,10 @@ fn rv_c(cmd: &mut Command, to_replace: &Vec<(String, SExp)>) {
 
 fn rv_se(sexp: &mut SExp, to_replace: &Vec<(String, SExp)>) {
     match sexp {
-        SExp::Compound(sexps) | SExp::BExp(_, sexps) | SExp::NExp(_, sexps) => {
+        SExp::Compound(sexps)
+        | SExp::BExp(_, sexps)
+        | SExp::NExp(_, sexps)
+        | SExp::StrExp(_, sexps) => {
             for sexp in sexps {
                 rv_se(&mut *sexp.borrow_mut(), to_replace)
             }
@@ -575,7 +595,10 @@ fn choles_rcse(rcse: &Rcse) -> Vec<(Rcse, Sort)> {
             let sort = c.borrow().sort();
             vec![(rcse.clone(), sort)]
         }
-        SExp::Compound(sexps) | SExp::BExp(_, sexps) | SExp::NExp(_, sexps) => {
+        SExp::Compound(sexps)
+        | SExp::BExp(_, sexps)
+        | SExp::NExp(_, sexps)
+        | SExp::StrExp(_, sexps) => {
             let mut v = vec![];
             for sexp in sexps {
                 v.extend(choles_rcse(&Rcse::nb(Rc::clone(sexp))));
@@ -758,6 +781,28 @@ fn bav_se(
             // interact with abstract domains
             // if bavs.len() <= before_exploration_num_bavs {
             let name = vng.get_name(Sort::Dec());
+            bavs.push((name, sec, pre_uqvars));
+            // }
+            Ok(())
+        }
+        SExp::StrExp(nop, sexps) => {
+            let sec = SExp::StrExp(nop.clone(), sexps.clone());
+            let pre_uqvars = qvars.uqvars.clone();
+            let before_exploration_num_bavs = bavs.len();
+            for sexp in sexps {
+                bav_se(
+                    false,
+                    &mut *sexp.borrow_mut(),
+                    vng,
+                    bavs,
+                    qvars,
+                    timer.clone(),
+                )?;
+            }
+            // NOTE removing "leaf optimization" temporarily as it's unclear how that should
+            // interact with abstract domains
+            // if bavs.len() <= before_exploration_num_bavs {
+            let name = vng.get_name(Sort::Str());
             bavs.push((name, sec, pre_uqvars));
             // }
             Ok(())
@@ -1011,7 +1056,8 @@ mod tests {
     fn bav_fmt_str() {
         assert_display_snapshot!(Script::Commands(get_bav_assign_fmt_str(&vec![
             ("BAV1".to_owned(), Sort::Bool()),
-            ("BAV2".to_owned(), Sort::Dec())
+            ("BAV2".to_owned(), Sort::Dec()),
+            ("BAV3".to_owned(), Sort::Str()),
         ])));
     }
 

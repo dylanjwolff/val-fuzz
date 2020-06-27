@@ -62,6 +62,7 @@ pub enum SExp {
     QExists(Vec<(SymbolRc, SortRc)>, SExpBoxRc),
     BExp(BoolOpRc, Vec<SExpRc>),
     NExp(NumOp, Vec<SExpRc>),
+    StrExp(StrOp, Vec<SExpRc>),
     Constant(ConstantRc),
     Symbol(SymbolRc),
 }
@@ -110,6 +111,17 @@ pub enum BoolOp {
     Strisdig(),
 }
 
+#[derive(Serialize, Deserialize, Debug, Eq, PartialEq, Clone)]
+pub enum StrOp {
+    Strcat(),
+    StrAt(),
+    StrFromCode(),
+    Substr(),
+    StrReplace(),
+    StrReplaceRe(),
+    StrReplaceReAll(),
+    StrReplaceAll(),
+}
 #[derive(Serialize, Deserialize, Debug, Eq, PartialEq, Clone)]
 pub enum NumOp {
     Sub(),
@@ -461,6 +473,17 @@ impl fmt::Display for SExp {
                     .fold(Ok(()), acc_result)?;
                 write!(f, ")")
             }
+            SExp::StrExp(o, v) => {
+                write!(f, "({} ", o)?;
+                v.iter()
+                    .enumerate()
+                    .map(|(i, sexp)| match i == 0 {
+                        true => write!(f, "{}", sexp.borrow()),
+                        false => write!(f, " {}", sexp.borrow()),
+                    })
+                    .fold(Ok(()), acc_result)?;
+                write!(f, ")")
+            }
             SExp::QForAll(v, s) => {
                 write!(f, "(forall (")?;
                 v.iter()
@@ -483,6 +506,21 @@ impl fmt::Display for Symbol {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         match self {
             Symbol::Token(s) | Symbol::Token(s) => write!(f, "{}", s),
+        }
+    }
+}
+
+impl fmt::Display for StrOp {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        match self {
+            StrOp::Strcat() => write!(f, "str.++"),
+            StrOp::StrAt() => write!(f, "str.at"),
+            StrOp::StrFromCode() => write!(f, "str.from_code"),
+            StrOp::Substr() => write!(f, "str.substr"),
+            StrOp::StrReplace() => write!(f, "str.replace"),
+            StrOp::StrReplaceAll() => write!(f, "str.replace_all"),
+            StrOp::StrReplaceRe() => write!(f, "str.replace_re"),
+            StrOp::StrReplaceReAll() => write!(f, "str.replace_re_all"),
         }
     }
 }
