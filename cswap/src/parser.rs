@@ -158,10 +158,10 @@ fn str_op(s: &str) -> IResult<&str, StrOp> {
         map(tag("str.at"), |_| StrOp::StrAt()),
         map(tag("str.from_code"), |_| StrOp::StrFromCode()),
         map(tag("str.substr"), |_| StrOp::Substr()),
-        map(tag("str.replace"), |_| StrOp::StrReplace()),
+        map(tag("str.replace_re_all"), |_| StrOp::StrReplaceReAll()),
         map(tag("str.replace_all"), |_| StrOp::StrReplaceAll()),
         map(tag("str.replace_re"), |_| StrOp::StrReplaceRe()),
-        map(tag("str.replace_re_all"), |_| StrOp::StrReplaceReAll()),
+        map(tag("str.replace"), |_| StrOp::StrReplace()),
     ));
 
     ws!(naked_strop_tags)(s)
