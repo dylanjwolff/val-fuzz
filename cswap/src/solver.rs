@@ -454,6 +454,9 @@ impl RSolve {
     }
 
     pub fn has_unrecoverable_error(&self) -> bool {
+        if self.was_timeout {
+            return false;
+        }
         self.lines
             .iter()
             .filter_map(|l| match l {
