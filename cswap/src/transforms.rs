@@ -70,15 +70,17 @@ fn init_vars(script: &mut Script, vars: Vec<(String, Sort)>) -> Vec<CommandRc> {
 
     let mut end = cmds.split_off(after_log_pos);
 
-    let decls = vars
-        .into_iter()
-        .map(|(vname, sort)| Command::DeclConst(vname, rccell!(sort)))
-        .map(|cmd| rccell!(cmd))
-        .collect::<Vec<CommandRc>>();
-
+    let decls = get_var_inits(vars);
     cmds.append(&mut decls.clone());
     cmds.append(&mut end);
     decls
+}
+
+fn get_var_inits(vars: Vec<(String, Sort)>) -> Vec<CommandRc> {
+    vars.into_iter()
+        .map(|(vname, sort)| Command::DeclConst(vname, rccell!(sort)))
+        .map(|cmd| rccell!(cmd))
+        .collect::<Vec<CommandRc>>()
 }
 
 fn add_ba(script: &mut Script, bavs: Vec<(String, SExp, VarBindings)>) {
@@ -260,15 +262,17 @@ pub fn ba_script(script: &mut Script, md: &mut Metadata) -> io::Result<Script> {
     let mut bavs = vec![];
     bav(script, &mut vng, &mut bavs)?;
 
-    init_vars(script, vng.vars_generated.clone());
     let mut bavns = vng
         .vars_generated
+        .clone()
         .into_iter()
         .filter(|(name, sort)| !name.contains("REPL"))
         .collect();
     md.bavns.append(&mut bavns);
 
     let mut decls = grab_all_decls(script);
+    let mut vs = get_var_inits(vng.vars_generated);
+    decls.append(&mut vs);
     let mut ba = get_boolean_abstraction(bavs);
     decls.append(&mut ba);
     decls.push(rccell!(Command::CheckSat()));
@@ -914,6 +918,13 @@ mod tests {
     fn ba_script_snap() {
         let str_script =
             "(declare-const x Int)(declare-const y Int)(assert (or (and (> x 3) (< y 7)) (= y x)))(assert (distinct y x))";
+        let mut p = script(str_script).unwrap().1;
+        assert_display_snapshot!(ba_script(&mut p, &mut Metadata::new_empty()).unwrap());
+    }
+
+    #[test]
+    fn decl_order_ba_script_snap() {
+        let str_script = "(define-sort FP () (_ FloatingPoint 11 53)) (assert  (exists ((x FP)) (fp.isInfinite (fp.sqrt RTN x))))";
         let mut p = script(str_script).unwrap().1;
         assert_display_snapshot!(ba_script(&mut p, &mut Metadata::new_empty()).unwrap());
     }
