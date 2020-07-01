@@ -333,10 +333,10 @@ pub fn sexp(s: &str) -> IResult<&str, SExp> {
         map(quantifier, |(tbs, sexp)| {
             SExp::QForAll(tbs, rccell!(Box::new(sexp)))
         }),
+        map(constant, |c| SExp::Constant(rccell!(c))),
         map(rec_sexp, |es| {
             SExp::Compound(es.into_iter().map(|e| rccell!(e)).collect())
         }),
-        map(constant, |c| SExp::Constant(rccell!(c))),
         map(symbol, |s| {
             SExp::Symbol(rccell!(Symbol::Token(s.to_owned())))
         }),
@@ -607,6 +607,13 @@ mod tests {
     use insta::assert_debug_snapshot;
     use insta::assert_display_snapshot;
     use std::fs;
+
+    #[test]
+    fn identifier_snap() {
+        let df = command("(assert (fp.gt ~C1_const_-25497521 (_ +zero 8 24)))");
+        assert_debug_snapshot!(df.unwrap().1);
+    }
+
     #[test]
     fn partial_name_fn_decl_snap() {
         let df = command("(assert (forall ((?i Int) (?j Int)) (=> (<= 0 ?j) (= (shr_ ?i (+ ?j 1)) (divide (shr_ ?i ?j) 2)))))");

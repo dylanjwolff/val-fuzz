@@ -1,0 +1,36 @@
+---
+source: cswap/src/parser.rs
+expression: df.unwrap().1
+---
+Assert(
+    RefCell {
+        value: BExp(
+            RefCell {
+                value: Fpgt,
+            },
+            [
+                RefCell {
+                    value: Symbol(
+                        RefCell {
+                            value: Token(
+                                "~C1_const_-25497521",
+                            ),
+                        },
+                    ),
+                },
+                RefCell {
+                    value: Constant(
+                        RefCell {
+                            value: Fp(
+                                PZero(
+                                    "8",
+                                    "24",
+                                ),
+                            ),
+                        },
+                    ),
+                },
+            ],
+        ),
+    },
+)
