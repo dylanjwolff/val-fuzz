@@ -13,6 +13,7 @@ use nom::character::complete::digit1;
 use nom::character::complete::hex_digit1;
 use nom::character::complete::line_ending;
 use nom::character::complete::multispace0;
+use nom::character::complete::multispace1;
 use nom::character::complete::not_line_ending;
 use nom::combinator::not;
 use nom::combinator::peek;
@@ -26,6 +27,12 @@ use nom::{bytes::complete::tag, combinator::map, sequence::tuple, IResult};
 use std::fs;
 use std::io;
 use std::path::Path;
+
+macro_rules! op_ws {
+    ($x:expr) => {
+        delimited(multispace0, $x, alt((multispace1, tag(")"))))
+    };
+}
 
 macro_rules! ws {
     ($x:expr) => {
@@ -164,7 +171,7 @@ fn str_op(s: &str) -> IResult<&str, StrOp> {
         map(tag("str.replace"), |_| StrOp::StrReplace()),
     ));
 
-    ws!(naked_strop_tags)(s)
+    op_ws!(naked_strop_tags)(s)
 }
 
 fn str_sexp(s: &str) -> IResult<&str, SExp> {
@@ -191,7 +198,7 @@ fn num_op(s: &str) -> IResult<&str, NumOp> {
         map(tag("str.indexof"), |_| NumOp::StrIndexOf()),
     ));
 
-    ws!(naked_numop_tags)(s)
+    op_ws!(naked_numop_tags)(s)
 }
 
 fn num_sexp(s: &str) -> IResult<&str, SExp> {
@@ -218,7 +225,7 @@ fn bool_fp_ops(s: &str) -> IResult<&str, BoolOp> {
         map(tag("fp.isPositive"), |_| BoolOp::Fppos()),
     ));
 
-    ws!(naked_bop_tags)(s)
+    op_ws!(naked_bop_tags)(s)
 }
 
 fn bool_str_ops(s: &str) -> IResult<&str, BoolOp> {
@@ -232,7 +239,7 @@ fn bool_str_ops(s: &str) -> IResult<&str, BoolOp> {
         map(tag("str.is_digit"), |_| BoolOp::Strisdig()),
     ));
 
-    ws!(naked_bop_tags)(s)
+    op_ws!(naked_bop_tags)(s)
 }
 
 fn bool_bv_ops(s: &str) -> IResult<&str, BoolOp> {
@@ -245,7 +252,7 @@ fn bool_bv_ops(s: &str) -> IResult<&str, BoolOp> {
         map(tag("bvsge"), |_| BoolOp::Bvsge()),
     ));
 
-    ws!(naked_bop_tags)(s)
+    op_ws!(naked_bop_tags)(s)
 }
 
 fn bool_int_ops(s: &str) -> IResult<&str, BoolOp> {
@@ -258,7 +265,7 @@ fn bool_int_ops(s: &str) -> IResult<&str, BoolOp> {
         map(char('>'), |_| BoolOp::Gt()),
     ));
 
-    ws!(alt((naked_bop_tags, naked_bop_chars)))(s)
+    op_ws!(alt((naked_bop_tags, naked_bop_chars)))(s)
 }
 
 fn bool_core_ops(s: &str) -> IResult<&str, BoolOp> {
@@ -271,7 +278,7 @@ fn bool_core_ops(s: &str) -> IResult<&str, BoolOp> {
     ));
     let naked_eq = map(char('='), |_| BoolOp::Equals());
 
-    ws!(alt((naked_bool_tags, naked_eq)))(s)
+    op_ws!(alt((naked_bool_tags, naked_eq)))(s)
 }
 
 fn bool_sexp(s: &str) -> IResult<&str, SExp> {
@@ -598,7 +605,14 @@ pub fn script_from_f(filepath: &Path) -> io::Result<Script> {
 mod tests {
     use super::*;
     use insta::assert_debug_snapshot;
+    use insta::assert_display_snapshot;
     use std::fs;
+    #[test]
+    fn partial_name_fn_decl_snap() {
+        let df = command("(assert (forall ((?i Int) (?j Int)) (=> (<= 0 ?j) (= (shr_ ?i (+ ?j 1)) (divide (shr_ ?i ?j) 2)))))");
+        assert_display_snapshot!(df.unwrap().1);
+    }
+
     #[test]
     fn decl_snap() {
         let df = command("(declare-datatypes NodeMobile ((Rnode)))");

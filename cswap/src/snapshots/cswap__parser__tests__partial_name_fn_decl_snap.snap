@@ -1,0 +1,5 @@
+---
+source: cswap/src/parser.rs
+expression: df.unwrap().1
+---
+(assert (forall ((?i Int)(?j Int)) (=> (<= 0 ?j) (= (shr_ ?i (+ ?j 1)) (divide (shr_ ?i ?j) 2)))))
