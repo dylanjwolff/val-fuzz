@@ -62,6 +62,7 @@ pub enum SExp {
     QExists(Vec<(SymbolRc, SortRc)>, SExpBoxRc),
     BExp(BoolOpRc, Vec<SExpRc>),
     NExp(NumOp, Vec<SExpRc>),
+    FPExp(FpOp, Option<(String, String)>, Vec<SExpRc>),
     StrExp(StrOp, Vec<SExpRc>),
     Constant(ConstantRc),
     Symbol(SymbolRc),
@@ -70,6 +71,23 @@ pub enum SExp {
 #[derive(Serialize, PartialEq, PartialOrd, Ord, Deserialize, Debug, Clone, Eq)]
 pub enum Symbol {
     Token(String),
+}
+
+#[derive(Serialize, Deserialize, Debug, Eq, PartialEq, Clone)]
+pub enum FpOp {
+    Abs(),
+    Neg(),
+    Add(),
+    Sub(),
+    Mul(),
+    Div(),
+    Fma(),
+    Sqrt(),
+    Rem(),
+    RTI(),
+    Min(),
+    Max(),
+    ToFp(),
 }
 
 #[derive(Serialize, Deserialize, Debug, Eq, PartialEq, Clone)]
@@ -462,6 +480,17 @@ impl fmt::Display for SExp {
                     .fold(Ok(()), acc_result)?;
                 write!(f, ")")
             }
+            SExp::FPExp(o, _s, v) => {
+                write!(f, "({} ", o)?;
+                v.iter()
+                    .enumerate()
+                    .map(|(i, sexp)| match i == 0 {
+                        true => write!(f, "{}", sexp.borrow()),
+                        false => write!(f, " {}", sexp.borrow()),
+                    })
+                    .fold(Ok(()), acc_result)?;
+                write!(f, ")")
+            }
             SExp::NExp(o, v) => {
                 write!(f, "({} ", o)?;
                 v.iter()
@@ -540,6 +569,26 @@ impl fmt::Display for NumOp {
             NumOp::StrToCode() => write!(f, "str.to_code"),
             NumOp::StrToInt() => write!(f, "str.to_int"),
             NumOp::StrIndexOf() => write!(f, "str.indexof"),
+        }
+    }
+}
+
+impl fmt::Display for FpOp {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        match self {
+            FpOp::Abs() => write!(f, "fp.abs"),
+            FpOp::Neg() => write!(f, "fp.neg"),
+            FpOp::Add() => write!(f, "fp.add"),
+            FpOp::Sub() => write!(f, "fp.sub"),
+            FpOp::Mul() => write!(f, "fp.mul"),
+            FpOp::Div() => write!(f, "fp.div"),
+            FpOp::Fma() => write!(f, "fp.fma"),
+            FpOp::Sqrt() => write!(f, "fp.sqrt"),
+            FpOp::Rem() => write!(f, "fp.rem"),
+            FpOp::RTI() => write!(f, "fp.roundToIntegral"),
+            FpOp::Min() => write!(f, "fp.min"),
+            FpOp::Max() => write!(f, "fp.max"),
+            FpOp::ToFp() => write!(f, "_ to_fp"),
         }
     }
 }

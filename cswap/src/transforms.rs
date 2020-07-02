@@ -390,7 +390,11 @@ fn rl_s(
             }
         }
 
-        SExp::Compound(v) | SExp::BExp(_, v) | SExp::NExp(_, v) | SExp::StrExp(_, v) => {
+        SExp::Compound(v)
+        | SExp::BExp(_, v)
+        | SExp::FPExp(_, _, v)
+        | SExp::NExp(_, v)
+        | SExp::StrExp(_, v) => {
             for e in v {
                 rl_s(&mut *e.borrow_mut(), scoped_vars, timer, recur_count)?
             }
@@ -433,6 +437,7 @@ fn rv_se(sexp: &mut SExp, to_replace: &Vec<(String, SExp)>) {
     match sexp {
         SExp::Compound(sexps)
         | SExp::BExp(_, sexps)
+        | SExp::FPExp(_, _, sexps)
         | SExp::NExp(_, sexps)
         | SExp::StrExp(_, sexps) => {
             for sexp in sexps {
@@ -601,6 +606,7 @@ fn choles_rcse(rcse: &Rcse) -> Vec<(Rcse, Sort)> {
         }
         SExp::Compound(sexps)
         | SExp::BExp(_, sexps)
+        | SExp::FPExp(_, _, sexps)
         | SExp::NExp(_, sexps)
         | SExp::StrExp(_, sexps) => {
             let mut v = vec![];
@@ -763,6 +769,28 @@ fn bav_se(
             // interact with abstract domains
             // if bavs.len() <= before_exploration_num_bavs {
             let name = vng.get_name(Sort::Bool());
+            bavs.push((name, sec, pre_uqvars));
+            // }
+            Ok(())
+        }
+        SExp::FPExp(op, sort, sexps) => {
+            let sec = SExp::FPExp(op.clone(), sort.clone(), sexps.clone());
+            let pre_uqvars = qvars.uqvars.clone();
+            let before_exploration_num_bavs = bavs.len();
+            for sexp in sexps {
+                bav_se(
+                    false,
+                    &mut *sexp.borrow_mut(),
+                    vng,
+                    bavs,
+                    qvars,
+                    timer.clone(),
+                )?;
+            }
+            // NOTE removing "leaf optimization" temporarily as it's unclear how that should
+            // interact with abstract domains
+            // if bavs.len() <= before_exploration_num_bavs {
+            let name = vng.get_name(Sort::Dec());
             bavs.push((name, sec, pre_uqvars));
             // }
             Ok(())

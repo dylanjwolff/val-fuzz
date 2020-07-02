@@ -159,6 +159,26 @@ fn symbol(s: &str) -> IResult<&str, &str> {
     take_while1(|c: char| !c.is_whitespace() && !(c == '(') && !(c == ')'))(s)
 }
 
+fn fp_op(s: &str) -> IResult<&str, &str> {
+    /*    let naked_fpop_tags = alt((
+        map(tag("fp.abs"),|_|),
+        map(tag("fp.neg"),|_|),
+        map(tag("fp.add"),|_|),
+        map(tag("fp.sub"),|_|),
+        map(tag("fp.mul"),|_|),
+        map(tag("fp.div"),|_|),
+        map(tag("fp.fma"),|_|),
+        map(tag("fp.sqrt"),|_|),
+        map(tag("fp.rem"),|_|),
+        map(tag("fp.roundToIntegral"),|_|),
+        map(tag("fp.min"),|_|),
+        map(tag("fp.max"),|_|),
+    //    map(tuple((ws!(tag("_")), tag("to_fp"))),|_|),
+        ));
+    */
+    Ok(("", ""))
+}
+
 fn str_op(s: &str) -> IResult<&str, StrOp> {
     let naked_strop_tags = alt((
         map(tag("str.++"), |_| StrOp::Strcat()),
