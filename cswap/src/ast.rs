@@ -382,9 +382,9 @@ impl BitVecConst {
 }
 
 impl FPConst {
-    fn get_eb_sb(&self) -> (String, String) {
+    pub fn get_eb_sb(&self) -> (String, String) {
         match self {
-            FPConst::Num(_, ebv, sbv) => (ebv.len().to_string(), sbv.len().to_string()),
+            FPConst::Num(_, ebv, sbv) => (ebv.len().to_string(), (sbv.len() + 1).to_string()),
             FPConst::PZero(eb, sb)
             | FPConst::NZero(eb, sb)
             | FPConst::PInf(eb, sb)

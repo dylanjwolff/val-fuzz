@@ -715,8 +715,16 @@ mod tests {
     }
 
     #[test]
+    fn fp_eb_sb_snap() {
+        assert_debug_snapshot!(fp("(fp #b0 #x81 #b00101000000010001001000)")
+            .unwrap()
+            .1
+            .get_eb_sb());
+    }
+
+    #[test]
     fn fp_snap() {
-        assert_debug_snapshot!(fp("(fp #b0 #b00000000000 #x0000000000000)"));
+        assert_debug_snapshot!(fp("(fp #b0 #b00000000000 #x0000000000000)").unwrap().1);
     }
 
     #[test]
