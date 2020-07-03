@@ -1,0 +1,24 @@
+---
+source: cswap/src/fuzzer.rs
+expression: script
+---
+(declare-const GEN1 Real)
+(declare-const GEN2 Int)
+(declare-const GEN3 Real)
+(declare-const GEN4 Int)
+(declare-const mpfx (_ FloatingPoint 11 53))
+(declare-const BAV1 Real)
+(declare-const BAV2 (_ FloatingPoint 11 53))
+(declare-const BAV3 Real)
+(declare-const BAV4 (_ FloatingPoint 11 53))
+(declare-const BAV5 (_ FloatingPoint 11 53))
+(declare-const BAV6 Bool)
+(assert (= BAV1 (- GEN2)))
+(assert (= BAV2 ((_ to_fp 11 53) roundNearestTiesToEven GEN1 (- GEN2))))
+(assert (= BAV3 (- GEN4)))
+(assert (= BAV4 ((_ to_fp 11 53) roundNearestTiesToEven GEN3 (- GEN4))))
+(assert (= BAV5 (fp.mul roundTowardPositive ((_ to_fp 11 53) roundNearestTiesToEven GEN1 (- GEN2)) ((_ to_fp 11 53) roundNearestTiesToEven GEN3 (- GEN4)))))
+(assert (= BAV6 (= mpfx (fp.mul roundTowardPositive ((_ to_fp 11 53) roundNearestTiesToEven GEN1 (- GEN2)) ((_ to_fp 11 53) roundNearestTiesToEven GEN3 (- GEN4))))))
+(check-sat)
+(get-model)
+

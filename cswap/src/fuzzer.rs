@@ -314,6 +314,26 @@ mod test {
     use tempfile::TempDir;
 
     #[test]
+    fn ba_script_num() {
+        let mut script = script("(assert (= 3 (+ 4 4)))").unwrap().1;
+        let mut md = Metadata::new_empty();
+        replace_constants_with_fresh_vars(&mut script, &mut md);
+        script = ba_script(&mut script, &mut md).unwrap();
+        assert_display_snapshot!(script);
+    }
+
+    #[test]
+    fn ba_script_fpop() {
+        let mut script = script("(declare-const mpfx (_ FloatingPoint 11 53))(assert (= mpfx (fp.mul roundTowardPositive
+            ((_ to_fp 11 53) roundNearestTiesToEven 0.5792861143265499723753464422770775854587554931640625 (- 1022))
+            ((_ to_fp 11 53) roundNearestTiesToEven 1.3902774452208657152141313417814671993255615234375 (- 17)))))").unwrap().1;
+        let mut md = Metadata::new_empty();
+        replace_constants_with_fresh_vars(&mut script, &mut md);
+        script = ba_script(&mut script, &mut md).unwrap();
+        assert_display_snapshot!(script);
+    }
+
+    #[test]
     fn bav_stateful() {
         let script =
             script("(decl-const BAV1 bool)(assert (< x 5))(assert (= BAV1 (< x 5)))(check-sat)")

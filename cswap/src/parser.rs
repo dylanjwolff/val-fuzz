@@ -173,7 +173,15 @@ fn fp_op(s: &str) -> IResult<&str, FpOp> {
         map(tag("fp.roundToIntegral"), |_| FpOp::RTI()),
         map(tag("fp.min"), |_| FpOp::Min()),
         map(tag("fp.max"), |_| FpOp::Max()),
-        map(tuple((ws!(tag("_")), tag("to_fp"))), |_| FpOp::ToFp()),
+        map(
+            brack!(tuple((
+                ws!(tag("_")),
+                ws!(tag("to_fp")),
+                ws!(integer),
+                integer
+            ))),
+            |(_, _, eb, sb)| FpOp::ToFp(eb.to_owned(), sb.to_owned()),
+        ),
     ));
     op_ws!(naked_fpop_tags)(s)
 }
@@ -181,8 +189,8 @@ fn fp_op(s: &str) -> IResult<&str, FpOp> {
 fn fp_sexp(s: &str) -> IResult<&str, SExp> {
     let initial_res = tuple((fp_op, many1(sexp)));
     brack!(map(initial_res, |(op, sexps)| {
-        let fp_sort = if op == FpOp::ToFp() {
-            Some((sexps[0].to_string(), sexps[1].to_string()))
+        let fp_sort = if let FpOp::ToFp(eb, sb) = &op {
+            Some((eb.to_owned(), sb.to_owned()))
         } else {
             sexps
                 .iter()
@@ -643,6 +651,26 @@ mod tests {
     use insta::assert_debug_snapshot;
     use insta::assert_display_snapshot;
     use std::fs;
+
+    #[test]
+    fn fp_op_inference_snap() {
+        let df = command("(assert (= mpfx (fp.mul roundTowardPositive
+            ((_ to_fp 11 53) roundNearestTiesToEven 0.5792861143265499723753464422770775854587554931640625 (- 1022))
+            ((_ to_fp 11 53) roundNearestTiesToEven 1.3902774452208657152141313417814671993255615234375 (- 17)))))");
+        if let Command::Assert(c) = df.clone().unwrap().1 {
+            if let SExp::BExp(_, sexps) = &*c.borrow() {
+                if let SExp::FPExp(_, fpsort, _) = &*sexps[1].borrow() {
+                    assert_debug_snapshot!(fpsort);
+                } else {
+                    assert_debug_snapshot!(sexps);
+                }
+            } else {
+                assert_debug_snapshot!(c);
+            }
+        } else {
+            assert_debug_snapshot!(df.unwrap().1);
+        }
+    }
 
     #[test]
     fn identifier_snap() {

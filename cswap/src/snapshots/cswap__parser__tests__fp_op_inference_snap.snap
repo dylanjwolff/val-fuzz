@@ -1,0 +1,10 @@
+---
+source: cswap/src/parser.rs
+expression: fpsort
+---
+Some(
+    (
+        "11",
+        "53",
+    ),
+)

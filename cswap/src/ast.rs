@@ -87,7 +87,7 @@ pub enum FpOp {
     RTI(),
     Min(),
     Max(),
-    ToFp(),
+    ToFp(String, String),
 }
 
 #[derive(Serialize, Deserialize, Debug, Eq, PartialEq, Clone)]
@@ -618,7 +618,7 @@ impl fmt::Display for FpOp {
             FpOp::RTI() => write!(f, "fp.roundToIntegral"),
             FpOp::Min() => write!(f, "fp.min"),
             FpOp::Max() => write!(f, "fp.max"),
-            FpOp::ToFp() => write!(f, "_ to_fp"),
+            FpOp::ToFp(eb, sb) => write!(f, "(_ to_fp {} {})", eb, sb),
         }
     }
 }
