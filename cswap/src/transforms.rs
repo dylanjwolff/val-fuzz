@@ -1,4 +1,4 @@
-use crate::ast::{AstNode, BoolOp, Command, Constant, Logic, SExp, Script, Sort, Symbol};
+use crate::ast::{AstNode, BoolOp, Command, Constant, FPConst, Logic, SExp, Script, Sort, Symbol};
 use crate::ast::{CommandRc, SExpRc, SortRc, SymbolRc};
 
 use crate::liftio;
@@ -211,6 +211,52 @@ fn rel_0(name: String, relative: BoolOp) -> SExp {
     )
 }
 
+fn fp_eq(name: String, other: FPConst) -> SExp {
+    let var = rccell!(Symbol::Token(name));
+    SExp::BExp(
+        rccell!(BoolOp::Equals()),
+        vec![
+            rccell!(SExp::BExp(
+                rccell!(BoolOp::Equals()),
+                vec![
+                    rccell!(SExp::Symbol(Rc::clone(&var))),
+                    rccell!(SExp::Constant(rccell!(Constant::Fp(other))))
+                ]
+            )),
+            rccell!(SExp::Symbol(rccell!(Symbol::Token("{}".to_owned())))),
+        ],
+    )
+}
+
+fn fp_between(name: String, low: FPConst, high: FPConst) -> SExp {
+    let var = rccell!(Symbol::Token(name));
+    SExp::BExp(
+        rccell!(BoolOp::Equals()),
+        vec![
+            rccell!(SExp::BExp(
+                rccell!(BoolOp::And()),
+                vec![
+                    rccell!(SExp::BExp(
+                        rccell!(BoolOp::Fpgt()),
+                        vec![
+                            rccell!(SExp::Symbol(Rc::clone(&var))),
+                            rccell!(SExp::Constant(rccell!(Constant::Fp(low))))
+                        ]
+                    )),
+                    rccell!(SExp::BExp(
+                        rccell!(BoolOp::Fplt()),
+                        vec![
+                            rccell!(SExp::Symbol(Rc::clone(&var))),
+                            rccell!(SExp::Constant(rccell!(Constant::Fp(high))))
+                        ]
+                    ))
+                ]
+            )),
+            rccell!(SExp::Symbol(rccell!(Symbol::Token("{}".to_owned())))),
+        ],
+    )
+}
+
 // Change this to return a vec of SExp that can then be trimmed down / filtered according to how many switches we flip at a time
 pub fn get_bav_assign_fmt_str(bavns: &Vec<(String, Sort)>) -> Vec<CommandRc> {
     let mut baveq = bavns.into_iter().flat_map(|(vname, vsort)| match vsort {
@@ -227,6 +273,23 @@ pub fn get_bav_assign_fmt_str(bavns: &Vec<(String, Sort)>) -> Vec<CommandRc> {
             rel_0(vname.clone(), BoolOp::Gt()),
         ],
         Sort::Str() => vec![eq_emptystr(vname.clone())],
+        Sort::Fp(eb, sb) => vec![
+            fp_eq(vname.clone(), FPConst::NInf(eb.clone(), sb.clone())),
+            fp_between(
+                vname.clone(),
+                FPConst::NInf(eb.clone(), sb.clone()),
+                FPConst::NZero(eb.clone(), sb.clone()),
+            ),
+            fp_eq(vname.clone(), FPConst::NZero(eb.clone(), sb.clone())),
+            fp_eq(vname.clone(), FPConst::PZero(eb.clone(), sb.clone())),
+            fp_between(
+                vname.clone(),
+                FPConst::PZero(eb.clone(), sb.clone()),
+                FPConst::PInf(eb.clone(), sb.clone()),
+            ),
+            fp_eq(vname.clone(), FPConst::PInf(eb.clone(), sb.clone())),
+            fp_eq(vname.clone(), FPConst::Nan(eb.clone(), sb.clone())),
+        ],
         _ => panic!("Unreachable brangch"),
     });
 
@@ -911,6 +974,27 @@ mod tests {
     use insta::assert_display_snapshot;
 
     #[test]
+    fn fp_eq_snap() {
+        let s = fp_eq(
+            "VAR".to_owned(),
+            FPConst::PZero("11".to_owned(), "53".to_owned()),
+        );
+
+        assert_display_snapshot!(s);
+    }
+
+    #[test]
+    fn fp_between_snap() {
+        let s = fp_between(
+            "VAR".to_owned(),
+            FPConst::PZero("11".to_owned(), "53".to_owned()),
+            FPConst::PInf("11".to_owned(), "53".to_owned()),
+        );
+
+        assert_display_snapshot!(s);
+    }
+
+    #[test]
     fn num_op_ba_script_snap() {
         let str_script = "(assert (< (+ 4 3) x))";
         let mut p = script(str_script).unwrap().1;
@@ -1099,6 +1183,10 @@ mod tests {
             ("BAV1".to_owned(), Sort::Bool()),
             ("BAV2".to_owned(), Sort::Dec()),
             ("BAV3".to_owned(), Sort::Str()),
+            (
+                "BAV4".to_owned(),
+                Sort::Fp("11".to_owned(), "53".to_owned())
+            ),
         ])));
     }
 

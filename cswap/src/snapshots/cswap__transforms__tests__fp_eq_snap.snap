@@ -1,0 +1,5 @@
+---
+source: cswap/src/transforms.rs
+expression: s
+---
+(= (= VAR (_ +zero 11 53)) {})

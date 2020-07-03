@@ -1,0 +1,5 @@
+---
+source: cswap/src/transforms.rs
+expression: s
+---
+(= (and (fp.gt VAR (_ +zero 11 53)) (fp.lt VAR (_ +oo 11 53))) {})
