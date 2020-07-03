@@ -648,6 +648,9 @@ pub fn script_from_f(filepath: &Path) -> io::Result<Script> {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::config::Metadata;
+    use crate::transforms::choles;
+    use crate::transforms::try_all_rcholes;
     use insta::assert_debug_snapshot;
     use insta::assert_display_snapshot;
     use std::fs;
@@ -712,14 +715,6 @@ mod tests {
     fn sort_of_const_num_snap() {
         let c = constant("(fp #b0 #xf #b10110)").unwrap().1;
         assert_debug_snapshot!(format!("{}", c.sort()));
-    }
-
-    #[test]
-    fn fp_eb_sb_snap() {
-        assert_debug_snapshot!(fp("(fp #b0 #x81 #b00101000000010001001000)")
-            .unwrap()
-            .1
-            .get_eb_sb());
     }
 
     #[test]

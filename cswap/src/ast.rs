@@ -366,7 +366,7 @@ impl Constant {
                 | FPConst::PZero(m, n)
                 | FPConst::NZero(m, n)
                 | FPConst::Nan(m, n) => Sort::Fp(m.to_owned(), n.to_owned()),
-                FPConst::Num(_, e, s) => Sort::Fp(e.len().to_string(), (s.len() - 1).to_string()),
+                FPConst::Num(_, e, s) => Sort::Fp(e.len().to_string(), (s.len() + 1).to_string()),
             },
         }
     }
@@ -680,6 +680,7 @@ mod tests {
     use crate::parser::*;
     use insta::assert_debug_snapshot;
     use insta::assert_display_snapshot;
+
     #[test]
     fn decl_generic_display_snap() {
         let str_script = "(define-fun smt_set_cup ((s1 mySet) (s2 mySet)) mySet (union s1 s2))";
