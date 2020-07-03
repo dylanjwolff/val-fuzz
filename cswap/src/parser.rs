@@ -1,6 +1,6 @@
 use super::ast::{
-    BitVecConst, BoolOp, Command, Constant, FPConst, Logic, NumOp, SExp, SExpBoxRc, SExpRc, Script,
-    Sort, SortRc, StrOp, Symbol, SymbolRc,
+    BitVecConst, BoolOp, Command, Constant, FPConst, FpOp, Logic, NumOp, SExp, SExpBoxRc, SExpRc,
+    Script, Sort, SortRc, StrOp, Symbol, SymbolRc,
 };
 
 use crate::liftio;
@@ -159,24 +159,39 @@ fn symbol(s: &str) -> IResult<&str, &str> {
     take_while1(|c: char| !c.is_whitespace() && !(c == '(') && !(c == ')'))(s)
 }
 
-fn fp_op(s: &str) -> IResult<&str, &str> {
-    /*    let naked_fpop_tags = alt((
-        map(tag("fp.abs"),|_|),
-        map(tag("fp.neg"),|_|),
-        map(tag("fp.add"),|_|),
-        map(tag("fp.sub"),|_|),
-        map(tag("fp.mul"),|_|),
-        map(tag("fp.div"),|_|),
-        map(tag("fp.fma"),|_|),
-        map(tag("fp.sqrt"),|_|),
-        map(tag("fp.rem"),|_|),
-        map(tag("fp.roundToIntegral"),|_|),
-        map(tag("fp.min"),|_|),
-        map(tag("fp.max"),|_|),
-    //    map(tuple((ws!(tag("_")), tag("to_fp"))),|_|),
-        ));
-    */
-    Ok(("", ""))
+fn fp_op(s: &str) -> IResult<&str, FpOp> {
+    let naked_fpop_tags = alt((
+        map(tag("fp.abs"), |_| FpOp::Abs()),
+        map(tag("fp.neg"), |_| FpOp::Neg()),
+        map(tag("fp.add"), |_| FpOp::Add()),
+        map(tag("fp.sub"), |_| FpOp::Sub()),
+        map(tag("fp.mul"), |_| FpOp::Mul()),
+        map(tag("fp.div"), |_| FpOp::Div()),
+        map(tag("fp.fma"), |_| FpOp::Fma()),
+        map(tag("fp.sqrt"), |_| FpOp::Sqrt()),
+        map(tag("fp.rem"), |_| FpOp::Rem()),
+        map(tag("fp.roundToIntegral"), |_| FpOp::RTI()),
+        map(tag("fp.min"), |_| FpOp::Min()),
+        map(tag("fp.max"), |_| FpOp::Max()),
+        map(tuple((ws!(tag("_")), tag("to_fp"))), |_| FpOp::ToFp()),
+    ));
+    op_ws!(naked_fpop_tags)(s)
+}
+
+fn fp_sexp(s: &str) -> IResult<&str, SExp> {
+    let initial_res = tuple((fp_op, many1(sexp)));
+    brack!(map(initial_res, |(op, sexps)| {
+        let fp_sort = if op == FpOp::ToFp() {
+            Some((sexps[0].to_string(), sexps[1].to_string()))
+        } else {
+            sexps
+                .iter()
+                .map(|sexp| sexp.fp_sort())
+                .find(|s| s.is_some())
+                .flatten()
+        };
+        SExp::FPExp(op, fp_sort, sexps.into_iter().map(|s| rccell!(s)).collect())
+    }))(s)
 }
 
 fn str_op(s: &str) -> IResult<&str, StrOp> {
@@ -346,6 +361,7 @@ pub fn sexp(s: &str) -> IResult<&str, SExp> {
         bool_sexp,
         num_sexp,
         str_sexp,
+        fp_sexp,
         map(let_sexp, |(tbs, sexp)| SExp::Let(tbs, sexp)),
         map(existential_q, |(tbs, sexp)| {
             SExp::QExists(tbs, rccell!(Box::new(sexp)))

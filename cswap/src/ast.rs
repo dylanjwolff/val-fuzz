@@ -381,6 +381,19 @@ impl BitVecConst {
     }
 }
 
+impl FPConst {
+    fn get_eb_sb(&self) -> (String, String) {
+        match self {
+            FPConst::Num(_, ebv, sbv) => (ebv.len().to_string(), sbv.len().to_string()),
+            FPConst::PZero(eb, sb)
+            | FPConst::NZero(eb, sb)
+            | FPConst::PInf(eb, sb)
+            | FPConst::NInf(eb, sb)
+            | FPConst::Nan(eb, sb) => (eb.to_owned(), sb.to_owned()),
+        }
+    }
+}
+
 impl fmt::Display for FPConst {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         match self {
@@ -443,6 +456,23 @@ impl SExp {
 
     pub fn false_sexp() -> SExp {
         SExp::Symbol(rccell!(Symbol::Token("false".to_owned())))
+    }
+
+    pub fn fp_sort(&self) -> Option<(String, String)> {
+        match self {
+            SExp::Constant(c) => match &*c.borrow() {
+                Constant::Fp(fpc) => Some(fpc.get_eb_sb()),
+                _ => None,
+            },
+            SExp::FPExp(_, sort, _) => sort.clone(),
+            SExp::Compound(v) => v
+                .iter()
+                .map(|sexp| sexp.borrow().fp_sort())
+                .find(|r| r.is_some())
+                .flatten(),
+            // Could do variable lookups here?
+            _ => None,
+        }
     }
 }
 

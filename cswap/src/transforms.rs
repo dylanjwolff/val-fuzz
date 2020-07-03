@@ -790,8 +790,10 @@ fn bav_se(
             // NOTE removing "leaf optimization" temporarily as it's unclear how that should
             // interact with abstract domains
             // if bavs.len() <= before_exploration_num_bavs {
-            let name = vng.get_name(Sort::Dec());
-            bavs.push((name, sec, pre_uqvars));
+            if let Some((eb, sb)) = sort {
+                let name = vng.get_name(Sort::Fp(eb.clone(), sb.clone()));
+                bavs.push((name, sec, pre_uqvars));
+            }
             // }
             Ok(())
         }
