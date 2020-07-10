@@ -126,10 +126,11 @@ impl<'a> StatefulBavAssign<'a> {
 
     pub fn do_iteration_tv(
         &mut self,
+        i: u64,
         truth_values: BitVec,
         mask: BitVec,
     ) -> io::Result<(PathBuf, PathBuf)> {
-        let new_file: PathBuf = self.cfg.file_provider.iterfile(&self.md)?;
+        let new_file: PathBuf = self.cfg.file_provider.iterfile(i, &self.md)?;
         let mut f = OpenOptions::new()
             .create(true)
             .append(true)
@@ -179,8 +180,10 @@ fn group_bav_assign(
 ) -> io::Result<Vec<(PathBuf, PathBuf)>> {
     let mut sba = StatefulBavAssign::new(filepaths, cfg)?;
     let mut fs = vec![];
+    let mut i = 0;
     while let Some((tv, mask)) = sba.urng.sample_and_mask() {
-        fs.push(sba.do_iteration_tv(tv, mask)?);
+        fs.push(sba.do_iteration_tv(i, tv, mask)?);
+        i = i + 1;
     }
     Ok(fs)
 }
@@ -254,7 +257,18 @@ pub fn solver_fn(filepaths: (PathBuf, PathBuf), cfg: &Config) {
 }
 
 fn resub_model(result: &RSolve, filepaths: &(PathBuf, PathBuf), cfg: &Config) -> io::Result<()> {
-    trace!("RESUB! for file {:?}", filepaths.0);
+    trace!(
+        "RESUB! for file {:?}",
+        filepaths
+            .0
+            .file_stem()
+            .unwrap()
+            .to_str()
+            .unwrap()
+            .to_owned()
+            .replace("iter_", "")
+    );
+
     let md: Metadata = liftio!(serde_lexpr::from_str(&fs::read_to_string(&filepaths.1)?))?;
     let mut choles_script = script_from_f_unsanitized(&md.choles_path(&cfg.file_provider))?;
 
@@ -267,7 +281,9 @@ fn resub_model(result: &RSolve, filepaths: &(PathBuf, PathBuf), cfg: &Config) ->
     if to_replace.len() > 0 {
         rv(&mut choles_script, &mut to_replace);
 
-        let resubbed_f = cfg.file_provider.serialize_resub(&choles_script, &md)?;
+        let resubbed_f = cfg
+            .file_provider
+            .serialize_resub(&choles_script, &filepaths.0, &md)?;
 
         let results = profiles_solve(resubbed_f.to_str().unwrap_or("defaultname"), &cfg.profiles);
 
@@ -371,7 +387,7 @@ mod test {
         };
 
         let (tv, mask) = sba.urng.sample_and_mask().unwrap();
-        let (f, _) = sba.do_iteration_tv(tv, mask).unwrap();
+        let (f, _) = sba.do_iteration_tv(0, tv, mask).unwrap();
         let result = fs::read_to_string(f).unwrap();
         assert_display_snapshot!(result);
     }

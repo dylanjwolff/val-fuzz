@@ -118,21 +118,26 @@ impl FileProvider {
         Ok(pb)
     }
 
-    pub fn iterfile(&self, md: &Metadata) -> io::Result<PathBuf> {
+    pub fn iterfile(&self, i: u64, md: &Metadata) -> io::Result<PathBuf> {
         let tfile = Builder::new()
             .prefix("iter_")
             .rand_bytes(10)
-            .suffix(&md.seed_file)
+            .suffix(&("_".to_owned() + &i.to_string() + "_" + &md.seed_file))
             .tempfile_in(&self.scratchdir)?;
         let (_, pb) = liftio!(tfile.keep())?;
         Ok(pb)
     }
 
-    pub fn resubfile(&self, md: &Metadata) -> io::Result<PathBuf> {
+    pub fn resubfile(&self, iterfile: &Path, md: &Metadata) -> io::Result<PathBuf> {
+        let stem = iterfile
+            .file_name()
+            .and_then(|s| s.to_str())
+            .map(|s| s.to_owned())
+            .unwrap_or(md.seed_file.to_owned() + "_unknown_iter");
         let tfile = Builder::new()
             .prefix("resub_")
             .rand_bytes(10)
-            .suffix(&md.seed_file)
+            .suffix(&("_".to_owned() + &stem))
             .tempfile_in(&self.scratchdir)?;
         let (_, pb) = liftio!(tfile.keep())?;
         Ok(pb)
@@ -196,8 +201,13 @@ impl FileProvider {
         Ok((fs, fm))
     }
 
-    pub fn serialize_resub(&self, script: &Script, md: &Metadata) -> Result<PathBuf, io::Error> {
-        let f = self.resubfile(md)?;
+    pub fn serialize_resub(
+        &self,
+        script: &Script,
+        iterfile: &Path,
+        md: &Metadata,
+    ) -> Result<PathBuf, io::Error> {
+        let f = self.resubfile(iterfile, md)?;
         fs::write(&f, script.to_string())?;
         Ok(f)
     }

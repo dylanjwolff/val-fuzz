@@ -268,8 +268,10 @@ fn bav_assign_worker(
         match StatefulBavAssign::new(filepaths.clone(), &cfg) {
             Ok(mut sba) => {
                 trace!("Adding assignments of {:?} skeletion to the Q", filepaths.0);
+                let mut i = 0;
                 while let Some((tv, mask)) = sba.urng.sample_and_mask() {
-                    let mut to_push = match sba.do_iteration_tv(tv, mask) {
+                    i = i + 1;
+                    let mut to_push = match sba.do_iteration_tv(i, tv, mask) {
                         Ok(v) => v,
                         Err(e) => {
                             warn!("Iteration error {}", e);
