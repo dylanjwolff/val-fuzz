@@ -270,6 +270,15 @@ fn bav_assign_worker(
                 trace!("Adding assignments of {:?} skeletion to the Q", filepaths.0);
                 let mut i = 0;
                 while let Some((tv, mask)) = sba.urng.sample_and_mask() {
+                    let ef = sba
+                        .md
+                        .bavns
+                        .iter()
+                        .zip(mask.iter())
+                        .filter_map(|((name, sort), mbit)| if mbit { Some(name) } else { None })
+                        .zip(tv.iter())
+                        .collect::<Vec<(&String, bool)>>();
+
                     i = i + 1;
                     let mut to_push = match sba.do_iteration_tv(i, tv, mask) {
                         Ok(v) => v,

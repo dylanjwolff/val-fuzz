@@ -1,0 +1,6 @@
+(declare-const GEN1 String)
+(declare-const GEN2 String)
+(set-option :smt.string_solver z3str3)
+(declare-fun a () String)
+(assert (distinct (str.++ a GEN1) (str.++ GEN2 a)))
+(check-sat-using unit-subsume-simplify)

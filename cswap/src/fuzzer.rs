@@ -50,7 +50,7 @@ pub fn exec_single_thread(dirname: &str, cfg: Config) {
 
     for f in q.into_iter() {
         match mutator(f.clone(), &cfg.file_provider)
-            .and_then(|skel| group_bav_assign(skel, &cfg))
+            .and_then(|skel| single_thread_group_bav_assign(skel, &cfg))
             .map(|iters| {
                 for iter in iters.into_iter() {
                     solver_fn(iter, &cfg);
@@ -71,7 +71,7 @@ pub fn mutator(filepath: PathBuf, file_provider: &FileProvider) -> io::Result<(P
 pub struct StatefulBavAssign<'a> {
     top_of_script: Box<String>,
     bottom_of_script: Box<String>,
-    md: Metadata,
+    pub md: Metadata,
     pub urng: RandUniqPermGen,
     cfg: &'a Config,
 }
@@ -174,14 +174,24 @@ impl<'a> StatefulBavAssign<'a> {
     }
 }
 
-fn group_bav_assign(
+fn single_thread_group_bav_assign(
     filepaths: (PathBuf, PathBuf),
     cfg: &Config,
 ) -> io::Result<Vec<(PathBuf, PathBuf)>> {
     let mut sba = StatefulBavAssign::new(filepaths, cfg)?;
     let mut fs = vec![];
     let mut i = 0;
+
     while let Some((tv, mask)) = sba.urng.sample_and_mask() {
+        let ef = sba
+            .md
+            .bavns
+            .iter()
+            .zip(mask.iter())
+            .filter_map(|((name, sort), mbit)| if mbit { Some(name) } else { None })
+            .zip(tv.iter())
+            .collect::<Vec<(&String, bool)>>();
+
         fs.push(sba.do_iteration_tv(i, tv, mask)?);
         i = i + 1;
     }
