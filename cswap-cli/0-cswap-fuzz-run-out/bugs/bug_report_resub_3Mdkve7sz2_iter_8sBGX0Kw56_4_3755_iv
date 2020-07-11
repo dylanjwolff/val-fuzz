@@ -1,7 +1,0 @@
-z3 model_validate=true: 
-	stdout:
- sat
-(error "line 26 column 10: an invalid model was generated")
- 
-	 stderr:
- 

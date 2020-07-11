@@ -1,1 +1,0 @@
-((bavns #("BDOM1" (Bool)) #("BDOM2" (Bool)) #("BDOM3" (Bool))) (constvns "GEN1" "GEN2") (seed_file . "3773_segf.smt2") (skeleton_file . "skel_3773_segf.smt2") (choles_file . "choles_3773_segf.smt2") (metadata_file . "md_3773_segf.smt2"))
