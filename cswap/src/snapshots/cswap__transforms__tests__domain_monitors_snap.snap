@@ -1,0 +1,17 @@
+---
+source: cswap/src/transforms.rs
+expression: "Script::Commands(r.1)"
+---
+(assert (= BDOM1 BAV1))
+(assert (= (= BAV3 0) BDOM2))
+(assert (= (< BAV3 0) BDOM3))
+(assert (= (> BAV3 0) BDOM4))
+(assert (= (= BAV4 "") BDOM5))
+(assert (= (= BAV5 (_ -oo 11 53)) BDOM6))
+(assert (= (and (fp.gt BAV5 (_ -oo 11 53)) (fp.lt BAV5 (_ -zero 11 53))) BDOM7))
+(assert (= (= BAV5 (_ -zero 11 53)) BDOM8))
+(assert (= (= BAV5 (_ +zero 11 53)) BDOM9))
+(assert (= (and (fp.gt BAV5 (_ +zero 11 53)) (fp.lt BAV5 (_ +oo 11 53))) BDOM10))
+(assert (= (= BAV5 (_ +oo 11 53)) BDOM11))
+(assert (= (= BAV5 (_ NaN 11 53)) BDOM12))
+

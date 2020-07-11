@@ -6,8 +6,12 @@ expression: ba_str
 (declare-const BAV2 Bool)
 (declare-const QUAL_REPLACE1 Int)
 (declare-const QUAL_REPLACE2 String)
+(declare-const BDOM1 Bool)
+(declare-const BDOM2 Bool)
 (assert (= BAV1 (< QUAL_REPLACE1 4)))
 (assert (= BAV2 (= QUAL_REPLACE2 "")))
+(assert (= BDOM1 BAV1))
+(assert (= BDOM2 BAV2))
 (check-sat)
 (get-model)
 

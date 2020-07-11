@@ -4,8 +4,16 @@ expression: ba_str
 ---
 (declare-const BAV1 Real)
 (declare-const BAV2 Bool)
+(declare-const BDOM1 Bool)
+(declare-const BDOM2 Bool)
+(declare-const BDOM3 Bool)
+(declare-const BDOM4 Bool)
 (assert (= BAV1 (+ 4 3)))
 (assert (= BAV2 (< (+ 4 3) x)))
+(assert (= (= BAV1 0) BDOM1))
+(assert (= (< BAV1 0) BDOM2))
+(assert (= (> BAV1 0) BDOM3))
+(assert (= BDOM4 BAV2))
 (check-sat)
 (get-model)
 

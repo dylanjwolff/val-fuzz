@@ -98,6 +98,7 @@ fn add_ba(script: &mut Script, bavs: Vec<(String, SExp, VarBindings)>) {
     cmds.append(&mut end);
 }
 
+// Get sub-exp monitors
 fn get_boolean_abstraction(bavs: Vec<(String, SExp, VarBindings)>) -> Vec<CommandRc> {
     let mut baveq_iter = bavs.into_iter().map(|(vname, sexp, vbs)| {
         let rhs = SExp::BExp(
@@ -115,6 +116,75 @@ fn get_boolean_abstraction(bavs: Vec<(String, SExp, VarBindings)>) -> Vec<Comman
     });
 
     many_assert(&mut baveq_iter)
+}
+
+// Get BOOLEAN domain monitors ... THESE are added to the metadata      Vec<String, Sort>, vng -> Vec<Variables>, Vec<Command>
+fn get_boolean_domain_monitors(
+    subexp_monitors: Vec<(String, Sort)>,
+) -> (Vec<(String, Sort)>, Vec<CommandRc>) {
+    let mut vng = VarNameGenerator::new("BDOM");
+    let mut baveq = subexp_monitors
+        .into_iter()
+        .flat_map(|(vname, vsort)| match vsort {
+            Sort::Bool() => vec![SExp::BExp(
+                rccell!(BoolOp::Equals()),
+                vec![
+                    rccell!(SExp::Symbol(rccell!(Symbol::Token(
+                        vng.get_name(Sort::Bool())
+                    )))),
+                    rccell!(SExp::Symbol(rccell!(Symbol::Token(vname)))),
+                ],
+            )],
+            Sort::Dec() => vec![
+                bav_rel_0(vng.get_name(Sort::Bool()), vname.clone(), BoolOp::Equals()),
+                bav_rel_0(vng.get_name(Sort::Bool()), vname.clone(), BoolOp::Lt()),
+                bav_rel_0(vng.get_name(Sort::Bool()), vname.clone(), BoolOp::Gt()),
+            ],
+            Sort::Str() => vec![bav_eq_emptystr(vng.get_name(Sort::Bool()), vname.clone())],
+            Sort::Fp(eb, sb) => vec![
+                bav_fp_eq(
+                    vng.get_name(Sort::Bool()),
+                    vname.clone(),
+                    FPConst::NInf(eb.clone(), sb.clone()),
+                ),
+                bav_fp_between(
+                    vng.get_name(Sort::Bool()),
+                    vname.clone(),
+                    FPConst::NInf(eb.clone(), sb.clone()),
+                    FPConst::NZero(eb.clone(), sb.clone()),
+                ),
+                bav_fp_eq(
+                    vng.get_name(Sort::Bool()),
+                    vname.clone(),
+                    FPConst::NZero(eb.clone(), sb.clone()),
+                ),
+                bav_fp_eq(
+                    vng.get_name(Sort::Bool()),
+                    vname.clone(),
+                    FPConst::PZero(eb.clone(), sb.clone()),
+                ),
+                bav_fp_between(
+                    vng.get_name(Sort::Bool()),
+                    vname.clone(),
+                    FPConst::PZero(eb.clone(), sb.clone()),
+                    FPConst::PInf(eb.clone(), sb.clone()),
+                ),
+                bav_fp_eq(
+                    vng.get_name(Sort::Bool()),
+                    vname.clone(),
+                    FPConst::PInf(eb.clone(), sb.clone()),
+                ),
+                bav_fp_eq(
+                    vng.get_name(Sort::Bool()),
+                    vname.clone(),
+                    FPConst::Nan(eb.clone(), sb.clone()),
+                ),
+            ],
+            _ => panic!("Unreachable brangch"),
+        });
+
+    let cmds = many_assert(&mut baveq);
+    (vng.vars_generated, cmds)
 }
 
 fn many_assert(iter: &mut dyn Iterator<Item = SExp>) -> Vec<CommandRc> {
@@ -179,40 +249,40 @@ fn get_bav_assign(bavns: &Vec<String>, ta: BitVec) -> Command {
     assert_many(&mut baveq)
 }
 
-fn eq_emptystr(name: String) -> SExp {
+fn bav_eq_emptystr(bavname: String, strmonitorname: String) -> SExp {
     SExp::BExp(
         rccell!(BoolOp::Equals()),
         vec![
             rccell!(SExp::BExp(
                 rccell!(BoolOp::Equals()),
                 vec![
-                    rccell!(SExp::Symbol(rccell!(Symbol::Token(name)))),
+                    rccell!(SExp::Symbol(rccell!(Symbol::Token(strmonitorname)))),
                     rccell!(SExp::Constant(rccell!(Constant::Dec("\"\"".to_owned()))))
                 ]
             )),
-            rccell!(SExp::Symbol(rccell!(Symbol::Token("{}".to_owned())))),
+            rccell!(SExp::Symbol(rccell!(Symbol::Token(bavname)))),
         ],
     )
 }
 
-fn rel_0(name: String, relative: BoolOp) -> SExp {
+fn bav_rel_0(bav_name: String, num_monitor_name: String, relative: BoolOp) -> SExp {
     SExp::BExp(
         rccell!(BoolOp::Equals()),
         vec![
             rccell!(SExp::BExp(
                 rccell!(relative),
                 vec![
-                    rccell!(SExp::Symbol(rccell!(Symbol::Token(name)))),
+                    rccell!(SExp::Symbol(rccell!(Symbol::Token(num_monitor_name)))),
                     rccell!(SExp::Constant(rccell!(Constant::Dec("0".to_owned()))))
                 ]
             )),
-            rccell!(SExp::Symbol(rccell!(Symbol::Token("{}".to_owned())))),
+            rccell!(SExp::Symbol(rccell!(Symbol::Token(bav_name)))),
         ],
     )
 }
 
-fn fp_eq(name: String, other: FPConst) -> SExp {
-    let var = rccell!(Symbol::Token(name));
+fn bav_fp_eq(bav_name: String, fp_monitor_name: String, other: FPConst) -> SExp {
+    let var = rccell!(Symbol::Token(fp_monitor_name));
     SExp::BExp(
         rccell!(BoolOp::Equals()),
         vec![
@@ -223,13 +293,13 @@ fn fp_eq(name: String, other: FPConst) -> SExp {
                     rccell!(SExp::Constant(rccell!(Constant::Fp(other))))
                 ]
             )),
-            rccell!(SExp::Symbol(rccell!(Symbol::Token("{}".to_owned())))),
+            rccell!(SExp::Symbol(rccell!(Symbol::Token(bav_name)))),
         ],
     )
 }
 
-fn fp_between(name: String, low: FPConst, high: FPConst) -> SExp {
-    let var = rccell!(Symbol::Token(name));
+fn bav_fp_between(bav_name: String, fp_monitor_name: String, low: FPConst, high: FPConst) -> SExp {
+    let var = rccell!(Symbol::Token(fp_monitor_name));
     SExp::BExp(
         rccell!(BoolOp::Equals()),
         vec![
@@ -252,7 +322,7 @@ fn fp_between(name: String, low: FPConst, high: FPConst) -> SExp {
                     ))
                 ]
             )),
-            rccell!(SExp::Symbol(rccell!(Symbol::Token("{}".to_owned())))),
+            rccell!(SExp::Symbol(rccell!(Symbol::Token(bav_name)))),
         ],
     )
 }
@@ -267,29 +337,6 @@ pub fn get_bav_assign_fmt_str(bavns: &Vec<(String, Sort)>) -> Vec<CommandRc> {
                 rccell!(SExp::Symbol(rccell!(Symbol::Token("{}".to_owned())))),
             ],
         )],
-        Sort::Dec() => vec![
-            rel_0(vname.clone(), BoolOp::Equals()),
-            rel_0(vname.clone(), BoolOp::Lt()),
-            rel_0(vname.clone(), BoolOp::Gt()),
-        ],
-        Sort::Str() => vec![eq_emptystr(vname.clone())],
-        Sort::Fp(eb, sb) => vec![
-            fp_eq(vname.clone(), FPConst::NInf(eb.clone(), sb.clone())),
-            fp_between(
-                vname.clone(),
-                FPConst::NInf(eb.clone(), sb.clone()),
-                FPConst::NZero(eb.clone(), sb.clone()),
-            ),
-            fp_eq(vname.clone(), FPConst::NZero(eb.clone(), sb.clone())),
-            fp_eq(vname.clone(), FPConst::PZero(eb.clone(), sb.clone())),
-            fp_between(
-                vname.clone(),
-                FPConst::PZero(eb.clone(), sb.clone()),
-                FPConst::PInf(eb.clone(), sb.clone()),
-            ),
-            fp_eq(vname.clone(), FPConst::PInf(eb.clone(), sb.clone())),
-            fp_eq(vname.clone(), FPConst::Nan(eb.clone(), sb.clone())),
-        ],
         _ => panic!("Unreachable brangch"),
     });
 
@@ -331,13 +378,19 @@ pub fn ba_script(script: &mut Script, md: &mut Metadata) -> io::Result<Script> {
         .into_iter()
         .filter(|(name, sort)| !name.contains("REPL"))
         .collect();
-    md.bavns.append(&mut bavns);
+
+    let (mut bdomvs, mut bdomcmds) = get_boolean_domain_monitors(bavns);
+
+    md.bavns.append(&mut bdomvs.clone());
+    let mut bdom_inits = get_var_inits(bdomvs);
 
     let mut decls = grab_all_decls(script);
     let mut vs = get_var_inits(vng.vars_generated);
     decls.append(&mut vs);
+    decls.append(&mut bdom_inits);
     let mut ba = get_boolean_abstraction(bavs);
     decls.append(&mut ba);
+    decls.append(&mut bdomcmds);
     decls.push(rccell!(Command::CheckSat()));
     let mut ba_script = Script::Commands(decls);
     add_get_model(&mut ba_script);
@@ -975,8 +1028,9 @@ mod tests {
 
     #[test]
     fn fp_eq_snap() {
-        let s = fp_eq(
-            "VAR".to_owned(),
+        let s = bav_fp_eq(
+            "BDOM".to_owned(),
+            "MVAR".to_owned(),
             FPConst::PZero("11".to_owned(), "53".to_owned()),
         );
 
@@ -985,8 +1039,9 @@ mod tests {
 
     #[test]
     fn fp_between_snap() {
-        let s = fp_between(
-            "VAR".to_owned(),
+        let s = bav_fp_between(
+            "BDOM".to_owned(),
+            "MVAR".to_owned(),
             FPConst::PZero("11".to_owned(), "53".to_owned()),
             FPConst::PInf("11".to_owned(), "53".to_owned()),
         );
@@ -1178,16 +1233,26 @@ mod tests {
     }
 
     #[test]
-    fn bav_fmt_str() {
-        assert_display_snapshot!(Script::Commands(get_bav_assign_fmt_str(&vec![
+    fn domain_monitors_snap() {
+        let r = get_boolean_domain_monitors(vec![
             ("BAV1".to_owned(), Sort::Bool()),
-            ("BAV2".to_owned(), Sort::Dec()),
-            ("BAV3".to_owned(), Sort::Str()),
+            ("BAV3".to_owned(), Sort::Dec()),
+            ("BAV4".to_owned(), Sort::Str()),
             (
-                "BAV4".to_owned(),
-                Sort::Fp("11".to_owned(), "53".to_owned())
+                "BAV5".to_owned(),
+                Sort::Fp("11".to_owned(), "53".to_owned()),
             ),
-        ])));
+        ]);
+
+        assert_display_snapshot!(Script::Commands(r.1));
+    }
+
+    #[test]
+    fn bav_fmt_str() {
+        assert_display_snapshot!(Script::Commands(get_bav_assign_fmt_str(&vec![(
+            "BDOM1".to_owned(),
+            Sort::Bool()
+        ),])));
     }
 
     #[test]
