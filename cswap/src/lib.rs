@@ -58,7 +58,7 @@ use std::hash::{Hasher};
 
 type InputPPQ = Arc<SegQueue<Result<PathBuf, PoisonPill>>>;
 type SkeletonQueue = Arc<SegQueue<(PathBuf, PathBuf)>>;
-type BavAssingedQ = Arc<ArrayQueue<(PathBuf, PathBuf)>>;
+type BavAssingedQ = Arc<ArrayQueue<(Vec<(String, bool)>, (PathBuf, PathBuf))>>;
 type StageCompleteA = Arc<StageComplete>;
 
 fn launch(qs: (InputPPQ, SkeletonQueue), worker_counts: (u8, u8, u8), cfg: Config) {
@@ -275,13 +275,15 @@ fn bav_assign_worker(
                         .bavns
                         .iter()
                         .zip(mask.iter())
-                        .filter_map(|((name, sort), mbit)| if mbit { Some(name) } else { None })
+                        .filter_map(
+                            |((name, sort), mbit)| if mbit { Some(name.to_owned()) } else { None },
+                        )
                         .zip(tv.iter())
-                        .collect::<Vec<(&String, bool)>>();
+                        .collect::<Vec<(String, bool)>>();
 
                     i = i + 1;
                     let mut to_push = match sba.do_iteration_tv(i, tv, mask) {
-                        Ok(v) => v,
+                        Ok(v) => (ef, v),
                         Err(e) => {
                             warn!("Iteration error {}", e);
                             continue;
@@ -305,7 +307,7 @@ fn solver_worker(qin: BavAssingedQ, prev_stage: StageCompleteA, cfg: Config) {
     let mut backoff = MyBackoff::new();
 
     while !prev_stage.is_complete() || qin.len() > 0 {
-        let filepaths = match qin.pop() {
+        let (enforcemt, filepaths) = match qin.pop() {
             Ok(item) => item,
             Err(_) => {
                 backoff.snooze();
@@ -313,7 +315,7 @@ fn solver_worker(qin: BavAssingedQ, prev_stage: StageCompleteA, cfg: Config) {
             }
         };
         trace!("Solving {:?}", filepaths.0);
-        solver_fn(filepaths.clone(), &cfg);
+        solver_fn(filepaths.clone(), enforcemt, &cfg);
         trace!("Done solving {:?}", filepaths.0);
     }
 }

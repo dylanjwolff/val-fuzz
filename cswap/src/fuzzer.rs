@@ -53,7 +53,7 @@ pub fn exec_single_thread(dirname: &str, cfg: Config) {
             .and_then(|skel| single_thread_group_bav_assign(skel, &cfg))
             .map(|iters| {
                 for iter in iters.into_iter() {
-                    solver_fn(iter, &cfg);
+                    solver_fn(iter, vec![], &cfg);
                 }
             }) {
             Err(e) => warn!("{} in file {:?}", e, f),
@@ -245,19 +245,18 @@ lazy_static! {
             .collect();
 }
 
-pub fn solver_fn(filepaths: (PathBuf, PathBuf), cfg: &Config) {
+pub fn solver_fn(filepaths: (PathBuf, PathBuf), enforcement: Vec<(String, bool)>, cfg: &Config) {
     let results = profiles_solve(
         filepaths.0.to_str().unwrap_or("defaultname"),
         &simple_profile,
     );
 
-    results
-        .iter()
-        .filter(|r| r.has_sat())
-        .for_each(|r| match resub_model(r, &filepaths, &cfg) {
+    results.iter().filter(|r| r.has_sat()).for_each(|r| {
+        match resub_model(r, &filepaths, &enforcement, &cfg) {
             Ok(()) => (),
             Err(e) => warn!("Resub error {} for file {:?}", e, filepaths.0),
-        });
+        }
+    });
 
     if !report_any_bugs(filepaths.0.as_path(), &results, &cfg.file_provider) {
         if cfg.remove_files {
@@ -266,7 +265,12 @@ pub fn solver_fn(filepaths: (PathBuf, PathBuf), cfg: &Config) {
     }
 }
 
-fn resub_model(result: &RSolve, filepaths: &(PathBuf, PathBuf), cfg: &Config) -> io::Result<()> {
+fn resub_model(
+    result: &RSolve,
+    filepaths: &(PathBuf, PathBuf),
+    enforcemt: &Vec<(String, bool)>,
+    cfg: &Config,
+) -> io::Result<()> {
     trace!(
         "RESUB! for file {:?}",
         filepaths
@@ -297,6 +301,28 @@ fn resub_model(result: &RSolve, filepaths: &(PathBuf, PathBuf), cfg: &Config) ->
 
         let results = profiles_solve(resubbed_f.to_str().unwrap_or("defaultname"), &cfg.profiles);
 
+        let (enames, evals): (Vec<_>, Vec<_>) = enforcemt.iter().cloned().unzip();
+
+        // TODO pull this out into separate fn and clean up (no string comp)
+        results.iter().for_each(|result| {
+            result
+                .extract_const_var_vals(&enames)
+                .into_iter()
+                .map(|(sym, sexp)| (sym.to_string(), sexp.to_string()))
+                .for_each(|(name, strval)| {
+                    enforcemt
+                        .iter()
+                        .find(|(ename, eval)| *ename == name)
+                        .map(|(ename, eval)| {
+                            if eval.to_string() == strval {
+                                println!("SUCESS ENFORCE {} == {}", ename, eval)
+                            } else {
+                                println!("FAIL ENFORCE {} == {} != {}", ename, eval, strval)
+                            }
+                        });
+                })
+        });
+
         if !report_any_bugs(&resubbed_f, &results, &cfg.file_provider) {
             if cfg.remove_files {
                 fs::remove_file(&resubbed_f).unwrap_or(());
@@ -322,6 +348,7 @@ pub fn strip_and_transform(
     let chf = fp.cholesfile(&mut md)?;
     fs::write(chf, script.to_string())?;
 
+    // if cfg.include og create another file and add it to the metadata NOT replace below
     let ba_script = ba_script(&mut script, &mut md)?;
 
     return Ok((ba_script, md));
