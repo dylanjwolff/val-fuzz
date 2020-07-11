@@ -382,13 +382,18 @@ pub fn ba_script(script: &mut Script, md: &mut Metadata) -> io::Result<Script> {
     let (mut bdomvs, mut bdomcmds) = get_boolean_domain_monitors(bavns);
 
     md.bavns.append(&mut bdomvs.clone());
-    let mut bdom_inits = get_var_inits(bdomvs);
 
     let mut decls = grab_all_decls(script);
-    let mut vs = get_var_inits(vng.vars_generated);
+
+    let mut bdom_inits = init_vars(script, bdomvs);
+    let mut vs = init_vars(script, vng.vars_generated);
     decls.append(&mut vs);
     decls.append(&mut bdom_inits);
     let mut ba = get_boolean_abstraction(bavs);
+    script.insert_all(end_insert_pt(script), &ba);
+    script.insert_all(end_insert_pt(script), &bdomcmds);
+    add_get_model(script);
+
     decls.append(&mut ba);
     decls.append(&mut bdomcmds);
     decls.push(rccell!(Command::CheckSat()));
@@ -1081,6 +1086,15 @@ mod tests {
             .to_string();
 
         assert!(ba_str.contains("declare-const QUAL") || ba_str.contains("declare-fun QUAL"));
+    }
+
+    #[test]
+    fn ba_script_skel_w_og_snap() {
+        let str_script =
+            "(declare-const x Int)(declare-const y Int)(assert (or (and (> x (+ y 3)) (< y 7)) (= y x)))(assert (distinct y x))";
+        let mut p = script(str_script).unwrap().1;
+        ba_script(&mut p, &mut Metadata::new_empty()).unwrap();
+        assert_display_snapshot!(p);
     }
 
     #[test]

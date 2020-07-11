@@ -218,6 +218,21 @@ impl Script {
         }
     }
 
+    pub fn insert_all(&mut self, i: usize, new_cmds: &Vec<CommandRc>) {
+        let Script::Commands(cmds) = self;
+        if i > cmds.len() {
+            for cmd in new_cmds {
+                cmds.push(Rc::clone(cmd));
+            }
+        } else {
+            let mut after = cmds.split_off(i);
+            for cmd in new_cmds {
+                cmds.push(Rc::clone(cmd));
+            }
+            cmds.append(&mut after);
+        }
+    }
+
     pub fn split(mut me: Self, i: usize) -> (Script, Script) {
         let Script::Commands(cmds) = &mut me;
         if i > cmds.len() {
