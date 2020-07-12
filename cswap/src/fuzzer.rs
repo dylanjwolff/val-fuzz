@@ -318,27 +318,37 @@ fn resub_model(
     Ok(())
 }
 
+/// Exit on first success, only report if no successes and at least one failure
 fn log_check_enforce(results: &Vec<RSolve>, enforcemt: &Vec<(String, bool)>) {
     let (enames, evals): (Vec<_>, Vec<_>) = enforcemt.iter().cloned().unzip();
 
     // TODO clean up (no string comp)
-    results.iter().for_each(|result| {
-        result
-            .extract_const_var_vals(&enames)
-            .into_iter()
-            .map(|(sym, sexp)| (sym.to_string(), sexp.to_string()))
-            .for_each(|(name, strval)| {
-                enforcemt
-                    .iter()
-                    .find(|(ename, eval)| *ename == name)
-                    .map(|(ename, eval)| {
-                        if eval.to_string() == strval {
-                            trace!("SUCESS ENFORCE {} == {}", ename, eval)
-                        } else {
-                            trace!("FAIL ENFORCE {} == {} != {}", ename, eval, strval)
-                        }
-                    });
-            })
+
+    let strress = results
+        .iter()
+        .flat_map(|result| {
+            result
+                .extract_const_var_vals(&enames)
+                .into_iter()
+                .map(|(sym, sexp)| (sym.to_string(), sexp.to_string()))
+        })
+        .collect::<Vec<(String, String)>>();
+    println!("stress {:?}", strress);
+
+    enforcemt.iter().for_each(|(ename, eval)| {
+        let mut filtered = strress
+            .iter()
+            .filter(|(name, strval)| *name == *ename)
+            .collect::<Vec<&(String, String)>>();
+        if filtered.len() > 0 {
+            match filtered
+                .iter()
+                .find(|(_, strval)| eval.to_string() == *strval)
+            {
+                Some(_) => trace!("SUCCESS ENFORCING {} to be {}", ename, eval),
+                None => trace!("FAILURE ENFORCING {} to be {}", ename, eval),
+            }
+        }
     });
 }
 
