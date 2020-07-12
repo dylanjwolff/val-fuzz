@@ -85,6 +85,17 @@ impl FileProvider {
         }
     }
 
+    pub fn og_w_monitors<'a>(&self, md: &'a mut Metadata) -> io::Result<PathBuf> {
+        let tfile = Builder::new()
+            .prefix("ogwms_")
+            .rand_bytes(0)
+            .suffix(&md.seed_file)
+            .tempfile_in(&self.skeldir)?;
+        let (_, pb) = liftio!(tfile.keep())?;
+        md.og_w_monitors_skel_file = Some(name(&pb));
+        Ok(pb)
+    }
+
     pub fn cholesfile<'a>(&self, md: &'a mut Metadata) -> io::Result<PathBuf> {
         let tfile = Builder::new()
             .prefix("choles_")
@@ -184,6 +195,16 @@ impl FileProvider {
         Ok(f)
     }
 
+    pub fn serialize_og_w_m<'a, 'b>(
+        &self,
+        script: &'a Script,
+        md: &'b mut Metadata,
+    ) -> Result<PathBuf, io::Error> {
+        let f = self.og_w_monitors(md)?;
+        fs::write(&f, script.to_string())?;
+        Ok(f)
+    }
+
     pub fn serialize_md<'a>(&self, md: &'a mut Metadata) -> Result<PathBuf, io::Error> {
         let f = self.mdfile(md)?;
         let mdstr = serde_lexpr::to_string(&md)?;
@@ -225,6 +246,7 @@ pub struct Metadata {
     pub constvns: Vec<String>,
     pub seed_file: String,
     pub skeleton_file: String,
+    pub og_w_monitors_skel_file: Option<String>,
     pub choles_file: String,
     pub metadata_file: String,
 }
@@ -244,6 +266,7 @@ impl Metadata {
             skeleton_file: "".to_owned(),
             choles_file: "".to_owned(),
             metadata_file: "".to_owned(),
+            og_w_monitors_skel_file: None,
         }
     }
     pub fn new(seed: &Path) -> Self {
@@ -254,6 +277,7 @@ impl Metadata {
             choles_file: "".to_owned(),
             skeleton_file: "".to_owned(),
             metadata_file: "".to_owned(),
+            og_w_monitors_skel_file: None,
         }
     }
 
@@ -277,5 +301,16 @@ impl Metadata {
         let mut p = fp.cholesdir.clone();
         p.push(&self.choles_file);
         p
+    }
+
+    pub fn ogwms_path(&self, fp: &FileProvider) -> Option<PathBuf> {
+        match &self.og_w_monitors_skel_file {
+            Some(file) => {
+                let mut p = fp.skeldir.clone();
+                p.push(file);
+                Some(p)
+            }
+            _ => None,
+        }
     }
 }
