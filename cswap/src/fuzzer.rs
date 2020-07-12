@@ -333,7 +333,6 @@ fn log_check_enforce(results: &Vec<RSolve>, enforcemt: &Vec<(String, bool)>) {
                 .map(|(sym, sexp)| (sym.to_string(), sexp.to_string()))
         })
         .collect::<Vec<(String, String)>>();
-    println!("stress {:?}", strress);
 
     enforcemt.iter().for_each(|(ename, eval)| {
         let mut filtered = strress
