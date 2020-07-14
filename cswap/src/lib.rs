@@ -81,11 +81,11 @@ fn launch(qs: (InputPPQ, SkeletonQueue), worker_counts: (u8, u8, u8), cfg: Confi
             let t_q = Arc::clone(&qs.0);
             let t_q2 = Arc::clone(&qs.1);
             let t_s1 = Arc::clone(&stage0);
-            let t_fp = cfg.file_provider.clone();
+            let t_cfg = cfg.clone();
 
             thread::Builder::new()
                 .stack_size(cfg.stack_size)
-                .spawn(move || mutator_worker(t_q, t_q2, t_s1, t_fp))
+                .spawn(move || mutator_worker(t_q, t_q2, t_s1, t_cfg))
         })
         .collect::<Vec<std::io::Result<JoinHandle<()>>>>();
 
@@ -213,12 +213,7 @@ pub fn exec(dirname: &str, worker_counts: (u8, u8, u8), cfg: Config) {
 }
 
 pub struct PoisonPill {}
-fn mutator_worker(
-    qin: InputPPQ,
-    qout: SkeletonQueue,
-    stage: StageCompleteA,
-    file_provider: FileProvider,
-) {
+fn mutator_worker(qin: InputPPQ, qout: SkeletonQueue, stage: StageCompleteA, cfg: Config) {
     let mut backoff = MyBackoff::new();
     let mut stage_finished = false;
     while !stage_finished {
@@ -236,7 +231,7 @@ fn mutator_worker(
         };
 
         backoff.reset();
-        match mutator(filepath.clone(), &file_provider) {
+        match mutator(filepath.clone(), &cfg) {
             Ok((skelf, mdf)) => qout.push((skelf, mdf)),
             Err(e) => warn!("Mutator error: {} in files {:?}", e, filepath),
         };

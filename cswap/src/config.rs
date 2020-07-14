@@ -26,6 +26,7 @@ pub struct Config {
     pub stack_size: usize,
     pub profiles: HashSet<ProfileIndex>,
     pub mask_size: usize,
+    pub monitors_in_final: bool,
 }
 
 #[macro_export]

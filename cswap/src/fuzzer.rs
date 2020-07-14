@@ -49,7 +49,7 @@ pub fn exec_single_thread(dirname: &str, cfg: Config) {
     }
 
     for f in q.into_iter() {
-        match mutator(f.clone(), &cfg.file_provider)
+        match mutator(f.clone(), &cfg)
             .and_then(|skel| single_thread_group_bav_assign(skel, &cfg))
             .map(|iters| {
                 for iter in iters.into_iter() {
@@ -62,9 +62,9 @@ pub fn exec_single_thread(dirname: &str, cfg: Config) {
     }
 }
 
-pub fn mutator(filepath: PathBuf, file_provider: &FileProvider) -> io::Result<(PathBuf, PathBuf)> {
-    let (script, mut md) = strip_and_transform(&filepath, &file_provider)?;
-    let (skelf, mdf) = file_provider.serialize_skel_and_md(&script, &mut md)?;
+pub fn mutator(filepath: PathBuf, cfg: &Config) -> io::Result<(PathBuf, PathBuf)> {
+    let (script, mut md) = strip_and_transform(&filepath, cfg)?;
+    let (skelf, mdf) = cfg.file_provider.serialize_skel_and_md(&script, &mut md)?;
     Ok((skelf.to_path_buf(), mdf.to_path_buf()))
 }
 
@@ -362,10 +362,7 @@ fn log_check_enforce(results: &Vec<RSolve>, enforcemt: &Vec<(String, bool)>) {
     });
 }
 
-pub fn strip_and_transform(
-    source_file: &Path,
-    fp: &FileProvider,
-) -> io::Result<(Script, Metadata)> {
+pub fn strip_and_transform(source_file: &Path, cfg: &Config) -> io::Result<(Script, Metadata)> {
     let mut script = script_from_f(source_file)?;
 
     if script.is_unsupported_logic() {
@@ -375,11 +372,13 @@ pub fn strip_and_transform(
     let mut md = Metadata::new(source_file);
 
     replace_constants_with_fresh_vars(&mut script, &mut md);
-    let chf = fp.cholesfile(&mut md)?;
+    let chf = cfg.file_provider.cholesfile(&mut md)?;
     fs::write(chf, script.to_string())?;
 
     let ba_script = ba_script(&mut script, &mut md)?;
-    fp.serialize_og_w_m(&script, &mut md)?;
+    if cfg.monitors_in_final {
+        cfg.file_provider.serialize_og_w_m(&script, &mut md)?;
+    }
 
     return Ok((ba_script, md));
 }
@@ -443,6 +442,7 @@ mod test {
             stack_size: 1,
             profiles: HashSet::new(),
             mask_size: 1,
+            monitors_in_final: false,
         };
 
         let mut sba = StatefulBavAssign {
