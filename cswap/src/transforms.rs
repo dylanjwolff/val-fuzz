@@ -1,11 +1,10 @@
-use crate::ast::{BoolOp, Command, Constant, FPConst, Logic, SExp, Script, Sort, Symbol};
+use crate::ast::{BoolOp, Command, Constant, FPConst, SExp, Script, Sort, Symbol};
 use crate::ast::{CommandRc, SExpRc, SortRc, SymbolRc};
 
 use crate::liftio;
 use crate::solver::check_valid_solve_as_temp;
 use crate::Metadata;
 use crate::Timer;
-use bit_vec::BitVec;
 use log::warn;
 use std::cell::RefCell;
 use std::collections::BTreeMap;
@@ -47,14 +46,6 @@ impl VarNameGenerator {
     }
 }
 
-fn set_logic_all(script: &mut Script) {
-    let Script::Commands(cmds) = script;
-    let _maybe_log_pos = cmds
-        .iter()
-        .find(|cmd| cmd.borrow().is_logic())
-        .map(|cmd| cmd.replace(Command::Logic(rccell!(Logic::Other("ALL".to_owned())))));
-}
-
 fn init_vars(script: &mut Script, vars: Vec<(String, Sort)>) -> Vec<CommandRc> {
     let Script::Commands(cmds) = script;
     if cmds.len() == 0 {
@@ -81,21 +72,6 @@ fn get_var_inits(vars: Vec<(String, Sort)>) -> Vec<CommandRc> {
         .map(|(vname, sort)| Command::DeclConst(vname, rccell!(sort)))
         .map(|cmd| rccell!(cmd))
         .collect::<Vec<CommandRc>>()
-}
-
-fn add_ba(script: &mut Script, bavs: Vec<(String, SExp, VarBindings)>) {
-    let Script::Commands(cmds) = script;
-
-    let maybe_cs_pos = cmds.iter().position(|cmd| cmd.borrow().is_checksat());
-
-    let cs_pos = match maybe_cs_pos {
-        Some(pos) => pos,
-        None => cmds.len(),
-    };
-
-    let mut end = cmds.split_off(cs_pos);
-    cmds.append(&mut get_boolean_abstraction(bavs));
-    cmds.append(&mut end);
 }
 
 // Get sub-exp monitors
@@ -192,19 +168,6 @@ fn many_assert(iter: &mut dyn Iterator<Item = SExp>) -> Vec<CommandRc> {
         .collect()
 }
 
-fn assert_many(iter: &mut dyn Iterator<Item = SExp>) -> Command {
-    let init = match iter.next() {
-        Some(bav_eq) => bav_eq,
-        _ => SExp::true_sexp(), // shouldn't ever actually be added
-    };
-
-    let intersection = iter.fold(init, |acc, curr| {
-        SExp::BExp(rccell!(BoolOp::And()), vec![rccell!(acc), rccell!(curr)])
-    });
-
-    return Command::Assert(rccell!(intersection));
-}
-
 pub fn end_insert_pt(script: &Script) -> usize {
     let Script::Commands(cmds) = script;
 
@@ -227,26 +190,6 @@ pub fn checksat_positions(script: &Script) -> Vec<usize> {
     }
 
     checksats
-}
-
-fn get_bav_assign(bavns: &Vec<String>, ta: BitVec) -> Command {
-    let bavs = bavns.into_iter().zip(ta.into_iter());
-    let mut baveq = bavs.into_iter().map(|(vname, bval)| {
-        let val = if bval {
-            SExp::true_sexp()
-        } else {
-            SExp::false_sexp()
-        };
-        SExp::BExp(
-            rccell!(BoolOp::Equals()),
-            vec![
-                rccell!(SExp::Symbol(rccell!(Symbol::Token(vname.clone())))),
-                rccell!(val),
-            ],
-        )
-    });
-
-    assert_many(&mut baveq)
 }
 
 fn bav_eq_emptystr(bavname: String, strmonitorname: String) -> SExp {
@@ -575,7 +518,7 @@ fn rv_se(sexp: &mut SExp, to_replace: &Vec<(String, SExp)>) {
         SExp::QExists(_, rest) => rv_se(&mut *rest.borrow_mut(), to_replace),
         SExp::Symbol(sym) => {
             let name = match &*sym.borrow() {
-                Symbol::Token(n) | Symbol::Token(n) => n,
+                Symbol::Token(n) => n,
             }
             .clone();
             for (to_be_rep, val) in to_replace {
@@ -591,22 +534,22 @@ fn rv_se(sexp: &mut SExp, to_replace: &Vec<(String, SExp)>) {
 
 #[derive(Debug, Eq, PartialEq, Clone)]
 pub enum Rcse {
-    nb(Rc<RefCell<SExp>>),
-    b(Rc<RefCell<Box<SExp>>>),
+    NotBox(Rc<RefCell<SExp>>),
+    Box(Rc<RefCell<Box<SExp>>>),
 }
 
 impl Rcse {
     fn swap(&self, new_sexp: SExp) {
         match self {
-            Rcse::nb(sexp) => *sexp.borrow_mut() = new_sexp,
-            Rcse::b(bsexp) => **bsexp.borrow_mut() = new_sexp,
+            Rcse::NotBox(sexp) => *sexp.borrow_mut() = new_sexp,
+            Rcse::Box(bsexp) => **bsexp.borrow_mut() = new_sexp,
         }
     }
 
     fn clone_v(&self) -> SExp {
         match self {
-            Rcse::nb(sexp) => sexp.borrow_mut().clone(),
-            Rcse::b(bsexp) => (**bsexp.borrow_mut()).clone(),
+            Rcse::NotBox(sexp) => sexp.borrow_mut().clone(),
+            Rcse::Box(bsexp) => (**bsexp.borrow_mut()).clone(),
         }
     }
 }
@@ -713,7 +656,7 @@ pub fn choles(script: &mut Script) -> Vec<(Rcse, Sort)> {
 fn choles_c(cmd: &mut Command) -> Vec<(Rcse, Sort)> {
     match cmd {
         Command::Assert(sexp) | Command::CheckSatAssuming(sexp) => {
-            choles_rcse(&Rcse::nb(Rc::clone(&sexp)))
+            choles_rcse(&Rcse::NotBox(Rc::clone(&sexp)))
         }
         _ => vec![],
     }
@@ -732,26 +675,26 @@ fn choles_rcse(rcse: &Rcse) -> Vec<(Rcse, Sort)> {
         | SExp::StrExp(_, sexps) => {
             let mut v = vec![];
             for sexp in sexps {
-                v.extend(choles_rcse(&Rcse::nb(Rc::clone(sexp))));
+                v.extend(choles_rcse(&Rcse::NotBox(Rc::clone(sexp))));
             }
             v
         }
         SExp::Let(vbs, rest) => {
             let mut v = vec![];
             for (_, sexp) in vbs {
-                v.extend(choles_rcse(&Rcse::nb(Rc::clone(sexp))));
+                v.extend(choles_rcse(&Rcse::NotBox(Rc::clone(sexp))));
             }
-            v.extend(choles_rcse(&Rcse::b(Rc::clone(rest))));
+            v.extend(choles_rcse(&Rcse::Box(Rc::clone(rest))));
             v
         }
-        SExp::QForAll(_, rest) => choles_rcse(&Rcse::b(Rc::clone(rest))),
-        SExp::QExists(_, rest) => choles_rcse(&Rcse::b(Rc::clone(rest))),
+        SExp::QForAll(_, rest) => choles_rcse(&Rcse::Box(Rc::clone(rest))),
+        SExp::QExists(_, rest) => choles_rcse(&Rcse::Box(Rc::clone(rest))),
         SExp::Symbol(_) => vec![],
     };
 
     match rcse {
-        Rcse::nb(s) => inner(&*s.borrow()),
-        Rcse::b(bs) => inner(&**bs.borrow()),
+        Rcse::NotBox(s) => inner(&*s.borrow()),
+        Rcse::Box(bs) => inner(&**bs.borrow()),
     }
 }
 
@@ -1267,22 +1210,6 @@ mod tests {
             "BDOM1".to_owned(),
             Sort::Bool()
         ),])));
-    }
-
-    #[test]
-    fn bav_qual_snap() {
-        let str_script = "(assert (forall ((x Real)) (= x 4)))";
-        let mut p = script(str_script).unwrap().1;
-
-        let mut vng = VarNameGenerator::new("BAV");
-        let mut bavs = vec![];
-        bav(&mut p, &mut vng, &mut bavs);
-        add_ba(&mut p, bavs);
-
-        let Script::Commands(cmds) = p;
-
-        let assertion_cmd = cmds.last().unwrap();
-        assert_display_snapshot!(assertion_cmd.borrow())
     }
 
     #[test]

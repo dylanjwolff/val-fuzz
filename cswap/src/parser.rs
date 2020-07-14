@@ -52,12 +52,6 @@ macro_rules! brack_ws {
     };
 }
 
-macro_rules! ws_brack {
-    ($x:expr) => {
-        ws!(delimited(char('('), $x, char(')')))
-    };
-}
-
 macro_rules! ws_brack_ws {
     ($x:expr) => {
         ws!(delimited(char('('), ws!($x), char(')')))
@@ -598,20 +592,6 @@ pub fn z3o(s: &str) -> IResult<&str, Vec<ResultLine>> {
     })
 }
 
-fn iv_model_err(s: &str) -> IResult<&str, &str> {
-    brack!(preceded(
-        ws!(tag("error")),
-        delimited(
-            char('"'),
-            preceded(
-                take_until("invalid model was generated"),
-                tag("invalid model was generated")
-            ),
-            char('"')
-        )
-    ))(s)
-}
-
 fn av(s: &str) -> IResult<&str, &str> {
     delimited(
         ws!(tag("ASSERTION VIOLATION")),
@@ -648,12 +628,9 @@ pub fn script_from_f(filepath: &Path) -> io::Result<Script> {
 #[cfg(test)]
 mod tests {
     use super::*;
-    
-    
-    
+
     use insta::assert_debug_snapshot;
     use insta::assert_display_snapshot;
-    use std::fs;
 
     #[test]
     fn fp_op_inference_snap() {
@@ -744,13 +721,6 @@ mod tests {
                 Line: 631
                 validate_defs(\"check_sat\")
                 (C)ontinue, (A)bort, (S)top, (T)hrow exception, Invoke (G)DB"));
-    }
-
-    #[test]
-    fn iv_snap() {
-        assert_debug_snapshot!(iv_model_err(
-            "(error \"line 5 column 10: an invalid model was generated\")"
-        ));
     }
 
     #[test]
@@ -847,16 +817,6 @@ mod tests {
     #[test]
     fn func_noargs_snap() {
         assert_debug_snapshot!(define_func("(define-fun foo () Int 7)"));
-    }
-
-    fn parse_file(f: &str) -> Script {
-        let contents = &fs::read_to_string(f).expect("error reading file")[..];
-        let contents_sans_comments = &rmv_comments(contents)
-            .expect("failed to rmv comments")
-            .1
-            .join(" ")[..];
-
-        script(contents_sans_comments).expect("parser error").1
     }
 
     #[test]

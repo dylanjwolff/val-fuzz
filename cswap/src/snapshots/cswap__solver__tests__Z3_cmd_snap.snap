@@ -1,12 +1,11 @@
 ---
 source: cswap/src/solver.rs
-expression: "Z3_Command_Builder::new().timeout(Duration::from_secs(3)).ematching(false).flat_rw(false).threads3().z3str3().cmd"
+expression: "Z3_Command_Builder::new().timeout(Duration::from_secs(3)).ematching(false).flat_rw(false).z3str3().cmd"
 ---
 [
     "z3",
     "model_validate=true",
     "smt.ematching=false",
     "rewriter.flat=false",
-    "smt.threads=3",
     "smt.string_solver=z3str3",
 ]

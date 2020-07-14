@@ -4,8 +4,7 @@ use std::fs;
 use std::path::Path;
 use std::rc::Rc;
 
-#[macro_use]
-use serde::{Serialize, Deserialize};
+use serde::{Deserialize, Serialize};
 
 pub type ScriptRc = Rc<RefCell<Script>>;
 pub type CommandRc = Rc<RefCell<Command>>;
@@ -579,7 +578,7 @@ impl fmt::Display for SExp {
 impl fmt::Display for Symbol {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         match self {
-            Symbol::Token(s) | Symbol::Token(s) => write!(f, "{}", s),
+            Symbol::Token(s) => write!(f, "{}", s),
         }
     }
 }

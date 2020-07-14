@@ -5,8 +5,6 @@ use std::fmt;
 use std::io::Write;
 use std::path::Path;
 
-
-
 use std::time::Duration;
 
 use tempfile::Builder;
@@ -22,8 +20,6 @@ pub enum SolveResult {
     Unknown,
     Timeout,
 }
-
-const TO: &str = "timeout: sending signal TERM";
 
 const SF: &str = "segfault";
 const SF_L: &str = "segmentation fault";
@@ -135,6 +131,7 @@ impl ProfileIndex {
 }
 
 #[derive(Debug, Eq, PartialEq, Clone)]
+#[allow(non_camel_case_types)]
 pub struct CVC4_Command_Builder {
     cmd: Vec<String>,
     to: Duration,
@@ -208,6 +205,7 @@ impl CVC4_Command_Builder {
 }
 
 #[derive(Debug, Eq, PartialEq, Clone)]
+#[allow(non_camel_case_types)]
 pub struct Z3_Command_Builder {
     cmd: Vec<String>,
     to: Duration,
@@ -254,11 +252,6 @@ impl Z3_Command_Builder {
 
     fn z3str3(&mut self) -> Self {
         self.cmd.push("smt.string_solver=z3str3".to_owned());
-        self.clone()
-    }
-
-    fn threads3(&mut self) -> Self {
-        self.cmd.push("smt.threads=3".to_owned());
         self.clone()
     }
 
@@ -679,7 +672,6 @@ mod tests {
                 .timeout(Duration::from_secs(3))
                 .ematching(false)
                 .flat_rw(false)
-                .threads3()
                 .z3str3()
                 .cmd
         );

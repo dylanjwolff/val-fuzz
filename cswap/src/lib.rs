@@ -53,8 +53,6 @@ use std::thread;
 use std::thread::JoinHandle;
 
 use walkdir::WalkDir;
-#[macro_use]
-use std::hash::{Hasher};
 
 type InputPPQ = Arc<SegQueue<Result<PathBuf, PoisonPill>>>;
 type SkeletonQueue = Arc<SegQueue<(PathBuf, PathBuf)>>;

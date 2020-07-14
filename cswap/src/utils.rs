@@ -1,20 +1,15 @@
 use bit_vec::BitVec;
 use nom::branch::alt;
 use nom::bytes::complete::take_until;
-use nom::error::ErrorKind;
-use nom::error_position;
 use nom::multi::many1;
 use nom::{bytes::complete::tag, IResult};
 use rand::Rng;
 use rand_xoshiro::rand_core::SeedableRng;
 use rand_xoshiro::Xoshiro256Plus;
 
-
 use std::cmp::Ord;
 use std::collections::BTreeMap;
 use std::collections::BTreeSet;
-
-
 
 use std::sync::Mutex;
 use std::thread;
@@ -302,14 +297,6 @@ fn dynamic_format_parser<'a, 'b>(
         o.push(i.0); // if there are no more {}, push the rest of the str
         (("", i.1), o)
     })
-}
-
-fn eof_str<'a>(s: &'a str) -> IResult<&'a str, &'a str> {
-    if s.len() == 0 {
-        Ok(("", ""))
-    } else {
-        Err(nom::Err::Error(error_position!(s, ErrorKind::Eof)))
-    }
 }
 
 pub type DFormatParseError<'a> =
