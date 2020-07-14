@@ -271,7 +271,7 @@ fn bav_assign_worker(
                         .iter()
                         .zip(mask.iter())
                         .filter_map(
-                            |((name, sort), mbit)| if mbit { Some(name.to_owned()) } else { None },
+                            |((name, _sort), mbit)| if mbit { Some(name.to_owned()) } else { None },
                         )
                         .zip(tv.iter())
                         .collect::<Vec<(String, bool)>>();

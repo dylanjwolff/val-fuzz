@@ -5,8 +5,8 @@ use std::fmt;
 use std::io::Write;
 use std::path::Path;
 
-use std::process;
-use std::str::from_utf8;
+
+
 use std::time::Duration;
 
 use tempfile::Builder;
@@ -288,7 +288,7 @@ fn solve_intern(cmd: Vec<String>, solver: Solver) -> RSolve {
             pcss.kill().unwrap_or(()); // We tried to kill it already, can't take more action, so ignore
             return RSolve::timeout(solver);
         }
-        Ok(Some(ExitStatus::Exited(s))) => (), // exited
+        Ok(Some(ExitStatus::Exited(_s))) => (), // exited
         Ok(Some(ExitStatus::Signaled(s))) => {
             if s == SIGSEGV {
                 return RSolve::segv(solver);
@@ -303,7 +303,7 @@ fn solve_intern(cmd: Vec<String>, solver: Solver) -> RSolve {
         Ok((Some(o), _)) => RSolve::move_new(solver, o, "".to_owned()),
         Ok((_, Some(e))) => RSolve::move_new(solver, "".to_owned(), e),
         Ok((None, None)) => RSolve::move_new(solver, "".to_owned(), "".to_owned()),
-        Err(e) => RSolve::process_error(), // process error
+        Err(_e) => RSolve::process_error(), // process error
     }
 }
 

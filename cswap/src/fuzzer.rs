@@ -12,7 +12,7 @@ use crate::transforms::rv;
 use crate::utils::dyn_fmt;
 use crate::utils::to_strs;
 use crate::utils::DFormatParseError;
-use crate::utils::MyBackoff;
+
 use crate::utils::RandUniqPermGen;
 
 use std::fs::OpenOptions;
@@ -30,7 +30,7 @@ use bit_vec::BitVec;
 use log::debug;
 use log::trace;
 use log::warn;
-use rand::Rng;
+
 use std::fs;
 use std::io::Write;
 use std::path::Path;
@@ -194,12 +194,12 @@ fn single_thread_group_bav_assign(
     let mut i = 0;
 
     while let Some((tv, mask)) = sba.urng.sample_and_mask() {
-        let ef = sba
+        let _ef = sba
             .md
             .bavns
             .iter()
             .zip(mask.iter())
-            .filter_map(|((name, sort), mbit)| if mbit { Some(name) } else { None })
+            .filter_map(|((name, _sort), mbit)| if mbit { Some(name) } else { None })
             .zip(tv.iter())
             .collect::<Vec<(&String, bool)>>();
 
@@ -331,7 +331,7 @@ fn resub_model(
 
 /// Exit on first success, only report if no successes and at least one failure
 fn log_check_enforce(results: &Vec<RSolve>, enforcemt: &Vec<(String, bool)>) {
-    let (enames, evals): (Vec<_>, Vec<_>) = enforcemt.iter().cloned().unzip();
+    let (enames, _evals): (Vec<_>, Vec<_>) = enforcemt.iter().cloned().unzip();
 
     // TODO clean up (no string comp)
 
@@ -346,9 +346,9 @@ fn log_check_enforce(results: &Vec<RSolve>, enforcemt: &Vec<(String, bool)>) {
         .collect::<Vec<(String, String)>>();
 
     enforcemt.iter().for_each(|(ename, eval)| {
-        let mut filtered = strress
+        let filtered = strress
             .iter()
-            .filter(|(name, strval)| *name == *ename)
+            .filter(|(name, _strval)| *name == *ename)
             .collect::<Vec<&(String, String)>>();
         if filtered.len() > 0 {
             match filtered
@@ -388,9 +388,9 @@ mod test {
     use super::*;
     use crate::ast::Sort;
     use crate::parser::script;
-    use crate::parser::script_from_f_unsanitized;
+    
     use bit_vec::BitVec;
-    use insta::assert_debug_snapshot;
+    
     use insta::assert_display_snapshot;
     use std::collections::HashSet;
     use tempfile::TempDir;

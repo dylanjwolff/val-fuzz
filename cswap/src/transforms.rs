@@ -1,4 +1,4 @@
-use crate::ast::{AstNode, BoolOp, Command, Constant, FPConst, Logic, SExp, Script, Sort, Symbol};
+use crate::ast::{BoolOp, Command, Constant, FPConst, Logic, SExp, Script, Sort, Symbol};
 use crate::ast::{CommandRc, SExpRc, SortRc, SymbolRc};
 
 use crate::liftio;
@@ -9,9 +9,9 @@ use bit_vec::BitVec;
 use log::warn;
 use std::cell::RefCell;
 use std::collections::BTreeMap;
-use std::collections::HashMap;
+
 use std::io;
-use std::iter::once;
+
 use std::rc::Rc;
 use std::time::Duration;
 
@@ -372,14 +372,14 @@ pub fn ba_script(script: &mut Script, md: &mut Metadata) -> io::Result<Script> {
     let mut bavs = vec![];
     bav(script, &mut vng, &mut bavs)?;
 
-    let mut bavns = vng
+    let bavns = vng
         .vars_generated
         .clone()
         .into_iter()
-        .filter(|(name, sort)| !name.contains("REPL"))
+        .filter(|(name, _sort)| !name.contains("REPL"))
         .collect();
 
-    let (mut bdomvs, mut bdomcmds) = get_boolean_domain_monitors(bavns);
+    let (bdomvs, mut bdomcmds) = get_boolean_domain_monitors(bavns);
 
     md.bavns.append(&mut bdomvs.clone());
 
@@ -875,7 +875,7 @@ fn bav_se(
         SExp::BExp(bop, sexps) => {
             let sec = SExp::BExp(Rc::clone(bop), sexps.clone());
             let pre_uqvars = qvars.uqvars.clone();
-            let before_exploration_num_bavs = bavs.len();
+            let _before_exploration_num_bavs = bavs.len();
             for sexp in sexps {
                 bav_se(
                     false,
@@ -897,7 +897,7 @@ fn bav_se(
         SExp::FPExp(op, sort, sexps) => {
             let sec = SExp::FPExp(op.clone(), sort.clone(), sexps.clone());
             let pre_uqvars = qvars.uqvars.clone();
-            let before_exploration_num_bavs = bavs.len();
+            let _before_exploration_num_bavs = bavs.len();
             for sexp in sexps {
                 bav_se(
                     false,
@@ -921,7 +921,7 @@ fn bav_se(
         SExp::NExp(nop, sexps) => {
             let sec = SExp::NExp(nop.clone(), sexps.clone());
             let pre_uqvars = qvars.uqvars.clone();
-            let before_exploration_num_bavs = bavs.len();
+            let _before_exploration_num_bavs = bavs.len();
             for sexp in sexps {
                 bav_se(
                     false,
@@ -943,7 +943,7 @@ fn bav_se(
         SExp::StrExp(nop, sexps) => {
             let sec = SExp::StrExp(nop.clone(), sexps.clone());
             let pre_uqvars = qvars.uqvars.clone();
-            let before_exploration_num_bavs = bavs.len();
+            let _before_exploration_num_bavs = bavs.len();
             for sexp in sexps {
                 bav_se(
                     false,
@@ -1115,7 +1115,7 @@ mod tests {
     #[test]
     fn grab_all_decls_snap() {
         let str_script = "(define-sort myset () (Set (Set (_ BitVec 1))))(declare-const x Int)(assert (= 3 4))(check-sat)(declare-fun z () Bool)(declare-const y Real)";
-        let mut p = script(str_script).unwrap().1;
+        let p = script(str_script).unwrap().1;
         assert_display_snapshot!(Script::Commands(grab_all_decls(&p)));
     }
 
