@@ -1,19 +1,13 @@
 ---
 source: cswap/src/solver.rs
-expression: "Z3_Command_Builder::new().timeout(Duration::from_secs(3)).ematching(false).flat_rw(false).z3str3().run_on(Path::new(\"test/prp-13-24.smt2\"))"
+expression: "Z3_Command_Builder::new().timeout(Duration::from_secs(3)).ematching(false).flat_rw(false).run_on(Path::new(\"test/2548.smt2\"))"
 ---
 RSolve {
     was_timeout: false,
     was_segv: false,
-    stdout: "(error \"line 2 column 22: unknown parameter \'ite_simp\'\nLegal parameters are:\n  auto_config (bool) (default: true)\n  debug_ref_count (bool) (default: false)\n  dot_proof_file (string) (default: proof.dot)\n  dump_models (bool) (default: false)\n  memory_high_watermark (unsigned int) (default: 0)\n  memory_max_alloc_count (unsigned int) (default: 0)\n  memory_max_size (unsigned int) (default: 0)\n  model (bool) (default: true)\n  model_validate (bool) (default: false)\n  proof (bool) (default: false)\n  rlimit (unsigned int) (default: 0)\n  smtlib2_compliant (bool) (default: false)\n  stats (bool) (default: false)\n  timeout (unsigned int) (default: 4294967295)\n  trace (bool) (default: false)\n  trace_file_name (string) (default: z3.log)\n  type_check (bool) (default: true)\n  unsat_core (bool) (default: false)\n  verbose (unsigned int) (default: 0)\n  warning (bool) (default: true)\n  well_sorted_check (bool) (default: false)\")\n(error \"line 3 column 31: unknown parameter \'simp_ite_compress\'\nLegal parameters are:\n  auto_config (bool) (default: true)\n  debug_ref_count (bool) (default: false)\n  dot_proof_file (string) (default: proof.dot)\n  dump_models (bool) (default: false)\n  memory_high_watermark (unsigned int) (default: 0)\n  memory_max_alloc_count (unsigned int) (default: 0)\n  memory_max_size (unsigned int) (default: 0)\n  model (bool) (default: true)\n  model_validate (bool) (default: false)\n  proof (bool) (default: false)\n  rlimit (unsigned int) (default: 0)\n  smtlib2_compliant (bool) (default: false)\n  stats (bool) (default: false)\n  timeout (unsigned int) (default: 4294967295)\n  trace (bool) (default: false)\n  trace_file_name (string) (default: z3.log)\n  type_check (bool) (default: true)\n  unsat_core (bool) (default: false)\n  verbose (unsigned int) (default: 0)\n  warning (bool) (default: true)\n  well_sorted_check (bool) (default: false)\")\nunsat\n",
+    stdout: "unsat\n",
     stderr: "",
     lines: [
-        Error(
-            "line 2 column 22: unknown parameter \'ite_simp\'\nLegal parameters are:\n  auto_config (bool) (default: true)\n  debug_ref_count (bool) (default: false)\n  dot_proof_file (string) (default: proof.dot)\n  dump_models (bool) (default: false)\n  memory_high_watermark (unsigned int) (default: 0)\n  memory_max_alloc_count (unsigned int) (default: 0)\n  memory_max_size (unsigned int) (default: 0)\n  model (bool) (default: true)\n  model_validate (bool) (default: false)\n  proof (bool) (default: false)\n  rlimit (unsigned int) (default: 0)\n  smtlib2_compliant (bool) (default: false)\n  stats (bool) (default: false)\n  timeout (unsigned int) (default: 4294967295)\n  trace (bool) (default: false)\n  trace_file_name (string) (default: z3.log)\n  type_check (bool) (default: true)\n  unsat_core (bool) (default: false)\n  verbose (unsigned int) (default: 0)\n  warning (bool) (default: true)\n  well_sorted_check (bool) (default: false)",
-        ),
-        Error(
-            "line 3 column 31: unknown parameter \'simp_ite_compress\'\nLegal parameters are:\n  auto_config (bool) (default: true)\n  debug_ref_count (bool) (default: false)\n  dot_proof_file (string) (default: proof.dot)\n  dump_models (bool) (default: false)\n  memory_high_watermark (unsigned int) (default: 0)\n  memory_max_alloc_count (unsigned int) (default: 0)\n  memory_max_size (unsigned int) (default: 0)\n  model (bool) (default: true)\n  model_validate (bool) (default: false)\n  proof (bool) (default: false)\n  rlimit (unsigned int) (default: 0)\n  smtlib2_compliant (bool) (default: false)\n  stats (bool) (default: false)\n  timeout (unsigned int) (default: 4294967295)\n  trace (bool) (default: false)\n  trace_file_name (string) (default: z3.log)\n  type_check (bool) (default: true)\n  unsat_core (bool) (default: false)\n  verbose (unsigned int) (default: 0)\n  warning (bool) (default: true)\n  well_sorted_check (bool) (default: false)",
-        ),
         Unsat,
     ],
     solver: Z3(
@@ -23,7 +17,6 @@ RSolve {
                 "model_validate=true",
                 "smt.ematching=false",
                 "rewriter.flat=false",
-                "smt.string_solver=z3str3",
             ],
             to: 3s,
         },

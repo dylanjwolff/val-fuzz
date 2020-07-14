@@ -96,7 +96,18 @@ impl<'a> StatefulBavAssign<'a> {
                 fs::remove_file(&filepaths.0).unwrap_or(());
                 fs::remove_file(&filepaths.1).unwrap_or(());
             }
-            return liftio!(Err(format!("All error on file {:?}", filepaths.0)));
+
+            let mut stresults = results
+                .iter()
+                .map(|o| o.to_string())
+                .collect::<Vec<String>>()
+                .join("\n----------\n");
+
+            stresults = format!("============== \n{}\n =============", stresults);
+
+            let errmsg = format!("All error on file {:?}", filepaths.0);
+            warn!("{}\n{}", errmsg, stresults);
+            return liftio!(Err(errmsg));
         }
 
         let (top, bottom) = Self::split(script);

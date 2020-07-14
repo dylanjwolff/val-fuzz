@@ -343,7 +343,7 @@ impl fmt::Display for Solver {
 
 #[derive(Debug, Eq, PartialEq, Clone)]
 pub struct RSolve {
-    was_timeout: bool,
+    pub was_timeout: bool,
     was_segv: bool,
     stdout: String,
     stderr: String,
@@ -669,8 +669,7 @@ mod tests {
             .timeout(Duration::from_secs(3))
             .ematching(false)
             .flat_rw(false)
-            .z3str3()
-            .run_on(Path::new("test/prp-13-24.smt2")));
+            .run_on(Path::new("test/2548.smt2")));
     }
 
     #[test]
