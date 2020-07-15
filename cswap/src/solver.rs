@@ -666,7 +666,7 @@ mod tests {
     }
 
     #[test]
-    fn Z3_cmd_snap() {
+    fn z3_cmd_snap() {
         assert_debug_snapshot!(
             Z3_Command_Builder::new()
                 .timeout(Duration::from_secs(3))
@@ -678,7 +678,7 @@ mod tests {
     }
 
     #[test]
-    fn CVC4_cmd_snap() {
+    fn cvc4_cmd_snap() {
         assert_debug_snapshot!(
             CVC4_Command_Builder::new()
                 .timeout(Duration::from_secs(3))

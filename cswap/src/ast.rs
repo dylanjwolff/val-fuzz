@@ -204,6 +204,7 @@ pub enum AstNode {
 }
 
 impl Script {
+    #[allow(unused)]
     pub fn to_f(&mut self, filepath: &Path) {
         fs::write(filepath, self.to_string());
     }

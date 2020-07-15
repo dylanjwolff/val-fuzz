@@ -1222,7 +1222,7 @@ mod tests {
             rccell!(Box::new(SExp::Symbol(rccell!(v)))),
         );
         let timer = Timer::new_started(Duration::from_secs(100));
-        rl_s(&mut sexp, &mut BTreeMap::new(), &timer, 0);
+        rl_s(&mut sexp, &mut BTreeMap::new(), &timer, 0).unwrap();
         assert_eq!(sexp, expected);
     }
 }

@@ -403,7 +403,7 @@ mod tests {
             if new_results.iter().all(|r| r.has_unrecoverable_error()) {
                 println!("Bad parse {:?}", filepath);
             } else {
-                fs::remove_file(&new_file);
+                fs::remove_file(&new_file).unwrap();
             }
         }
     }

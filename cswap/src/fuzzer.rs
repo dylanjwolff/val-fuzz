@@ -250,7 +250,7 @@ fn deserialize_from_f(
 use crate::solver::ProfileIndex;
 use std::collections::HashSet;
 lazy_static! {
-    static ref simple_profile: HashSet<ProfileIndex> =
+    static ref SIMPLE_PROFILE: HashSet<ProfileIndex> =
         vec![ProfileIndex::Z3(0), ProfileIndex::CVC4(1)]
             .into_iter()
             .collect();
@@ -259,7 +259,7 @@ lazy_static! {
 pub fn solver_fn(filepaths: (PathBuf, PathBuf), enforcement: Vec<(String, bool)>, cfg: &Config) {
     let results = profiles_solve(
         filepaths.0.to_str().unwrap_or("defaultname"),
-        &simple_profile,
+        &SIMPLE_PROFILE,
     );
 
     results.iter().filter(|r| r.has_sat()).for_each(|r| {
@@ -388,9 +388,9 @@ mod test {
     use super::*;
     use crate::ast::Sort;
     use crate::parser::script;
-    
+
     use bit_vec::BitVec;
-    
+
     use insta::assert_display_snapshot;
     use std::collections::HashSet;
     use tempfile::TempDir;
