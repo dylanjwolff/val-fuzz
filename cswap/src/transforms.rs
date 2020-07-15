@@ -396,6 +396,21 @@ fn rl_s(
 
     match sexp {
         SExp::Let(v, rest) => {
+            // note should be moved below first pass over vec
+            let mut vng = VarNameGenerator::new("RL_LET");
+            let mut new_globals = vec![];
+            for (var, exp) in v.iter() {
+                let maybe_sort = exp.borrow().sort();
+                if let Some(sort) = maybe_sort {
+                    
+                    let new_name = vng.get_name(sort.clone());
+                    let new_name_sexp = rccell!(SExp::Symbol(rccell!(Symbol::Token(new_name))));
+                    new_globals.push((Rc::clone(&new_name_sexp), Rc::clone(exp)));
+                    println!("NG: {} ({}) = {}", new_name_sexp.borrow(),sort, exp.borrow());
+                    // scoped_vars.insert(var, new_name_sexp.borrow().clone());
+                }
+            }
+
             recur_count = recur_count + 1;
             if recur_count > RECUR_LIMIT {
                 return liftio!(Err("Reached Recursion Limit Replacing 'Let' statements"));
@@ -1212,6 +1227,15 @@ mod tests {
         ),])));
     }
 
+    #[test]
+    fn rl_snap() {
+        let str_script = "(assert (let ((x 4)) (= x 3)))";
+        let mut p = script(str_script).unwrap().1;
+        let timer = Timer::new_started(Duration::from_secs(100));
+        rl(&mut p, &mut BTreeMap::new()).unwrap();
+        assert_display_snapshot!(p);
+    }
+    
     #[test]
     fn qc_rls() {
         let v = Symbol::Token("x".to_owned());
