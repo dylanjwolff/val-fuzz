@@ -272,7 +272,7 @@ fn solve_intern(cmd: Vec<String>, solver: Solver) -> RSolve {
 
     let mut pcss = match Popen::create(&cmd[..], cfg) {
         Ok(r) => r,
-        _ => return RSolve::process_error(),
+        Err(e) => return RSolve::process_error(e.to_string()),
     };
 
     let to_res = pcss.wait_timeout(solver.get_timeout());
@@ -296,7 +296,7 @@ fn solve_intern(cmd: Vec<String>, solver: Solver) -> RSolve {
         Ok((Some(o), _)) => RSolve::move_new(solver, o, "".to_owned()),
         Ok((_, Some(e))) => RSolve::move_new(solver, "".to_owned(), e),
         Ok((None, None)) => RSolve::move_new(solver, "".to_owned(), "".to_owned()),
-        Err(_e) => RSolve::process_error(), // process error
+        Err(e) => RSolve::process_error(e.to_string()), // process error
     }
 }
 
@@ -377,12 +377,12 @@ impl RSolve {
         }
     }
 
-    pub fn process_error() -> Self {
+    pub fn process_error(msg: String) -> Self {
         RSolve {
             was_timeout: false,
             was_segv: false,
-            stdout: "".to_owned(),
-            stderr: "".to_owned(),
+            stdout: "Process Error".to_owned(),
+            stderr: msg,
             lines: vec![ResultLine::Error("Process Error".to_owned())],
             solver: Solver::NONE,
         }
