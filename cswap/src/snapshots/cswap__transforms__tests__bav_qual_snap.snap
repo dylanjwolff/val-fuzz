@@ -1,5 +1,0 @@
----
-source: cswap/src/transforms.rs
-expression: assertion_cmd.borrow()
----
-(assert (forall ((x Real)) (= BAV1 (= x 4))))

@@ -1,8 +1,0 @@
----
-source: cswap/src/parser.rs
-expression: "fp(\"(fp #b0 #b00000000000 #x0000000000000)\").unwrap().1.get_eb_sb()"
----
-(
-    "11",
-    "53",
-)
