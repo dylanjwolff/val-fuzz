@@ -489,6 +489,21 @@ impl SExp {
             _ => None,
         }
     }
+
+    pub fn sort(&self) -> Option<Sort> {
+        match self {
+            SExp::Constant(c) => Some(c.borrow().sort()),
+            SExp::BExp(_, _) => Some(Sort::Bool()),
+            SExp::FPExp(_, s, _) => match s {
+                Some((eb, sb)) => Some(Sort::Fp(eb.clone(), sb.clone())),
+                None => None,
+            }
+            SExp::NExp(_, _) => Some(Sort::Dec()),
+            SExp::StrExp(_, _) => Some(Sort::Str()),
+            SExp::Let(_, s) | SExp::QForAll(_, s) | SExp::QExists(_, s) => s.borrow().sort(),
+            SExp::Symbol(_) | SExp::Compound(_) => None, 
+        }
+    }
 }
 
 impl fmt::Display for SExp {
