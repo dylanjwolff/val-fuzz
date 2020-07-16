@@ -32,6 +32,8 @@ RSolve {
         CVC4_Command_Builder {
             cmd: [
                 "cvc4",
+                "--tlimit",
+                "3000",
                 "--strings-exp",
                 "--incremental",
                 "--dump-models",

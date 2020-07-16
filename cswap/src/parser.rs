@@ -558,14 +558,9 @@ pub enum ResultLine {
 }
 
 fn timeout(s: &str) -> IResult<&str, &str> {
-    preceded(
-        ws!(tag("timeout: sending signal TERM to command")),
-        ws!(symbol),
-    )(s)
-}
-
-fn segf(s: &str) -> IResult<&str, &str> {
-    tag("timeout: the monitored command dumped core")(s)
+    alt((ws!(tag("timeout")),
+         ws!(tag("CVC4 interrupted by timeout."))
+    ))(s)
 }
 
 pub fn z3o(s: &str) -> IResult<&str, Vec<ResultLine>> {
@@ -580,7 +575,6 @@ pub fn z3o(s: &str) -> IResult<&str, Vec<ResultLine>> {
         map(z3_oerror, |e| ResultLine::Error(e.to_owned())),
         map(model, |m| ResultLine::Model(m)),
         map(timeout, |_| ResultLine::Timeout),
-        map(segf, |_| ResultLine::SegF),
         map(av, |_| ResultLine::AssertionViolation),
         map(generic, |s| ResultLine::Generic(s.to_owned())),
     ))))(s)
@@ -724,13 +718,8 @@ mod tests {
     }
 
     #[test]
-    fn segf_snap() {
-        assert_debug_snapshot!(segf("timeout: the monitored command dumped core"));
-    }
-
-    #[test]
     fn timeout_snap() {
-        assert_debug_snapshot!(timeout("timeout: sending signal TERM to command ‘z3’"));
+        assert_debug_snapshot!(timeout("timeout"));
     }
 
     #[test]

@@ -4,6 +4,8 @@ expression: "CVC4_Command_Builder::new().timeout(Duration::from_secs(3)).models(
 ---
 [
     "cvc4",
+    "--tlimit",
+    "3000",
     "--produce-models",
     "--check-models",
     "--unconstrained-simp",

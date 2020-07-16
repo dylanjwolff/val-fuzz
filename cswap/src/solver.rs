@@ -4,9 +4,15 @@ use std::collections::HashSet;
 use std::fmt;
 use std::io::Write;
 use std::path::Path;
+use subprocess::ExitStatus;
+use subprocess::Popen;
+use subprocess::PopenConfig;
+use subprocess::Redirection;
+
 
 use std::time::Duration;
 
+use log::warn;
 use tempfile::Builder;
 
 #[derive(Debug, Eq, PartialEq, Clone)]
@@ -20,6 +26,8 @@ pub enum SolveResult {
     Unknown,
     Timeout,
 }
+
+pub const SIGSEGV: u8 = 11;
 
 const SF: &str = "segfault";
 const SF_L: &str = "segmentation fault";
@@ -139,13 +147,18 @@ pub struct CVC4_Command_Builder {
 
 impl CVC4_Command_Builder {
     fn new() -> Self {
+        let to = Duration::from_secs(6);
         CVC4_Command_Builder {
-            cmd: vec!["cvc4"].into_iter().map(|s| s.to_owned()).collect(),
-            to: Duration::from_secs(6),
+            cmd: vec!["cvc4", "--tlimit", &to.as_millis().to_string()]
+                .into_iter()
+                .map(|s| s.to_owned())
+                .collect(),
+            to: to,
         }
     }
 
     fn timeout(&mut self, duration: Duration) -> Self {
+        self.cmd[2] = duration.as_millis().to_string();
         self.to = duration;
         self.clone()
     }
@@ -213,16 +226,18 @@ pub struct Z3_Command_Builder {
 
 impl Z3_Command_Builder {
     fn new() -> Self {
+        let to =Duration::from_secs(6);
         Z3_Command_Builder {
-            cmd: vec!["z3", "model_validate=true"]
+            cmd: vec!["z3", "model_validate=true", &format!("-T:{}", to.as_secs())]
                 .into_iter()
                 .map(|s| s.to_owned())
                 .collect(),
-            to: Duration::from_secs(6),
+            to: to,
         }
     }
 
     fn timeout(&mut self, duration: Duration) -> Self {
+        self.cmd[2] = format!("-T:{}", duration.as_secs());
         self.to = duration;
         self.clone()
     }
@@ -275,10 +290,15 @@ fn solve_intern(cmd: Vec<String>, solver: Solver) -> RSolve {
         Err(e) => return RSolve::process_error(e.to_string()),
     };
 
-    let to_res = pcss.wait_timeout(solver.get_timeout());
+    // If process hasn't returned 5 seconds after it was supposed to time out...
+    let to_res = pcss.wait_timeout(solver.get_timeout() + Duration::from_secs(5));
     match to_res {
         Ok(None) => {
-            pcss.kill().unwrap_or(()); // We tried to kill it already, can't take more action, so ignore
+            warn!("Timeout on {}", cmd.join(" "));
+            match pcss.kill() {
+                Ok(_) => (),
+                Err(e) => warn!("Failed to timeout kill {} with error {}", cmd.join(" "), e),
+            };
             return RSolve::timeout(solver);
         }
         Ok(Some(ExitStatus::Exited(_s))) => (), // exited
@@ -287,7 +307,7 @@ fn solve_intern(cmd: Vec<String>, solver: Solver) -> RSolve {
                 return RSolve::segv(solver);
             }
         }
-        _ => (), // should not happen
+        _ => panic!("Unreachable process response"), // should not happen
     }
 
     let r = pcss.communicate(None);
@@ -336,7 +356,7 @@ impl fmt::Display for Solver {
 
 #[derive(Debug, Eq, PartialEq, Clone)]
 pub struct RSolve {
-    pub was_timeout: bool,
+    was_timeout: bool,
     was_segv: bool,
     stdout: String,
     stderr: String,
@@ -447,7 +467,7 @@ impl RSolve {
     }
 
     pub fn has_unrecoverable_error(&self) -> bool {
-        if self.was_timeout {
+        if self.was_timeout() {
             return false;
         }
         self.lines
@@ -464,6 +484,7 @@ impl RSolve {
     }
 
     pub fn was_timeout(&self) -> bool {
+        self.was_timeout ||
         self.lines.iter().any(|l| match l {
             ResultLine::Timeout => true,
             _ => false,
@@ -601,12 +622,6 @@ pub fn check_valid_solve_as_temp(script: &Script) -> Result<Vec<RSolve>, String>
     Ok(results)
 }
 
-use subprocess::ExitStatus;
-use subprocess::Popen;
-use subprocess::PopenConfig;
-use subprocess::Redirection;
-
-pub const SIGSEGV: u8 = 11;
 
 #[cfg(test)]
 mod tests {
