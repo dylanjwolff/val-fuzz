@@ -356,19 +356,38 @@ pub fn add_get_model(script: &mut Script) {
 
 pub fn rl(script: &mut Script, scoped_vars: &mut BTreeMap<String, Vec<SExp>>) -> io::Result<()> {
     let timer = Timer::new_started(Duration::from_secs(5));
+    let mut vng = VarNameGenerator::new("RL_LET");
+    let mut new_vv = vec![];
     match script {
         Script::Commands(cmds) => {
             for cmd in cmds.iter_mut() {
-                rl_c(&mut *cmd.borrow_mut(), scoped_vars, &timer)?;
+                rl_c(
+                    &mut *cmd.borrow_mut(),
+                    scoped_vars,
+                    &mut vng,
+                    &mut new_vv,
+                    &timer,
+                )?;
             }
-            Ok(())
         }
-    }
+    };
+
+    init_vars(script, vng.vars_generated);
+    let cmds = many_assert(
+        &mut new_vv
+            .iter()
+            .map(|(a, b)| SExp::BExp(rccell!(BoolOp::Equals()), vec![Rc::clone(a), Rc::clone(b)])),
+    );
+
+    script.insert_all(end_insert_pt(script), &cmds);
+    Ok(())
 }
 
 fn rl_c(
     cmd: &mut Command,
     scoped_vars: &mut BTreeMap<String, Vec<SExp>>,
+    vng: &mut VarNameGenerator,
+    new_var_vals: &mut Vec<(SExpRc, SExpRc)>,
     timer: &Timer,
 ) -> io::Result<()> {
     if timer.is_done() {
@@ -376,9 +395,14 @@ fn rl_c(
     }
 
     match cmd {
-        Command::Assert(s) | Command::CheckSatAssuming(s) => {
-            rl_s(&mut *s.borrow_mut(), scoped_vars, timer, 0)
-        }
+        Command::Assert(s) | Command::CheckSatAssuming(s) => rl_s(
+            &mut *s.borrow_mut(),
+            scoped_vars,
+            vng,
+            new_var_vals,
+            timer,
+            0,
+        ),
         _ => Ok(()),
     }
 }
@@ -387,6 +411,8 @@ static RECUR_LIMIT: u8 = 10;
 fn rl_s(
     sexp: &mut SExp,
     scoped_vars: &mut BTreeMap<String, Vec<SExp>>,
+    vng: &mut VarNameGenerator,
+    new_var_vals: &mut Vec<(SExpRc, SExpRc)>,
     timer: &Timer,
     mut recur_count: u8,
 ) -> io::Result<()> {
@@ -396,22 +422,6 @@ fn rl_s(
 
     match sexp {
         SExp::Let(v, rest) => {
-            // note should be moved below first pass over vec
-            let mut vng = VarNameGenerator::new("RL_LET");
-            let mut new_globals = vec![];
-            for (var, exp) in v.iter() {
-                let maybe_sort = exp.borrow().sort();
-                if let Some(sort) = maybe_sort {
-                    
-                    let new_name = vng.get_name(sort.clone());
-                    let new_name_sexp = rccell!(SExp::Symbol(rccell!(Symbol::Token(new_name))));
-                    new_globals.push((Rc::clone(&new_name_sexp), Rc::clone(exp)));
-                    println!("NG: {} ({}) = {}", new_name_sexp.borrow(),sort, exp.borrow());
-                    // scoped_vars.insert(var, new_name_sexp.borrow().clone());
-                }
-            }
-
-            recur_count = recur_count + 1;
             if recur_count > RECUR_LIMIT {
                 return liftio!(Err("Reached Recursion Limit Replacing 'Let' statements"));
             }
@@ -425,12 +435,32 @@ fn rl_s(
 
             let mut new_vars: Vec<(&SymbolRc, &SExpRc)> = vec![];
             for (var, val) in v {
-                rl_s(&mut *val.borrow_mut(), scoped_vars, timer, recur_count)?; // first make sure the val is "let-free"
+                rl_s(
+                    &mut *val.borrow_mut(),
+                    scoped_vars,
+                    vng,
+                    new_var_vals,
+                    timer,
+                    recur_count,
+                )?; // first make sure the val is "let-free"
                 new_vars.push((var, val)); // make note of the mapping to add to the rest
             }
 
             // Add all of the allocated variabled to the scope
             for (var, val) in new_vars.iter() {
+                let val = match val.borrow().sort() {
+                    Some(sort) => {
+                        let new_name = vng.get_name(sort.clone());
+                        let new_name_sexp = rccell!(SExp::Symbol(rccell!(Symbol::Token(new_name))));
+                        new_var_vals.push((Rc::clone(&new_name_sexp), Rc::clone(val)));
+                        new_name_sexp
+                    }
+                    None => {
+                        recur_count = recur_count + 1;
+                        Rc::clone(*val)
+                    }
+                };
+                // insert or create
                 let maybe_vals = scoped_vars.get_mut(&var.borrow().to_string()[..]);
                 match maybe_vals {
                     Some(vals) => vals.push((*val).borrow().clone()),
@@ -441,7 +471,14 @@ fn rl_s(
             }
 
             // Recurse on the rest of the SExp
-            rl_s(&mut *rest.borrow_mut(), scoped_vars, timer, recur_count)?;
+            rl_s(
+                &mut *rest.borrow_mut(),
+                scoped_vars,
+                vng,
+                new_var_vals,
+                timer,
+                recur_count,
+            )?;
 
             // Pop our variables off of the stack
             for (var, _) in new_vars {
@@ -475,12 +512,25 @@ fn rl_s(
         | SExp::NExp(_, v)
         | SExp::StrExp(_, v) => {
             for e in v {
-                rl_s(&mut *e.borrow_mut(), scoped_vars, timer, recur_count)?
+                rl_s(
+                    &mut *e.borrow_mut(),
+                    scoped_vars,
+                    vng,
+                    new_var_vals,
+                    timer,
+                    recur_count,
+                )?
             }
             Ok(())
         }
-        SExp::QForAll(_, s) => rl_s(&mut s.borrow_mut(), scoped_vars, timer, recur_count),
-        SExp::QExists(_, s) => rl_s(&mut s.borrow_mut(), scoped_vars, timer, recur_count),
+        SExp::QForAll(_, s) | SExp::QExists(_, s) => rl_s(
+            &mut s.borrow_mut(),
+            scoped_vars,
+            vng,
+            new_var_vals,
+            timer,
+            recur_count,
+        ),
         SExp::Constant(_) => Ok(()),
     }
 }
@@ -1229,13 +1279,14 @@ mod tests {
 
     #[test]
     fn rl_snap() {
-        let str_script = "(assert (let ((x 4)) (= x 3)))";
+        let str_script =
+            "(assert (= x (let ((x 4)) (let ((y (+ x 2))(z (unknown_op x))) (= (- x 4) y z)))))";
         let mut p = script(str_script).unwrap().1;
         let timer = Timer::new_started(Duration::from_secs(100));
         rl(&mut p, &mut BTreeMap::new()).unwrap();
         assert_display_snapshot!(p);
     }
-    
+
     #[test]
     fn qc_rls() {
         let v = Symbol::Token("x".to_owned());
@@ -1246,7 +1297,15 @@ mod tests {
             rccell!(Box::new(SExp::Symbol(rccell!(v)))),
         );
         let timer = Timer::new_started(Duration::from_secs(100));
-        rl_s(&mut sexp, &mut BTreeMap::new(), &timer, 0).unwrap();
+        rl_s(
+            &mut sexp,
+            &mut BTreeMap::new(),
+            &mut VarNameGenerator::new("RL_LET"),
+            &mut vec![],
+            &timer,
+            0,
+        )
+        .unwrap();
         assert_eq!(sexp, expected);
     }
 }

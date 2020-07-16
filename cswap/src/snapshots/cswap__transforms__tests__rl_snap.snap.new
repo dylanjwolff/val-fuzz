@@ -1,6 +1,0 @@
----
-source: cswap/src/transforms.rs
-expression: p
----
-(assert (= 4 3))
-

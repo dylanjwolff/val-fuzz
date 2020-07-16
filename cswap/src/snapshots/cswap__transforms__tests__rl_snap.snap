@@ -1,0 +1,10 @@
+---
+source: cswap/src/transforms.rs
+expression: p
+---
+(declare-const RL_LET1 Int)
+(declare-const RL_LET2 Real)
+(assert (= x (= (- RL_LET1 4) RL_LET2 (unknown_op RL_LET1))))
+(assert (= RL_LET1 4))
+(assert (= RL_LET2 (+ RL_LET1 2)))
+
