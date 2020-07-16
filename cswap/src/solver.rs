@@ -356,7 +356,7 @@ impl fmt::Display for Solver {
 
 #[derive(Debug, Eq, PartialEq, Clone)]
 pub struct RSolve {
-    pub was_timeout: bool,
+    was_timeout: bool,
     was_segv: bool,
     stdout: String,
     stderr: String,
@@ -467,7 +467,7 @@ impl RSolve {
     }
 
     pub fn has_unrecoverable_error(&self) -> bool {
-        if self.was_timeout {
+        if self.was_timeout() {
             return false;
         }
         self.lines
@@ -484,6 +484,7 @@ impl RSolve {
     }
 
     pub fn was_timeout(&self) -> bool {
+        self.was_timeout ||
         self.lines.iter().any(|l| match l {
             ResultLine::Timeout => true,
             _ => false,
