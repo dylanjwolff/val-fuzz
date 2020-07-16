@@ -5,6 +5,7 @@ expression: "Z3_Command_Builder::new().timeout(Duration::from_secs(3)).ematching
 [
     "z3",
     "model_validate=true",
+    "-T:3",
     "smt.ematching=false",
     "rewriter.flat=false",
     "smt.string_solver=z3str3",

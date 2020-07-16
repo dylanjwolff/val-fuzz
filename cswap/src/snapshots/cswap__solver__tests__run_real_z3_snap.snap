@@ -15,6 +15,7 @@ RSolve {
             cmd: [
                 "z3",
                 "model_validate=true",
+                "-T:3",
                 "smt.ematching=false",
                 "rewriter.flat=false",
             ],
