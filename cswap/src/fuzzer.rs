@@ -7,6 +7,7 @@ use crate::parser::script_from_f;
 use crate::parser::script_from_f_unsanitized;
 use crate::solver::check_valid_solve;
 use crate::solver::profiles_solve;
+use crate::solver::ProfileIndex;
 use crate::solver::RSolve;
 use crate::transforms::rv;
 use crate::utils::dyn_fmt;
@@ -23,6 +24,7 @@ use crate::ast::SExp;
 use crate::transforms::{
     ba_script, end_insert_pt, get_bav_assign_fmt_str, replace_constants_with_fresh_vars,
 };
+use std::collections::HashSet;
 
 use crate::liftio;
 use crate::liftio_e;
@@ -247,8 +249,6 @@ fn deserialize_from_f(
     Ok((script, md))
 }
 
-use crate::solver::ProfileIndex;
-use std::collections::HashSet;
 lazy_static! {
     static ref SIMPLE_PROFILE: HashSet<ProfileIndex> =
         vec![ProfileIndex::Z3(0), ProfileIndex::CVC4(1)]
@@ -333,8 +333,6 @@ fn resub_model(
 fn log_check_enforce(results: &Vec<RSolve>, enforcemt: &Vec<(String, bool)>) {
     let (enames, _evals): (Vec<_>, Vec<_>) = enforcemt.iter().cloned().unzip();
 
-    // TODO clean up (no string comp)
-
     let strress = results
         .iter()
         .flat_map(|result| {
@@ -343,7 +341,7 @@ fn log_check_enforce(results: &Vec<RSolve>, enforcemt: &Vec<(String, bool)>) {
                 .into_iter()
                 .map(|(sym, sexp)| (sym.to_string(), sexp.to_string()))
         })
-        .collect::<Vec<(String, String)>>();
+        .collect::<Vec<(String, String)>>(); // TODO clean up (no string comp)
 
     enforcemt.iter().for_each(|(ename, eval)| {
         let filtered = strress

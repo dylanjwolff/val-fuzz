@@ -308,8 +308,7 @@ pub fn grab_all_decls(script: &Script) -> Vec<CommandRc> {
 }
 
 pub fn ba_script(script: &mut Script, md: &mut Metadata) -> io::Result<Script> {
-    let mut scopes = BTreeMap::new();
-    rl(script, &mut scopes)?;
+    rl(script)?;
 
     let mut vng = VarNameGenerator::new("BAV");
     let mut bavs = vec![];
@@ -319,7 +318,7 @@ pub fn ba_script(script: &mut Script, md: &mut Metadata) -> io::Result<Script> {
         .vars_generated
         .clone()
         .into_iter()
-        .filter(|(name, _sort)| !name.contains("REPL"))
+        .filter(|(name, _sort)| !name.contains("REPL")) // TODO move quantifiers into same step as "let" replacement to avoid this
         .collect();
 
     let (bdomvs, mut bdomcmds) = get_boolean_domain_monitors(bavns);
@@ -354,7 +353,8 @@ pub fn add_get_model(script: &mut Script) {
     });
 }
 
-pub fn rl(script: &mut Script, scoped_vars: &mut BTreeMap<String, Vec<SExp>>) -> io::Result<()> {
+pub fn rl(script: &mut Script) -> io::Result<()> {
+    let mut scoped_vars = BTreeMap::new();
     let timer = Timer::new_started(Duration::from_secs(5));
     let mut vng = VarNameGenerator::new("RL_LET");
     let mut new_vv = vec![];
@@ -363,7 +363,7 @@ pub fn rl(script: &mut Script, scoped_vars: &mut BTreeMap<String, Vec<SExp>>) ->
             for cmd in cmds.iter_mut() {
                 rl_c(
                     &mut *cmd.borrow_mut(),
-                    scoped_vars,
+                    &mut scoped_vars,
                     &mut vng,
                     &mut new_vv,
                     &timer,
@@ -1282,8 +1282,7 @@ mod tests {
         let str_script =
             "(assert (= x (let ((x 4)) (let ((y (+ x 2))(z (unknown_op x))) (= (- x 4) y z)))))";
         let mut p = script(str_script).unwrap().1;
-        let timer = Timer::new_started(Duration::from_secs(100));
-        rl(&mut p, &mut BTreeMap::new()).unwrap();
+        rl(&mut p).unwrap();
         assert_display_snapshot!(p);
     }
 
