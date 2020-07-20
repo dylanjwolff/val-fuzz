@@ -37,6 +37,9 @@ pub enum Command {
     GenericDecl(String, Vec<Vec<String>>),
     DeclConst(String, SortRc),
     DeclFn(Symbol, Vec<Sort>, Sort),
+    DefineFun(Symbol, Vec<(SymbolRc, SortRc)>, Sort, SExpRc),
+    DefineFunRec(Symbol, Vec<(SymbolRc, SortRc)>, Sort, SExpRc),
+    DefineFunsRec(Vec<(Symbol, Vec<(SymbolRc, SortRc)>, Sort, SExpRc)>),
     Generic(String),
 }
 
@@ -346,10 +349,49 @@ impl fmt::Display for Command {
                     .fold(Ok(()), acc_result)?;
                 write!(f, ") {})", rtype)
             }
+            Command::DefineFun(name, args, rtype, body) => {
+                write!(f, "(define-fun ")?;
+                write_fn_definition(f, name, args, rtype, body)?;
+                write!(f, ")")
+            }
+            Command::DefineFunRec(name, args, rtype, body) => {
+                write!(f, "(define-fun-rec ")?;
+                write_fn_definition(f, name, args, rtype, body)?;
+                write!(f, ")")
+            }
+            Command::DefineFunsRec(fn_defines) => {
+                write!(f, "(define-funs-rec ")?;
+
+                fn_defines.iter().fold(Ok(()), |acc, fn_def| {
+                    acc.and_then(|_| {
+                        write!(f, "(")?;
+                        write_fn_definition(f, &fn_def.0, &fn_def.1, &fn_def.2, &fn_def.3)?;
+                        write!(f, "(")
+                    })
+                })
+            }
             Command::Generic(s) => write!(f, "{}", s),
             Command::Assert(s) => write!(f, "(assert {})", s.borrow()),
         }
     }
+}
+
+fn write_fn_definition(
+    f: &mut fmt::Formatter,
+    name: &Symbol,
+    args: &Vec<(SymbolRc, SortRc)>,
+    rtype: &Sort,
+    body: &SExpRc,
+) -> fmt::Result {
+    write!(f, "{} (", name)?;
+    args.iter()
+        .enumerate()
+        .map(|(i, arg)| match i == 0 {
+            true => write!(f, "({} {})", arg.0.borrow(), arg.1.borrow()),
+            false => write!(f, " ({} {})", arg.0.borrow(), arg.1.borrow()),
+        })
+        .fold(Ok(()), acc_result)?;
+    write!(f, ") {} {}", rtype, body.borrow())
 }
 
 impl fmt::Display for Constant {
@@ -497,11 +539,11 @@ impl SExp {
             SExp::FPExp(_, s, _) => match s {
                 Some((eb, sb)) => Some(Sort::Fp(eb.clone(), sb.clone())),
                 None => None,
-            }
+            },
             SExp::NExp(_, _) => Some(Sort::Dec()),
             SExp::StrExp(_, _) => Some(Sort::Str()),
             SExp::Let(_, s) | SExp::QForAll(_, s) | SExp::QExists(_, s) => s.borrow().sort(),
-            SExp::Symbol(_) | SExp::Compound(_) => None, 
+            SExp::Symbol(_) | SExp::Compound(_) => None,
         }
     }
 }
