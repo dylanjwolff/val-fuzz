@@ -397,9 +397,6 @@ fn naked_decl_generic(s: &str) -> IResult<&str, Command> {
         tag("declare-datatypes"),
         tag("declare-datatype"),
         tag("declare-sort"),
-        tag("define-funs-rec"),
-        tag("define-fun-rec"),
-        tag("define-fun"),
         tag("define-sort"),
     ));
     let inner = tuple((ws!(decls), many0(ws!(unknown_balanced))));
@@ -487,6 +484,9 @@ fn naked_command(s: &str) -> IResult<&str, Command> {
             Command::DeclConst(v.to_owned(), rccell!(s))
         }),
         naked_decl_fn,
+        naked_define_func,
+        naked_define_func_rec,
+        naked_define_funcs_rec,
         naked_decl_generic,
     ))(s)
 }
@@ -538,32 +538,26 @@ pub fn rmv_comments(s: &str) -> IResult<&str, Vec<&str>> {
     many1(alt((not_comment, map(comment, |_| ""))))(s)
 }
 
-fn define_func(s: &str) -> IResult<&str, Command> {
+fn naked_define_func(s: &str) -> IResult<&str, Command> {
     map(
-        brack!(preceded(
-            ws!(tag("define-fun")),
-            ws!(mapped_naked_fn_definition)
-        )),
+        preceded(ws!(tag("define-fun")), ws!(mapped_naked_fn_definition)),
         |(name, args, rtype, body)| Command::DefineFun(name, args, rtype, body),
     )(s)
 }
 
-fn define_func_rec(s: &str) -> IResult<&str, Command> {
+fn naked_define_func_rec(s: &str) -> IResult<&str, Command> {
     map(
-        brack!(preceded(
-            ws!(tag("define-fun-rec")),
-            ws!(mapped_naked_fn_definition)
-        )),
+        preceded(ws!(tag("define-fun-rec")), ws!(mapped_naked_fn_definition)),
         |(name, args, rtype, body)| Command::DefineFunRec(name, args, rtype, body),
     )(s)
 }
 
-fn define_funcs_rec(s: &str) -> IResult<&str, Command> {
+fn naked_define_funcs_rec(s: &str) -> IResult<&str, Command> {
     map(
-        brack!(preceded(
+        preceded(
             ws!(tag("define-funs-rec")),
-            many0(ws!(mapped_naked_fn_definition))
-        )),
+            many0(ws!(mapped_naked_fn_definition)),
+        ),
         |fn_defines| Command::DefineFunsRec(fn_defines),
     )(s)
 }
@@ -688,8 +682,8 @@ mod tests {
 
     #[test]
     fn fn_define_snap() {
-        let df = define_func_rec("(define-fun-rec app ((l1 Lst) (l2 Lst)) Lst (ite ((_ is nil) l1) l2 (cons (head l1) (app (tail l1) l2))))");
-        assert_display_snapshot!(df.unwrap().1);
+        let df = command("(define-fun-rec app ((l1 Lst) (l2 Lst)) Lst (ite ((_ is nil) l1) l2 (cons (head l1) (app (tail l1) l2))))");
+        assert_debug_snapshot!(df.unwrap().1);
     }
 
     #[test]
@@ -846,12 +840,12 @@ mod tests {
 
     #[test]
     fn func_snap() {
-        assert_debug_snapshot!(define_func("(define-fun foo ((a Real) (b String)) Int 7)"));
+        assert_debug_snapshot!(command("(define-fun foo ((a Real) (b String)) Int 7)"));
     }
 
     #[test]
     fn func_noargs_snap() {
-        assert_debug_snapshot!(define_func("(define-fun foo () Int 7)"));
+        assert_debug_snapshot!(command("(define-fun foo () Int 7)"));
     }
 
     #[test]
