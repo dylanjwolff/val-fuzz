@@ -423,6 +423,14 @@ fn naked_fn_definition(s: &str) -> IResult<&str, (Symbol, Vec<(SymbolRc, SortRc)
     ))(s)
 }
 
+fn mapped_naked_fn_definition(
+    s: &str,
+) -> IResult<&str, (Symbol, Vec<(SymbolRc, SortRc)>, Sort, SExpRc)> {
+    map(naked_fn_definition, |(name, args, rtype, body)| {
+        (name, args, rtype, rccell!(body))
+    })(s)
+}
+
 fn naked_decl_fn(s: &str) -> IResult<&str, Command> {
     let args = delimited(char('('), many0(ws!(sort)), char(')'));
     let pre_map = preceded(
@@ -530,25 +538,42 @@ pub fn rmv_comments(s: &str) -> IResult<&str, Vec<&str>> {
     many1(alt((not_comment, map(comment, |_| ""))))(s)
 }
 
-fn define_func(s: &str) -> IResult<&str, (Symbol, Vec<(SymbolRc, SortRc)>, Sort, SExp)> {
-    brack!(preceded(ws!(tag("define-fun")), ws!(naked_fn_definition)))(s)
+fn define_func(s: &str) -> IResult<&str, Command> {
+    map(
+        brack!(preceded(
+            ws!(tag("define-fun")),
+            ws!(mapped_naked_fn_definition)
+        )),
+        |(name, args, rtype, body)| Command::DefineFun(name, args, rtype, body),
+    )(s)
 }
 
-fn define_func_rec(s: &str) -> IResult<&str, (Symbol, Vec<(SymbolRc, SortRc)>, Sort, SExp)> {
-    brack!(preceded(
-        ws!(tag("define-fun-rec")),
-        ws!(naked_fn_definition)
-    ))(s)
+fn define_func_rec(s: &str) -> IResult<&str, Command> {
+    map(
+        brack!(preceded(
+            ws!(tag("define-fun-rec")),
+            ws!(mapped_naked_fn_definition)
+        )),
+        |(name, args, rtype, body)| Command::DefineFunRec(name, args, rtype, body),
+    )(s)
 }
 
-fn define_funcs_rec(s: &str) -> IResult<&str, Vec<(Symbol, Vec<(SymbolRc, SortRc)>, Sort, SExp)>> {
-    brack!(preceded(
-        ws!(tag("define-funs-rec")),
-        many0(ws!(naked_fn_definition))
-    ))(s)
+fn define_funcs_rec(s: &str) -> IResult<&str, Command> {
+    map(
+        brack!(preceded(
+            ws!(tag("define-funs-rec")),
+            many0(ws!(mapped_naked_fn_definition))
+        )),
+        |fn_defines| Command::DefineFunsRec(fn_defines),
+    )(s)
 }
+
 pub fn model(s: &str) -> IResult<&str, Vec<(Symbol, Vec<(SymbolRc, SortRc)>, Sort, SExp)>> {
-    brack!(preceded(ws!(tag("model")), many0(ws!(define_func))))(s)
+    let model_result = ws!(brack!(preceded(
+        ws!(tag("define-fun")),
+        ws!(naked_fn_definition)
+    )));
+    brack!(preceded(ws!(tag("model")), many0(model_result)))(s)
 }
 
 pub fn z3_oerror(s: &str) -> IResult<&str, &str> {
@@ -663,8 +688,8 @@ mod tests {
 
     #[test]
     fn fn_define_snap() {
-        let df = naked_fn_definition("app ((l1 Lst) (l2 Lst)) Lst (ite ((_ is nil) l1) l2 (cons (head l1) (app (tail l1) l2))))");
-        assert_debug_snapshot!(df.unwrap().1);
+        let df = define_func_rec("(define-fun-rec app ((l1 Lst) (l2 Lst)) Lst (ite ((_ is nil) l1) l2 (cons (head l1) (app (tail l1) l2))))");
+        assert_display_snapshot!(df.unwrap().1);
     }
 
     #[test]

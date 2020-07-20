@@ -1,0 +1,5 @@
+---
+source: cswap/src/parser.rs
+expression: df.unwrap().1
+---
+(define-fun-rec app ((l1 Lst) (l2 Lst)) Lst (ite ((_ is nil) l1) l2 (cons (head l1) (app (tail l1) l2))))

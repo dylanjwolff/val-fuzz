@@ -5,19 +5,21 @@ expression: "define_func(\"(define-fun foo () Int 7)\")"
 Ok(
     (
         "",
-        (
+        DefineFun(
             Token(
                 "foo",
             ),
             [],
             UInt,
-            Constant(
-                RefCell {
-                    value: UInt(
-                        "7",
-                    ),
-                },
-            ),
+            RefCell {
+                value: Constant(
+                    RefCell {
+                        value: UInt(
+                            "7",
+                        ),
+                    },
+                ),
+            },
         ),
     ),
 )
