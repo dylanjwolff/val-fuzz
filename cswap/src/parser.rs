@@ -413,6 +413,16 @@ fn naked_decl_generic(s: &str) -> IResult<&str, Command> {
     })(s)
 }
 
+fn naked_fn_definition(s: &str) -> IResult<&str, (Symbol, Vec<(SymbolRc, SortRc)>, Sort, SExp)> {
+    let mapped_symbol = map(symbol, |s| Symbol::Token(s.to_owned()));
+    tuple((
+        ws!(mapped_symbol),
+        brack!(many0(ws!(var_binding))),
+        ws!(sort),
+        sexp,
+    ))(s)
+}
+
 fn naked_decl_fn(s: &str) -> IResult<&str, Command> {
     let args = delimited(char('('), many0(ws!(sort)), char(')'));
     let pre_map = preceded(
@@ -520,19 +530,23 @@ pub fn rmv_comments(s: &str) -> IResult<&str, Vec<&str>> {
     many1(alt((not_comment, map(comment, |_| ""))))(s)
 }
 
-pub fn define_func(s: &str) -> IResult<&str, (Symbol, Vec<(SymbolRc, SortRc)>, Sort, SExp)> {
-    let mapped_symbol = map(symbol, |s| Symbol::Token(s.to_owned()));
+fn define_func(s: &str) -> IResult<&str, (Symbol, Vec<(SymbolRc, SortRc)>, Sort, SExp)> {
+    brack!(preceded(ws!(tag("define-fun")), ws!(naked_fn_definition)))(s)
+}
+
+fn define_func_rec(s: &str) -> IResult<&str, (Symbol, Vec<(SymbolRc, SortRc)>, Sort, SExp)> {
     brack!(preceded(
-        ws!(tag("define-fun")),
-        tuple((
-            ws!(mapped_symbol),
-            brack!(many0(ws!(var_binding))),
-            ws!(sort),
-            ws!(sexp)
-        ))
+        ws!(tag("define-fun-rec")),
+        ws!(naked_fn_definition)
     ))(s)
 }
 
+fn define_funcs_rec(s: &str) -> IResult<&str, Vec<(Symbol, Vec<(SymbolRc, SortRc)>, Sort, SExp)>> {
+    brack!(preceded(
+        ws!(tag("define-funs-rec")),
+        many0(ws!(naked_fn_definition))
+    ))(s)
+}
 pub fn model(s: &str) -> IResult<&str, Vec<(Symbol, Vec<(SymbolRc, SortRc)>, Sort, SExp)>> {
     brack!(preceded(ws!(tag("model")), many0(ws!(define_func))))(s)
 }
@@ -558,8 +572,9 @@ pub enum ResultLine {
 }
 
 fn timeout(s: &str) -> IResult<&str, &str> {
-    alt((ws!(tag("timeout")),
-         ws!(tag("CVC4 interrupted by timeout."))
+    alt((
+        ws!(tag("timeout")),
+        ws!(tag("CVC4 interrupted by timeout.")),
     ))(s)
 }
 
@@ -644,6 +659,12 @@ mod tests {
         } else {
             assert_debug_snapshot!(df.unwrap().1);
         }
+    }
+
+    #[test]
+    fn fn_define_snap() {
+        let df = naked_fn_definition("app ((l1 Lst) (l2 Lst)) Lst (ite ((_ is nil) l1) l2 (cons (head l1) (app (tail l1) l2))))");
+        assert_debug_snapshot!(df.unwrap().1);
     }
 
     #[test]

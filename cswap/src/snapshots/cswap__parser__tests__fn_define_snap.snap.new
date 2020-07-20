@@ -1,0 +1,195 @@
+---
+source: cswap/src/parser.rs
+expression: df.unwrap().1
+---
+(
+    Token(
+        "app",
+    ),
+    [
+        (
+            RefCell {
+                value: Token(
+                    "l1",
+                ),
+            },
+            RefCell {
+                value: UserDef(
+                    "Lst",
+                ),
+            },
+        ),
+        (
+            RefCell {
+                value: Token(
+                    "l2",
+                ),
+            },
+            RefCell {
+                value: UserDef(
+                    "Lst",
+                ),
+            },
+        ),
+    ],
+    UserDef(
+        "Lst",
+    ),
+    Compound(
+        [
+            RefCell {
+                value: Symbol(
+                    RefCell {
+                        value: Token(
+                            "ite",
+                        ),
+                    },
+                ),
+            },
+            RefCell {
+                value: Compound(
+                    [
+                        RefCell {
+                            value: Compound(
+                                [
+                                    RefCell {
+                                        value: Symbol(
+                                            RefCell {
+                                                value: Token(
+                                                    "_",
+                                                ),
+                                            },
+                                        ),
+                                    },
+                                    RefCell {
+                                        value: Symbol(
+                                            RefCell {
+                                                value: Token(
+                                                    "is",
+                                                ),
+                                            },
+                                        ),
+                                    },
+                                    RefCell {
+                                        value: Symbol(
+                                            RefCell {
+                                                value: Token(
+                                                    "nil",
+                                                ),
+                                            },
+                                        ),
+                                    },
+                                ],
+                            ),
+                        },
+                        RefCell {
+                            value: Symbol(
+                                RefCell {
+                                    value: Token(
+                                        "l1",
+                                    ),
+                                },
+                            ),
+                        },
+                    ],
+                ),
+            },
+            RefCell {
+                value: Symbol(
+                    RefCell {
+                        value: Token(
+                            "l2",
+                        ),
+                    },
+                ),
+            },
+            RefCell {
+                value: Compound(
+                    [
+                        RefCell {
+                            value: Symbol(
+                                RefCell {
+                                    value: Token(
+                                        "cons",
+                                    ),
+                                },
+                            ),
+                        },
+                        RefCell {
+                            value: Compound(
+                                [
+                                    RefCell {
+                                        value: Symbol(
+                                            RefCell {
+                                                value: Token(
+                                                    "head",
+                                                ),
+                                            },
+                                        ),
+                                    },
+                                    RefCell {
+                                        value: Symbol(
+                                            RefCell {
+                                                value: Token(
+                                                    "l1",
+                                                ),
+                                            },
+                                        ),
+                                    },
+                                ],
+                            ),
+                        },
+                        RefCell {
+                            value: Compound(
+                                [
+                                    RefCell {
+                                        value: Symbol(
+                                            RefCell {
+                                                value: Token(
+                                                    "app",
+                                                ),
+                                            },
+                                        ),
+                                    },
+                                    RefCell {
+                                        value: Compound(
+                                            [
+                                                RefCell {
+                                                    value: Symbol(
+                                                        RefCell {
+                                                            value: Token(
+                                                                "tail",
+                                                            ),
+                                                        },
+                                                    ),
+                                                },
+                                                RefCell {
+                                                    value: Symbol(
+                                                        RefCell {
+                                                            value: Token(
+                                                                "l1",
+                                                            ),
+                                                        },
+                                                    ),
+                                                },
+                                            ],
+                                        ),
+                                    },
+                                    RefCell {
+                                        value: Symbol(
+                                            RefCell {
+                                                value: Token(
+                                                    "l2",
+                                                ),
+                                            },
+                                        ),
+                                    },
+                                ],
+                            ),
+                        },
+                    ],
+                ),
+            },
+        ],
+    ),
+)

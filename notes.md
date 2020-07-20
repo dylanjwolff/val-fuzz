@@ -54,3 +54,8 @@ or
 [] 50% Replacement Errors
 or
 [] error logging specifics
+
+@TODO 20th July
+[] Parse all function/const definitions/declarations
+[] Get sort of var from declarations
+[] Change BAV Assign code to use these variables instead of expressions
