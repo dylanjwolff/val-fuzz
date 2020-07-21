@@ -322,7 +322,6 @@ pub fn ba_script(script: &mut Script, md: &mut Metadata) -> io::Result<Script> {
         .into_iter()
         .map(|(a, b)| (a.to_string(), b))
         .filter(|(name, _sort)| !name.contains("GEN")); // TODO dont do string compares here
-    println!("OG V: {:?}", og_vars);
 
     let bavns = vng
         .vars_generated
