@@ -7,7 +7,5 @@ DeclFn(
         "x33",
     ),
     [],
-    UserDef(
-        "Bool",
-    ),
+    Bool,
 )

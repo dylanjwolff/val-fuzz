@@ -1,6 +1,6 @@
 ---
 source: cswap/src/parser.rs
-expression: "define_func(\"(define-fun foo ((a Real) (b String)) Int 7)\")"
+expression: "command(\"(define-fun foo ((a Real) (b String)) Int 7)\")"
 ---
 Ok(
     (
@@ -27,9 +27,7 @@ Ok(
                         ),
                     },
                     RefCell {
-                        value: UserDef(
-                            "String",
-                        ),
+                        value: Str,
                     },
                 ),
             ],

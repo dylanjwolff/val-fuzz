@@ -381,10 +381,36 @@ pub fn sexp(s: &str) -> IResult<&str, SExp> {
     )))(s)
 }
 
+fn fp_sort(s: &str) -> IResult<&str, Sort> {
+    let typical_fps = map(
+        brack_ws!(preceded(
+            tuple((ws!(tag("_")), ws!(tag("FloatingPoint")))),
+            tuple((ws!(integer), ws!(integer)))
+        )),
+        |(eb, sb)| Sort::Fp(eb.to_owned(), sb.to_owned()),
+    );
+    let fps16 = map(tag("Float16"), |_| {
+        Sort::Fp("5".to_owned(), "11".to_owned())
+    });
+    let fps32 = map(tag("Float32"), |_| {
+        Sort::Fp("8".to_owned(), "24".to_owned())
+    });
+    let fps64 = map(tag("Float64"), |_| {
+        Sort::Fp("11".to_owned(), "53".to_owned())
+    });
+    let fps128 = map(tag("Float128"), |_| {
+        Sort::Fp("15".to_owned(), "113".to_owned())
+    });
+    alt((typical_fps, fps16, fps32, fps64, fps128))(s)
+}
+
 fn sort(s: &str) -> IResult<&str, Sort> {
     ws!(alt((
         map(tag("Int"), |_| Sort::UInt()),
         map(tag("Real"), |_| Sort::Dec()),
+        map(tag("Bool"), |_| Sort::Bool()),
+        map(tag("String"), |_| Sort::Str()),
+        fp_sort,
         map(symbol, |s| Sort::UserDef(s.to_owned())),
         map(brack!(many1(sort)), |ss| {
             Sort::Compound(ss.into_iter().map(|s| rccell!(s)).collect())
@@ -664,6 +690,11 @@ mod tests {
 
     use insta::assert_debug_snapshot;
     use insta::assert_display_snapshot;
+
+    #[test]
+    fn fp_sort_snap() {
+        assert_debug_snapshot!(fp_sort("(_ FloatingPoint 11 53)"));
+    }
 
     #[test]
     fn fp_op_inference_snap() {

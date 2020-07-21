@@ -77,9 +77,7 @@ Ok(
                             "BAV5",
                         ),
                         [],
-                        UserDef(
-                            "Bool",
-                        ),
+                        Bool,
                         Symbol(
                             RefCell {
                                 value: Token(
@@ -93,9 +91,7 @@ Ok(
                             "BAV4",
                         ),
                         [],
-                        UserDef(
-                            "Bool",
-                        ),
+                        Bool,
                         Symbol(
                             RefCell {
                                 value: Token(
@@ -109,9 +105,7 @@ Ok(
                             "BAV3",
                         ),
                         [],
-                        UserDef(
-                            "Bool",
-                        ),
+                        Bool,
                         Symbol(
                             RefCell {
                                 value: Token(

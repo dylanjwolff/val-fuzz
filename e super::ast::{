@@ -1,0 +1,129 @@
+[1mdiff --git a/cswap/src/parser.rs b/cswap/src/parser.rs[m
+[1mindex ba165b4..989c611 100644[m
+[1m--- a/cswap/src/parser.rs[m
+[1m+++ b/cswap/src/parser.rs[m
+[36m@@ -1,8 +1,3 @@[m
+[31m-use super::ast::{[m
+[31m-    BitVecConst, BoolOp, Command, Constant, FPConst, FpOp, Logic, NumOp, SExp, SExpBoxRc, SExpRc,[m
+[31m-    Script, Sort, SortRc, StrOp, Symbol, SymbolRc,[m
+[31m-};[m
+[31m-[m
+ use crate::liftio;[m
+ use nom::branch::alt;[m
+ use nom::bytes::complete::take_until;[m
+[36m@@ -381,10 +376,16 @@[m [mpub fn sexp(s: &str) -> IResult<&str, SExp> {[m
+     )))(s)[m
+ }[m
+ [m
+[32m+[m[32mfn fp_sort(s: &str) -> IResult<&str, Sort> {[m
+[32m+[m[32m    brack_ws!(preceded(tuple((ws!(tag("_")), ws!(tag("FloatingPoint")))), tuple((ws!(integer), ws!(integer)))))(s)[m
+[32m+[m[32m}[m
+[32m+[m
+ fn sort(s: &str) -> IResult<&str, Sort> {[m
+     ws!(alt(([m
+         map(tag("Int"), |_| Sort::UInt()),[m
+         map(tag("Real"), |_| Sort::Dec()),[m
+[32m+[m[32m        map(tag("Bool"), |_| Sort::Bool()),[m
+[32m+[m[32m        map(tag("String"), |_| Sort::Str()),[m
+         map(symbol, |s| Sort::UserDef(s.to_owned())),[m
+         map(brack!(many1(sort)), |ss| {[m
+             Sort::Compound(ss.into_iter().map(|s| rccell!(s)).collect())[m
+[36m@@ -665,6 +666,11 @@[m [mmod tests {[m
+     use insta::assert_debug_snapshot;[m
+     use insta::assert_display_snapshot;[m
+ [m
+[32m+[m[32m    #[test][m
+[32m+[m[32m    fn fp_sort_snap() {[m
+[32m+[m[32m        assert_debug_snapshot!(fp_sort("(_ FloatingPoint 11 53)"));[m
+[32m+[m[32m    }[m
+[32m+[m
+     #[test][m
+     fn fp_op_inference_snap() {[m
+         let df = command("(assert (= mpfx (fp.mul roundTowardPositive[m
+[1mdiff --git a/cswap/src/snapshots/cswap__ast__tests__get_all_vb_snap.snap b/cswap/src/snapshots/cswap__ast__tests__get_all_vb_snap.snap[m
+[1mindex 9d33d13..bb89c41 100644[m
+[1m--- a/cswap/src/snapshots/cswap__ast__tests__get_all_vb_snap.snap[m
+[1m+++ b/cswap/src/snapshots/cswap__ast__tests__get_all_vb_snap.snap[m
+[36m@@ -21,8 +21,6 @@[m [mexpression: "script(&format!(\"(declare-const x Int)(declare-fun y () Lst)(defin[m
+         Token([m
+             "z",[m
+         ),[m
+[31m-        UserDef([m
+[31m-            "Bool",[m
+[31m-        ),[m
+[32m+[m[32m        Bool,[m
+     ),[m
+ ][m
+[1mdiff --git a/cswap/src/snapshots/cswap__parser__tests__decl_fn_snap.snap b/cswap/src/snapshots/cswap__parser__tests__decl_fn_snap.snap[m
+[1mindex d9660e7..53df7e9 100644[m
+[1m--- a/cswap/src/snapshots/cswap__parser__tests__decl_fn_snap.snap[m
+[1m+++ b/cswap/src/snapshots/cswap__parser__tests__decl_fn_snap.snap[m
+[36m@@ -7,7 +7,5 @@[m [mDeclFn([m
+         "x33",[m
+     ),[m
+     [],[m
+[31m-    UserDef([m
+[31m-        "Bool",[m
+[31m-    ),[m
+[32m+[m[32m    Bool,[m
+ )[m
+[1mdiff --git a/cswap/src/snapshots/cswap__parser__tests__func_snap.snap b/cswap/src/snapshots/cswap__parser__tests__func_snap.snap[m
+[1mindex fc4e7d9..f21d130 100644[m
+[1m--- a/cswap/src/snapshots/cswap__parser__tests__func_snap.snap[m
+[1m+++ b/cswap/src/snapshots/cswap__parser__tests__func_snap.snap[m
+[36m@@ -1,6 +1,6 @@[m
+ ---[m
+ source: cswap/src/parser.rs[m
+[31m-expression: "define_func(\"(define-fun foo ((a Real) (b String)) Int 7)\")"[m
+[32m+[m[32mexpression: "command(\"(define-fun foo ((a Real) (b String)) Int 7)\")"[m
+ ---[m
+ Ok([m
+     ([m
+[36m@@ -27,9 +27,7 @@[m [mOk([m
+                         ),[m
+                     },[m
+                     RefCell {[m
+[31m-                        value: UserDef([m
+[31m-                            "String",[m
+[31m-                        ),[m
+[32m+[m[32m                        value: Str,[m
+                     },[m
+                 ),[m
+             ],[m
+[1mdiff --git a/cswap/src/snapshots/cswap__parser__tests__z3o_model_snap.snap b/cswap/src/snapshots/cswap__parser__tests__z3o_model_snap.snap[m
+[1mindex 322d62d..9adeef7 100644[m
+[1m--- a/cswap/src/snapshots/cswap__parser__tests__z3o_model_snap.snap[m
+[1m+++ b/cswap/src/snapshots/cswap__parser__tests__z3o_model_snap.snap[m
+[36m@@ -77,9 +77,7 @@[m [mOk([m
+                             "BAV5",[m
+                         ),[m
+                         [],[m
+[31m-                        UserDef([m
+[31m-                            "Bool",[m
+[31m-                        ),[m
+[32m+[m[32m                        Bool,[m
+                         Symbol([m
+                             RefCell {[m
+                                 value: Token([m
+[36m@@ -93,9 +91,7 @@[m [mOk([m
+                             "BAV4",[m
+                         ),[m
+                         [],[m
+[31m-                        UserDef([m
+[31m-                            "Bool",[m
+[31m-                        ),[m
+[32m+[m[32m                        Bool,[m
+                         Symbol([m
+                             RefCell {[m
+                                 value: Token([m
+[36m@@ -109,9 +105,7 @@[m [mOk([m
+                             "BAV3",[m
+                         ),[m
+                         [],[m
+[31m-                        UserDef([m
+[31m-                            "Bool",[m
+[31m-                        ),[m
+[32m+[m[32m                        Bool,[m
+                         Symbol([m
+                             RefCell {[m
+                                 value: Token([m

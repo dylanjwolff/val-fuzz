@@ -1,0 +1,13 @@
+---
+source: cswap/src/parser.rs
+expression: "fp_sort(\"(_ FloatingPoint 11 53)\")"
+---
+Ok(
+    (
+        "",
+        Fp(
+            "11",
+            "53",
+        ),
+    ),
+)
