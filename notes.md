@@ -56,6 +56,6 @@ or
 [] error logging specifics
 
 @TODO 20th July
-[] Parse all function/const definitions/declarations
+[x] Parse all function/const definitions/declarations
 [] Get sort of var from declarations
 [] Change BAV Assign code to use these variables instead of expressions

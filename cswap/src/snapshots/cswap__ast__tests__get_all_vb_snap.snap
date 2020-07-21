@@ -1,0 +1,36 @@
+---
+source: cswap/src/ast.rs
+expression: "script(&format!(\"(declare-const x Int)(declare-fun y () Lst)(define-fun z () Bool (true)){}\",\n                def_fns)).unwrap().1.get_all_global_var_bindings()"
+---
+[
+    (
+        Token(
+            "x",
+        ),
+        UInt,
+    ),
+    (
+        Token(
+            "y",
+        ),
+        UserDef(
+            "Lst",
+        ),
+    ),
+    (
+        Token(
+            "z",
+        ),
+        UserDef(
+            "Bool",
+        ),
+    ),
+    (
+        Token(
+            "f2574$toXml",
+        ),
+        UserDef(
+            "String",
+        ),
+    ),
+]

@@ -1,0 +1,5 @@
+---
+source: cswap/src/parser.rs
+expression: df
+---
+(define-funs-rec ((f0 ((v0 a6)) a4)) (c4$2))

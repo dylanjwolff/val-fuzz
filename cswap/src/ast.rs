@@ -39,7 +39,7 @@ pub enum Command {
     DeclFn(Symbol, Vec<Sort>, Sort),
     DefineFun(Symbol, Vec<(SymbolRc, SortRc)>, Sort, SExpRc),
     DefineFunRec(Symbol, Vec<(SymbolRc, SortRc)>, Sort, SExpRc),
-    DefineFunsRec(Vec<(Symbol, Vec<(SymbolRc, SortRc)>, Sort, SExpRc)>),
+    DefineFunsRec(Vec<(Symbol, Vec<Sort>, Sort)>, Vec<SExp>),
     Generic(String),
 }
 
@@ -281,6 +281,29 @@ impl Script {
             _ => false,
         }
     }
+
+    pub fn get_all_global_var_bindings(&self) -> Vec<(Symbol, Sort)> {
+        let mut var_bindings = vec![];
+        let Script::Commands(cmds) = self;
+        for cmd in cmds {
+            match &*cmd.borrow() {
+                Command::DefineFun(name, _, sort, _) | Command::DefineFunRec(name, _, sort, _) => {
+                    var_bindings.push((name.clone(), sort.clone()))
+                }
+                Command::DefineFunsRec(decls, bodies) => {
+                    for ((name, _, sort), _) in decls.iter().zip(bodies.iter()) {
+                        var_bindings.push((name.clone(), sort.clone()))
+                    }
+                }
+                Command::DeclConst(name, sort) => {
+                    var_bindings.push((Symbol::Token(name.to_owned()), sort.borrow().clone()))
+                }
+                Command::DeclFn(name, _, sort) => var_bindings.push((name.clone(), sort.clone())),
+                _ => (),
+            }
+        }
+        var_bindings
+    }
 }
 
 impl fmt::Display for Script {
@@ -339,15 +362,9 @@ impl fmt::Display for Command {
                 write!(f, ")")
             }
             Command::DeclFn(name, args, rtype) => {
-                write!(f, "(declare-fun {} (", name)?;
-                args.iter()
-                    .enumerate()
-                    .map(|(i, arg)| match i == 0 {
-                        true => write!(f, "{}", arg),
-                        false => write!(f, " {}", arg),
-                    })
-                    .fold(Ok(()), acc_result)?;
-                write!(f, ") {})", rtype)
+                write!(f, "(declare-fun ")?;
+                write_fn_decl(f, name, args, rtype)?;
+                write!(f, ")")
             }
             Command::DefineFun(name, args, rtype, body) => {
                 write!(f, "(define-fun ")?;
@@ -359,16 +376,26 @@ impl fmt::Display for Command {
                 write_fn_definition(f, name, args, rtype, body)?;
                 write!(f, ")")
             }
-            Command::DefineFunsRec(fn_defines) => {
-                write!(f, "(define-funs-rec ")?;
+            Command::DefineFunsRec(decls, bodies) => {
+                write!(f, "(define-funs-rec (")?;
 
-                fn_defines.iter().fold(Ok(()), |acc, fn_def| {
+                decls.iter().fold(Ok(()), |acc, (name, args, sort)| {
                     acc.and_then(|_| {
                         write!(f, "(")?;
-                        write_fn_definition(f, &fn_def.0, &fn_def.1, &fn_def.2, &fn_def.3)?;
-                        write!(f, "(")
+                        write_fn_decl(f, name, args, sort)?;
+                        write!(f, ")")
                     })
-                })
+                })?;
+
+                write!(f, ") (")?;
+                for (i, body) in bodies.iter().enumerate() {
+                    if i == 0 {
+                        write!(f, "{}", body)?;
+                    } else {
+                        write!(f, " {}", body)?;
+                    }
+                }
+                write!(f, "))")
             }
             Command::Generic(s) => write!(f, "{}", s),
             Command::Assert(s) => write!(f, "(assert {})", s.borrow()),
@@ -392,6 +419,23 @@ fn write_fn_definition(
         })
         .fold(Ok(()), acc_result)?;
     write!(f, ") {} {}", rtype, body.borrow())
+}
+
+fn write_fn_decl(
+    f: &mut fmt::Formatter,
+    name: &Symbol,
+    args: &Vec<Sort>,
+    rtype: &Sort,
+) -> fmt::Result {
+    write!(f, "{} (", name)?;
+    args.iter()
+        .enumerate()
+        .map(|(i, arg)| match i == 0 {
+            true => write!(f, "{}", arg),
+            false => write!(f, " {}", arg),
+        })
+        .fold(Ok(()), acc_result)?;
+    write!(f, ") {}", rtype)
 }
 
 impl fmt::Display for Constant {
@@ -790,6 +834,24 @@ mod tests {
     fn sort_display_snap() {
         let sort = Sort::Compound(vec![rccell!(Sort::UInt()), rccell!(Sort::Bool())]);
         assert_debug_snapshot!(format!("{}", sort));
+    }
+
+    #[test]
+    fn get_all_vb_snap() {
+        let def_fns = "(define-funs-rec
+  (
+    (f2574$toXml((lc$$2577 List_CustomerType)) String)
+  )
+  (
+    (ite (is-List_CustomerType$CNil_CustomerType lc$$2577) \"\" (str.++ (f2656$toXml (List_CustomerType$Cstr_CustomerType$head lc$$2577)) (f2574$toXml (List_CustomerType$Cstr_CustomerType$tail lc$$2577))))
+  )
+)";
+        assert_debug_snapshot!(script(&format!(
+            "(declare-const x Int)(declare-fun y () Lst)(define-fun z () Bool (true)){}",
+            def_fns
+        ))
+        .unwrap()
+        .1.get_all_global_var_bindings())
     }
 
     #[test]

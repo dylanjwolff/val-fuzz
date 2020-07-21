@@ -438,10 +438,9 @@ fn fn_decl(s: &str) -> IResult<&str, (Symbol, Vec<Sort>, Sort)> {
 }
 
 fn naked_decl_fn(s: &str) -> IResult<&str, Command> {
-    map(
-        preceded(ws!(tag("declare-fun")), fn_decl),
-        |(name, args, rtype)| Command::DeclFn(name, args, rtype),
-    )(s)
+    map(fn_decl, |(name, args, rtype)| {
+        Command::DeclFn(name, args, rtype)
+    })(s)
 }
 
 fn naked_decl_const(s: &str) -> IResult<&str, (&str, Sort)> {
@@ -558,12 +557,9 @@ fn naked_define_funcs_rec(s: &str) -> IResult<&str, Command> {
     map(
         preceded(
             ws!(tag("define-funs-rec")),
-            tuple((
-                brack_ws!(many1(ws!(brack!(fn_decl)))),
-                ws!(brack_ws!(many1(ws!(sexp)))),
-            )),
+            many0(ws!(mapped_naked_fn_definition)),
         ),
-        |(fn_decls, bodies)| Command::DefineFunsRec(fn_decls, bodies),
+        |fn_defines| Command::DefineFunsRec(fn_defines),
     )(s)
 }
 
@@ -687,24 +683,14 @@ mod tests {
 
     #[test]
     fn fns_define_rec_snap() {
-        let df = command("(define-funs-rec ((f0((v0 a6))a4))(c4$2))")
-            .unwrap()
-            .1;
-        if let Command::DefineFunsRec(_, _) = df {
-            assert_display_snapshot!(df);
-        } else {
-            panic!("Wrong parse of command!");
-        }
+        let df = command("(define-funs-rec ((f0((v0 a6))a4))(c4$2))");
+        assert_debug_snapshot!(df.unwrap().1);
     }
 
     #[test]
     fn fn_define_rec_snap() {
-        let df = command("(define-fun-rec app ((l1 Lst) (l2 Lst)) Lst (ite ((_ is nil) l1) l2 (cons (head l1) (app (tail l1) l2))))").unwrap().1;
-        if let Command::DefineFunRec(_, _, _, _) = df {
-            assert_display_snapshot!(df);
-        } else {
-            panic!("Wrong parse of command!");
-        }
+        let df = command("(define-fun-rec app ((l1 Lst) (l2 Lst)) Lst (ite ((_ is nil) l1) l2 (cons (head l1) (app (tail l1) l2))))");
+        assert_debug_snapshot!(df.unwrap().1);
     }
 
     #[test]
