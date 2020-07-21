@@ -395,7 +395,7 @@ mod test {
 
     #[test]
     fn ba_script_num() {
-        let mut script = script("(assert (= 3 (+ 4 4)))").unwrap().1;
+        let mut script = script("(declare-fun z () Real)(assert (= 3 (+ z 4)))").unwrap().1;
         let mut md = Metadata::new_empty();
         replace_constants_with_fresh_vars(&mut script, &mut md);
         script = ba_script(&mut script, &mut md).unwrap();

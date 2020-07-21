@@ -111,7 +111,7 @@ fn get_boolean_domain_monitors(
                     rccell!(SExp::Symbol(rccell!(Symbol::Token(vname)))),
                 ],
             )],
-            Sort::Dec() => vec![
+            Sort::Dec() | Sort::UInt() => vec![
                 bav_rel_0(vng.get_name(Sort::Bool()), vname.clone(), BoolOp::Equals()),
                 bav_rel_0(vng.get_name(Sort::Bool()), vname.clone(), BoolOp::Lt()),
                 bav_rel_0(vng.get_name(Sort::Bool()), vname.clone(), BoolOp::Gt()),
@@ -156,7 +156,7 @@ fn get_boolean_domain_monitors(
                     FPConst::Nan(eb.clone(), sb.clone()),
                 ),
             ],
-            _ => panic!("Unreachable brangch"),
+            _ => vec![],
         });
 
     let cmds = many_assert(&mut baveq);
@@ -298,9 +298,12 @@ pub fn grab_all_decls(script: &Script) -> Vec<CommandRc> {
     let mut decl_cmds = vec![];
     for cmd in cmds {
         match *cmd.borrow() {
-            Command::DeclFn(_, _, _) | Command::DeclConst(_, _) | Command::GenericDecl(_, _) => {
-                decl_cmds.push(Rc::clone(cmd))
-            }
+            Command::DeclFn(_, _, _)
+            | Command::DeclConst(_, _)
+            | Command::GenericDecl(_, _)
+            | Command::DefineFun(_, _, _, _)
+            | Command::DefineFunRec(_, _, _, _)
+            | Command::DefineFunsRec(_, _) => decl_cmds.push(Rc::clone(cmd)),
             _ => (),
         }
     }
@@ -314,11 +317,19 @@ pub fn ba_script(script: &mut Script, md: &mut Metadata) -> io::Result<Script> {
     let mut bavs = vec![];
     bav(script, &mut vng, &mut bavs)?;
 
+    let og_vars = script
+        .get_all_global_var_bindings()
+        .into_iter()
+        .map(|(a, b)| (a.to_string(), b))
+        .filter(|(name, _sort)| !name.contains("GEN")); // TODO dont do string compares here
+    println!("OG V: {:?}", og_vars);
+
     let bavns = vng
         .vars_generated
         .clone()
         .into_iter()
         .filter(|(name, _sort)| !name.contains("REPL")) // TODO move quantifiers into same step as "let" replacement to avoid this
+        .chain(og_vars)
         .collect();
 
     let (bdomvs, mut bdomcmds) = get_boolean_domain_monitors(bavns);
@@ -902,9 +913,7 @@ fn bav_se(
             // }
             Ok(())
         }
-        SExp::FPExp(op, sort, sexps) => {
-            let sec = SExp::FPExp(op.clone(), sort.clone(), sexps.clone());
-            let pre_uqvars = qvars.uqvars.clone();
+        SExp::StrExp(_, sexps) | SExp::NExp(_, sexps) | SExp::FPExp(_, _, sexps) => {
             let _before_exploration_num_bavs = bavs.len();
             for sexp in sexps {
                 bav_se(
@@ -919,54 +928,6 @@ fn bav_se(
             // NOTE removing "leaf optimization" temporarily as it's unclear how that should
             // interact with abstract domains
             // if bavs.len() <= before_exploration_num_bavs {
-            if let Some((eb, sb)) = sort {
-                let name = vng.get_name(Sort::Fp(eb.clone(), sb.clone()));
-                bavs.push((name, sec, pre_uqvars));
-            }
-            // }
-            Ok(())
-        }
-        SExp::NExp(nop, sexps) => {
-            let sec = SExp::NExp(nop.clone(), sexps.clone());
-            let pre_uqvars = qvars.uqvars.clone();
-            let _before_exploration_num_bavs = bavs.len();
-            for sexp in sexps {
-                bav_se(
-                    false,
-                    &mut *sexp.borrow_mut(),
-                    vng,
-                    bavs,
-                    qvars,
-                    timer.clone(),
-                )?;
-            }
-            // NOTE removing "leaf optimization" temporarily as it's unclear how that should
-            // interact with abstract domains
-            // if bavs.len() <= before_exploration_num_bavs {
-            let name = vng.get_name(Sort::Dec());
-            bavs.push((name, sec, pre_uqvars));
-            // }
-            Ok(())
-        }
-        SExp::StrExp(nop, sexps) => {
-            let sec = SExp::StrExp(nop.clone(), sexps.clone());
-            let pre_uqvars = qvars.uqvars.clone();
-            let _before_exploration_num_bavs = bavs.len();
-            for sexp in sexps {
-                bav_se(
-                    false,
-                    &mut *sexp.borrow_mut(),
-                    vng,
-                    bavs,
-                    qvars,
-                    timer.clone(),
-                )?;
-            }
-            // NOTE removing "leaf optimization" temporarily as it's unclear how that should
-            // interact with abstract domains
-            // if bavs.len() <= before_exploration_num_bavs {
-            let name = vng.get_name(Sort::Str());
-            bavs.push((name, sec, pre_uqvars));
             // }
             Ok(())
         }
@@ -1064,7 +1025,7 @@ mod tests {
 
     #[test]
     fn num_op_ba_script_snap() {
-        let str_script = "(assert (< (+ 4 3) x))";
+        let str_script = "(declare-fun x () Real)(assert (< (+ 4 3) x))";
         let mut p = script(str_script).unwrap().1;
         let ba_str = ba_script(&mut p, &mut Metadata::new_empty())
             .unwrap()
