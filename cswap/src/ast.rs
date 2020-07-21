@@ -287,18 +287,27 @@ impl Script {
         let Script::Commands(cmds) = self;
         for cmd in cmds {
             match &*cmd.borrow() {
-                Command::DefineFun(name, _, sort, _) | Command::DefineFunRec(name, _, sort, _) => {
-                    var_bindings.push((name.clone(), sort.clone()))
+                Command::DefineFun(name, args, sort, _)
+                | Command::DefineFunRec(name, args, sort, _) => {
+                    if 0 == args.len() {
+                        var_bindings.push((name.clone(), sort.clone()))
+                    }
                 }
                 Command::DefineFunsRec(decls, bodies) => {
-                    for ((name, _, sort), _) in decls.iter().zip(bodies.iter()) {
-                        var_bindings.push((name.clone(), sort.clone()))
+                    for ((name, args, sort), _) in decls.iter().zip(bodies.iter()) {
+                        if 0 == args.len() {
+                            var_bindings.push((name.clone(), sort.clone()))
+                        }
                     }
                 }
                 Command::DeclConst(name, sort) => {
                     var_bindings.push((Symbol::Token(name.to_owned()), sort.borrow().clone()))
                 }
-                Command::DeclFn(name, _, sort) => var_bindings.push((name.clone(), sort.clone())),
+                Command::DeclFn(name, args, sort) => {
+                    if 0 == args.len() {
+                        var_bindings.push((name.clone(), sort.clone()))
+                    }
+                }
                 _ => (),
             }
         }
@@ -851,7 +860,8 @@ mod tests {
             def_fns
         ))
         .unwrap()
-        .1.get_all_global_var_bindings())
+        .1
+        .get_all_global_var_bindings())
     }
 
     #[test]

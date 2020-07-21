@@ -25,12 +25,4 @@ expression: "script(&format!(\"(declare-const x Int)(declare-fun y () Lst)(defin
             "Bool",
         ),
     ),
-    (
-        Token(
-            "f2574$toXml",
-        ),
-        UserDef(
-            "String",
-        ),
-    ),
 ]

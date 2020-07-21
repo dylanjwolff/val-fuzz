@@ -57,5 +57,9 @@ or
 
 @TODO 20th July
 [x] Parse all function/const definitions/declarations
-[] Get sort of var from declarations
-[] Change BAV Assign code to use these variables instead of expressions
+[x] Get sort of var from declarations
+[x] Change BAV Assign code to use these variables instead of expressions
+
+@TODO 21st July
+[x] Only do abstract domains for functions without args
+[] Parse FP and Boolean Sorts (and maybe others?) properly
