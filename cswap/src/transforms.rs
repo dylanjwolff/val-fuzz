@@ -383,11 +383,7 @@ pub fn rl(script: &mut Script) -> io::Result<()> {
     };
 
     init_vars(script, vng.vars_generated);
-    let cmds = many_assert(
-        &mut new_vv
-            .iter()
-            .map(|(a, b)| SExp::BExp(rccell!(BoolOp::Equals()), vec![Rc::clone(a), Rc::clone(b)])),
-    );
+    let cmds = many_assert(&mut new_vv.into_iter().map(|v| v.borrow().clone()));
 
     script.insert_all(end_insert_pt(script), &cmds);
     Ok(())
@@ -397,7 +393,7 @@ fn rl_c(
     cmd: &mut Command,
     scoped_vars: &mut BTreeMap<String, Vec<SExp>>,
     vng: &mut VarNameGenerator,
-    new_var_vals: &mut Vec<(SExpRc, SExpRc)>,
+    new_var_vals: &mut Vec<SExpRc>,
     timer: &Timer,
 ) -> io::Result<()> {
     if timer.is_done() {
@@ -419,12 +415,31 @@ fn rl_c(
     }
 }
 
+fn fresh_eq_val_sexp(fresh_name: String, val: &SExpRc, qvars: &QualedVars) -> (SExpRc, SExpRc) {
+    let new_name_sexp = rccell!(SExp::Symbol(rccell!(Symbol::Token(fresh_name))));
+    let equiv = SExp::BExp(
+        rccell!(BoolOp::Equals()),
+        vec![Rc::clone(&new_name_sexp), Rc::clone(val)],
+    );
+    if qvars.uqvars.len() > 0 {
+        (
+            new_name_sexp,
+            rccell!(SExp::QForAll(
+                qvars.uqvars.clone(),
+                rccell!(Box::new(equiv))
+            )),
+        )
+    } else {
+        (new_name_sexp, rccell!(equiv))
+    }
+}
+
 static RECUR_LIMIT: u8 = 10;
 fn rl_s(
     sexp: &mut SExp,
     scoped_vars: &mut BTreeMap<String, Vec<SExp>>,
     vng: &mut VarNameGenerator,
-    new_var_vals: &mut Vec<(SExpRc, SExpRc)>,
+    new_var_vals: &mut Vec<SExpRc>,
     qvars: &mut QualedVars,
     timer: &Timer,
     mut recur_count: u8,
@@ -465,16 +480,9 @@ fn rl_s(
                 let val = match val.borrow().sort() {
                     Some(sort) => {
                         let new_name = vng.get_name(sort.clone());
-                        let new_name_sexp = rccell!(SExp::Symbol(rccell!(Symbol::Token(new_name))));
-                        let new_var_val = if qvars.uqvars.len() > 0 {
-                            rccell!(SExp::QForAll(
-                                qvars.uqvars.clone(),
-                                rccell!(Box::new(val.borrow().clone()))
-                            ))
-                        } else {
-                            Rc::clone(val)
-                        };
-                        new_var_vals.push((Rc::clone(&new_name_sexp), new_var_val));
+                        let (new_name_sexp, new_var_val_sexp) =
+                            fresh_eq_val_sexp(new_name, val, qvars);
+                        new_var_vals.push(new_var_val_sexp);
                         new_name_sexp
                     }
                     None => {
@@ -1283,7 +1291,7 @@ mod tests {
         let expected = e.clone();
         let mut sexp = SExp::Let(
             vec![(rccell!(v.clone()), rccell!(e))],
-            rccell!(Box ::new(SExp::Symbol(rccell!(v)))),
+            rccell!(Box::new(SExp::Symbol(rccell!(v)))),
         );
         let timer = Timer::new_started(Duration::from_secs(100));
         let mut qvars = QualedVars::new();
