@@ -466,7 +466,15 @@ fn rl_s(
                     Some(sort) => {
                         let new_name = vng.get_name(sort.clone());
                         let new_name_sexp = rccell!(SExp::Symbol(rccell!(Symbol::Token(new_name))));
-                        new_var_vals.push((Rc::clone(&new_name_sexp), Rc::clone(val)));
+                        let new_var_val = if qvars.uqvars.len() > 0 {
+                            rccell!(SExp::QForAll(
+                                qvars.uqvars.clone(),
+                                rccell!(Box::new(val.borrow().clone()))
+                            ))
+                        } else {
+                            Rc::clone(val)
+                        };
+                        new_var_vals.push((Rc::clone(&new_name_sexp), new_var_val));
                         new_name_sexp
                     }
                     None => {
@@ -539,7 +547,22 @@ fn rl_s(
             }
             Ok(())
         }
-        SExp::QForAll(_, s) | SExp::QExists(_, s) => rl_s(
+        SExp::QForAll(vbs, s) => {
+            let num_vbs = vbs.len();
+            qvars.add_universals(vbs);
+            rl_s(
+                &mut s.borrow_mut(),
+                scoped_vars,
+                vng,
+                new_var_vals,
+                qvars,
+                timer,
+                recur_count,
+            )?;
+            qvars.pop_n_universal(num_vbs);
+            Ok(())
+        }
+        SExp::QExists(_, s) => rl_s(
             &mut s.borrow_mut(),
             scoped_vars,
             vng,
@@ -1260,14 +1283,14 @@ mod tests {
         let expected = e.clone();
         let mut sexp = SExp::Let(
             vec![(rccell!(v.clone()), rccell!(e))],
-            rccell!(Box::new(SExp::Symbol(rccell!(v)))),
+            rccell!(Box ::new(SExp::Symbol(rccell!(v)))),
         );
         let timer = Timer::new_started(Duration::from_secs(100));
         let mut qvars = QualedVars::new();
         rl_s(
             &mut sexp,
             &mut BTreeMap::new(),
-            &mut VarNameGenerator::new("RL_LET"),
+            &mut VarNameGenerator::new("rl_let"),
             &mut vec![],
             &mut qvars,
             &timer,
@@ -1275,5 +1298,15 @@ mod tests {
         )
         .unwrap();
         assert_eq!(sexp, expected);
+    }
+
+    #[test]
+    fn qual_inside_let_snap() {
+        let mut script = script("(assert (forall ((u Int)) (let ((w (+ u c1))) (> u w)))))")
+            .unwrap()
+            .1;
+
+        rl(&mut script);
+        assert_display_snapshot!(script);
     }
 }
