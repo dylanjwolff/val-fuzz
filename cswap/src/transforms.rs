@@ -404,12 +404,14 @@ fn rl_c(
         return liftio!(Err("Timeout Replacing 'Let' statements"));
     }
 
+    let mut qvars = QualedVars::new();
     match cmd {
         Command::Assert(s) | Command::CheckSatAssuming(s) => rl_s(
             &mut *s.borrow_mut(),
             scoped_vars,
             vng,
             new_var_vals,
+            &mut qvars,
             timer,
             0,
         ),
@@ -423,6 +425,7 @@ fn rl_s(
     scoped_vars: &mut BTreeMap<String, Vec<SExp>>,
     vng: &mut VarNameGenerator,
     new_var_vals: &mut Vec<(SExpRc, SExpRc)>,
+    qvars: &mut QualedVars,
     timer: &Timer,
     mut recur_count: u8,
 ) -> io::Result<()> {
@@ -450,6 +453,7 @@ fn rl_s(
                     scoped_vars,
                     vng,
                     new_var_vals,
+                    qvars,
                     timer,
                     recur_count,
                 )?; // first make sure the val is "let-free"
@@ -486,6 +490,7 @@ fn rl_s(
                 scoped_vars,
                 vng,
                 new_var_vals,
+                qvars,
                 timer,
                 recur_count,
             )?;
@@ -527,6 +532,7 @@ fn rl_s(
                     scoped_vars,
                     vng,
                     new_var_vals,
+                    qvars,
                     timer,
                     recur_count,
                 )?
@@ -538,6 +544,7 @@ fn rl_s(
             scoped_vars,
             vng,
             new_var_vals,
+            qvars,
             timer,
             recur_count,
         ),
@@ -1256,11 +1263,13 @@ mod tests {
             rccell!(Box::new(SExp::Symbol(rccell!(v)))),
         );
         let timer = Timer::new_started(Duration::from_secs(100));
+        let mut qvars = QualedVars::new();
         rl_s(
             &mut sexp,
             &mut BTreeMap::new(),
             &mut VarNameGenerator::new("RL_LET"),
             &mut vec![],
+            &mut qvars,
             &timer,
             0,
         )
