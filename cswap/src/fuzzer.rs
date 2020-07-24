@@ -7,6 +7,7 @@ use crate::parser::script_from_f;
 use crate::parser::script_from_f_unsanitized;
 use crate::solver::check_valid_solve;
 use crate::solver::profiles_solve;
+use crate::solver::randomized_profiles_solve;
 use crate::solver::ProfileIndex;
 use crate::solver::RSolve;
 use crate::transforms::rv;
@@ -257,9 +258,11 @@ lazy_static! {
 }
 
 pub fn solver_fn(filepaths: (PathBuf, PathBuf), enforcement: Vec<(String, bool)>, cfg: &Config) {
-    let results = profiles_solve(
+    let seed = cfg.get_specific_seed(&filepaths.0);
+    let results = randomized_profiles_solve(
         filepaths.0.to_str().unwrap_or("defaultname"),
         &SIMPLE_PROFILE,
+        seed,
     );
 
     results.iter().filter(|r| r.has_sat()).for_each(|r| {
@@ -395,7 +398,9 @@ mod test {
 
     #[test]
     fn ba_script_num() {
-        let mut script = script("(declare-fun z () Real)(assert (= 3 (+ z 4)))").unwrap().1;
+        let mut script = script("(declare-fun z () Real)(assert (= 3 (+ z 4)))")
+            .unwrap()
+            .1;
         let mut md = Metadata::new_empty();
         replace_constants_with_fresh_vars(&mut script, &mut md);
         script = ba_script(&mut script, &mut md).unwrap();

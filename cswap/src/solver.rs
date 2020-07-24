@@ -9,9 +9,9 @@ use subprocess::Popen;
 use subprocess::PopenConfig;
 use subprocess::Redirection;
 
-
 use std::time::Duration;
 
+use log::trace;
 use log::warn;
 use tempfile::Builder;
 
@@ -127,6 +127,40 @@ pub fn profiles_solve(filename: &str, pis: &HashSet<ProfileIndex>) -> Vec<RSolve
     mr_cvc4.chain(mr_z3).collect()
 }
 
+pub fn randomized_profiles_solve(
+    filename: &str,
+    pis: &HashSet<ProfileIndex>,
+    seed: u64,
+) -> Vec<RSolve> {
+    let filepath = Path::new(filename);
+
+    let mut mr_cvc4 = CVC4_PROFILES
+        .iter()
+        .zip(0..CVC4_PROFILES.len() - 1)
+        .filter(|(_, i)| pis.contains(&ProfileIndex::CVC4(*i)))
+        .map(|(p, _)| p.randomize(seed))
+        .map(|profile| profile.run_on(&filepath))
+        .peekable();
+
+    let mut mr_z3 = Z3_PROFILES
+        .iter()
+        .zip(0..Z3_PROFILES.len() - 1)
+        .filter(|(_, i)| pis.contains(&ProfileIndex::Z3(*i)))
+        .map(|(p, _)| p.randomize(seed))
+        .map(|profile| profile.run_on(&filepath))
+        .peekable();
+
+    trace!(
+        "Using e.g. {:?} as CVC4 solver command",
+        mr_cvc4.peek().map(|s| format!("{}", s))
+    );
+    trace!(
+        "Using e.g. {:?} as Z3 solver command",
+        mr_z3.peek().map(|s| format!("{}", s))
+    );
+    mr_cvc4.chain(mr_z3).collect()
+}
+
 impl ProfileIndex {
     pub fn new(ind: usize) -> Self {
         let num_cvc4_profiles = CVC4_PROFILES.len();
@@ -162,6 +196,13 @@ impl CVC4_Command_Builder {
         self.to = duration;
         self.clone()
     }
+    fn randomize(&self, seed: u64) -> Self {
+        let mut next = self.clone();
+        next.cmd.push(format!("random-seed={}", seed));
+        next.cmd.push(format!("seed={}", seed));
+        next
+    }
+
 
     fn models(&mut self) -> Self {
         self.cmd.push("--produce-models".to_owned());
@@ -226,7 +267,7 @@ pub struct Z3_Command_Builder {
 
 impl Z3_Command_Builder {
     fn new() -> Self {
-        let to =Duration::from_secs(6);
+        let to = Duration::from_secs(6);
         Z3_Command_Builder {
             cmd: vec!["z3", "model_validate=true", &format!("-T:{}", to.as_secs())]
                 .into_iter()
@@ -240,6 +281,15 @@ impl Z3_Command_Builder {
         self.cmd[2] = format!("-T:{}", duration.as_secs());
         self.to = duration;
         self.clone()
+    }
+
+    fn randomize(&self, seed: u64) -> Self {
+        let mut next = self.clone();
+        next.cmd.push(format!("smt.random_seed={}", seed));
+        next.cmd
+            .push(format!("smt.arith.random_initial_value=true"));
+        next.cmd.push(format!("smt.phase_selection=5"));
+        next
     }
 
     fn ematching(&mut self, should_ematch: bool) -> Self {
@@ -274,6 +324,18 @@ impl Z3_Command_Builder {
         let mut cmd = self.cmd.clone();
         cmd.push(target.to_str().unwrap().to_owned());
         solve_intern(cmd, Solver::Z3(self.clone()))
+    }
+}
+
+impl fmt::Display for Z3_Command_Builder {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        write!(f, "{}", self.cmd.join(" "))
+    }
+}
+
+impl fmt::Display for CVC4_Command_Builder {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        write!(f, "{}", self.cmd.join(" "))
     }
 }
 
@@ -484,11 +546,11 @@ impl RSolve {
     }
 
     pub fn was_timeout(&self) -> bool {
-        self.was_timeout ||
-        self.lines.iter().any(|l| match l {
-            ResultLine::Timeout => true,
-            _ => false,
-        })
+        self.was_timeout
+            || self.lines.iter().any(|l| match l {
+                ResultLine::Timeout => true,
+                _ => false,
+            })
     }
 
     fn propogate_diff(a: &Vec<ResultLine>, b: &Vec<ResultLine>) -> Result<Vec<ResultLine>, ()> {
@@ -621,7 +683,6 @@ pub fn check_valid_solve_as_temp(script: &Script) -> Result<Vec<RSolve>, String>
 
     Ok(results)
 }
-
 
 #[cfg(test)]
 mod tests {
