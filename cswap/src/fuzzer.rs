@@ -230,7 +230,7 @@ fn report_any_bugs(file: &Path, results: &Vec<RSolve>, fp: &FileProvider) -> boo
         .is_some()
         || if !RSolve::differential_test(&results).is_ok() {
             debug!("Reporting soundness bug for file {:?}", file);
-            fp.bug_report(file, &format!("{:?}", results));
+            fp.bug_report(file, &format!("SOUNDNESS BUG: {:?}", results));
             true
         } else {
             false
