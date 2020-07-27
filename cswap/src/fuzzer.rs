@@ -56,12 +56,13 @@ pub fn exec_single_thread(dirname: &str, cfg: Config) {
     }
 
     let mut seen_subs = BTreeSet::new();
+    let mut resubs = 0;
     for f in q.into_iter() {
         match mutator(f.clone(), &cfg)
             .and_then(|skel| single_thread_group_bav_assign(skel, &cfg))
             .map(|iters| {
                 for iter in iters.into_iter() {
-                    solver_fn(iter, &mut seen_subs, vec![], &cfg);
+                    solver_fn(iter, (&mut resubs, &mut seen_subs), vec![], &cfg);
                 }
             }) {
             Err(e) => warn!("{} in file {:?}", e, f),
@@ -263,10 +264,11 @@ lazy_static! {
 }
 pub fn solver_fn(
     filepaths: (PathBuf, PathBuf),
-    seen_subs: &mut BTreeSet<u64>,
+    stats: (&mut u64, &mut BTreeSet<u64>),
     enforcement: Vec<(String, bool)>,
     cfg: &Config,
 ) {
+    let (resubs, seen_subs) = stats;
     let seed = cfg.get_specific_seed(&filepaths.0);
     let results = randomized_profiles_solve(
         filepaths.0.to_str().unwrap_or("defaultname"),
@@ -275,6 +277,7 @@ pub fn solver_fn(
     );
 
     results.iter().filter(|r| r.has_sat()).for_each(|r| {
+        *resubs = *resubs + 1;
         match resub_model(r, &filepaths, seen_subs, &enforcement, &cfg) {
             Ok(()) => (),
             Err(e) => warn!("Resub error {} for file {:?}", e, filepaths.0),
