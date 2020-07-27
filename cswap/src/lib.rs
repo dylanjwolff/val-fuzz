@@ -153,20 +153,30 @@ fn launch(qs: (InputPPQ, SkeletonQueue), worker_counts: (u8, u8, u8), cfg: Confi
     let mut all_subs_seen = BTreeSet::new();
     let mut all_subs = 0;
     let mut all_iters = 0;
+    let mut all_tos = 0;
     for h in solver_handles {
-        let (i, r, s) = h.unwrap().join().unwrap();
+        let (t, i, r, s) = h.unwrap().join().unwrap();
         debug!("Saw {} unique substitutions (of {} substitutions) from {} iterations on a single thread", s.len(), r, i);
         all_subs_seen = all_subs_seen.union(&s).cloned().collect::<BTreeSet<u64>>();
         all_iters = all_iters + i;
         all_subs = all_subs + r;
+        all_tos = all_tos + t;
+        debug!(
+            "Saw {} of {} iterations time out completely on a single thread",
+            t, i
+        );
         backoff.snooze();
         trace!("Thread finished stage 3");
     }
     info!(
-        "Saw {} unique substitutions (of {} substitutions) from {} iterations on ALL threads",
+        "Saw {} unique substitutions (of {} substitutions) from {} iterations across ALL threads",
         all_subs_seen.len(),
         all_subs,
         all_iters
+    );
+    info!(
+        "Saw {} of {} iterations time out completely across ALL threads",
+        all_tos, all_iters
     );
     info!("Stage 3 Complete");
 }
@@ -318,12 +328,13 @@ fn solver_worker(
     qin: BavAssingedQ,
     prev_stage: StageCompleteA,
     cfg: Config,
-) -> (u64, u64, BTreeSet<u64>) {
+) -> (u64, u64, u64, BTreeSet<u64>) {
     let mut backoff = MyBackoff::new();
 
     let mut seen_subs = BTreeSet::new();
     let mut iters = 0;
     let mut resubs = 0;
+    let mut timeouts = 0;
 
     while !prev_stage.is_complete() || qin.len() > 0 {
         let (enforcemt, filepaths) = match qin.pop() {
@@ -337,13 +348,13 @@ fn solver_worker(
         trace!("Solving {:?}", filepaths.0);
         solver_fn(
             filepaths.clone(),
-            (&mut resubs, &mut seen_subs),
+            (&mut timeouts, &mut resubs, &mut seen_subs),
             enforcemt,
             &cfg,
         );
         trace!("Done solving {:?}", filepaths.0);
     }
-    (iters, resubs, seen_subs)
+    (timeouts, iters, resubs, seen_subs)
 }
 
 fn script_f_from_metadata_f(md_file: &PathBuf, fp: &FileProvider) -> Result<PathBuf, String> {

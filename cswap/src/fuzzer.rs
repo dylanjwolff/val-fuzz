@@ -57,12 +57,13 @@ pub fn exec_single_thread(dirname: &str, cfg: Config) {
 
     let mut seen_subs = BTreeSet::new();
     let mut resubs = 0;
+    let mut tos = 0;
     for f in q.into_iter() {
         match mutator(f.clone(), &cfg)
             .and_then(|skel| single_thread_group_bav_assign(skel, &cfg))
             .map(|iters| {
                 for iter in iters.into_iter() {
-                    solver_fn(iter, (&mut resubs, &mut seen_subs), vec![], &cfg);
+                    solver_fn(iter, (&mut tos, &mut resubs, &mut seen_subs), vec![], &cfg);
                 }
             }) {
             Err(e) => warn!("{} in file {:?}", e, f),
@@ -264,11 +265,11 @@ lazy_static! {
 }
 pub fn solver_fn(
     filepaths: (PathBuf, PathBuf),
-    stats: (&mut u64, &mut BTreeSet<u64>),
+    stats: (&mut u64, &mut u64, &mut BTreeSet<u64>),
     enforcement: Vec<(String, bool)>,
     cfg: &Config,
 ) {
-    let (resubs, seen_subs) = stats;
+    let (timeouts, resubs, seen_subs) = stats;
     let seed = cfg.get_specific_seed(&filepaths.0);
     let results = randomized_profiles_solve(
         filepaths.0.to_str().unwrap_or("defaultname"),
@@ -283,6 +284,14 @@ pub fn solver_fn(
             Err(e) => warn!("Resub error {} for file {:?}", e, filepaths.0),
         }
     });
+
+    let mut non_err = results
+        .iter()
+        .filter(|r| !r.has_unrecoverable_error())
+        .peekable();
+    if non_err.peek().is_some() && non_err.all(|r| r.was_timeout()) {
+        *timeouts = *timeouts + 1;
+    }
 
     if !report_any_bugs(filepaths.0.as_path(), &results, &cfg.file_provider) {
         if cfg.remove_files {
