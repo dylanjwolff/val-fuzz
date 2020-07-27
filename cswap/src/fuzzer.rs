@@ -17,7 +17,11 @@ use crate::utils::DFormatParseError;
 
 use crate::utils::RandUniqPermGen;
 
+use std::collections::hash_map::DefaultHasher;
+use std::collections::BTreeSet;
 use std::fs::OpenOptions;
+use std::hash::Hash;
+use std::hash::Hasher;
 use std::io;
 use walkdir::WalkDir;
 
@@ -51,12 +55,13 @@ pub fn exec_single_thread(dirname: &str, cfg: Config) {
         q.push(filepath);
     }
 
+    let mut seen_subs = BTreeSet::new();
     for f in q.into_iter() {
         match mutator(f.clone(), &cfg)
             .and_then(|skel| single_thread_group_bav_assign(skel, &cfg))
             .map(|iters| {
                 for iter in iters.into_iter() {
-                    solver_fn(iter, vec![], &cfg);
+                    solver_fn(iter, &mut seen_subs, vec![], &cfg);
                 }
             }) {
             Err(e) => warn!("{} in file {:?}", e, f),
@@ -256,8 +261,12 @@ lazy_static! {
             .into_iter()
             .collect();
 }
-
-pub fn solver_fn(filepaths: (PathBuf, PathBuf), enforcement: Vec<(String, bool)>, cfg: &Config) {
+pub fn solver_fn(
+    filepaths: (PathBuf, PathBuf),
+    seen_subs: &mut BTreeSet<u64>,
+    enforcement: Vec<(String, bool)>,
+    cfg: &Config,
+) {
     let seed = cfg.get_specific_seed(&filepaths.0);
     let results = randomized_profiles_solve(
         filepaths.0.to_str().unwrap_or("defaultname"),
@@ -266,7 +275,7 @@ pub fn solver_fn(filepaths: (PathBuf, PathBuf), enforcement: Vec<(String, bool)>
     );
 
     results.iter().filter(|r| r.has_sat()).for_each(|r| {
-        match resub_model(r, &filepaths, &enforcement, &cfg) {
+        match resub_model(r, &filepaths, seen_subs, &enforcement, &cfg) {
             Ok(()) => (),
             Err(e) => warn!("Resub error {} for file {:?}", e, filepaths.0),
         }
@@ -282,20 +291,11 @@ pub fn solver_fn(filepaths: (PathBuf, PathBuf), enforcement: Vec<(String, bool)>
 fn resub_model(
     result: &RSolve,
     filepaths: &(PathBuf, PathBuf),
+    seen_subs: &mut BTreeSet<u64>,
     enforcemt: &Vec<(String, bool)>,
     cfg: &Config,
 ) -> io::Result<()> {
-    trace!(
-        "RESUB! for file {:?}",
-        filepaths
-            .0
-            .file_stem()
-            .unwrap()
-            .to_str()
-            .unwrap()
-            .to_owned()
-            .replace("iter_", "")
-    );
+    debug!("RESUB! for file {:?}", filepaths.0);
 
     let md: Metadata = liftio!(serde_lexpr::from_str(&fs::read_to_string(&filepaths.1)?))?;
 
@@ -314,6 +314,10 @@ fn resub_model(
 
     if to_replace.len() > 0 {
         rv(&mut choles_script, &mut to_replace);
+
+        let mut s = DefaultHasher::new();
+        choles_script.to_string().hash(&mut s);
+        seen_subs.insert(s.finish());
 
         let resubbed_f = cfg
             .file_provider

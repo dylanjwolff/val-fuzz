@@ -43,7 +43,12 @@ use utils::Timer;
 
 use std::cmp::max;
 use std::cmp::min;
+use std::collections::hash_map::DefaultHasher;
+use std::collections::BTreeSet;
+use std::collections::HashSet;
 use std::fs;
+use std::hash::Hash;
+use std::hash::Hasher;
 use std::path::Path;
 use std::path::PathBuf;
 
@@ -111,7 +116,7 @@ fn launch(qs: (InputPPQ, SkeletonQueue), worker_counts: (u8, u8, u8), cfg: Confi
                 .stack_size(cfg.stack_size)
                 .spawn(move || solver_worker(t_baq, t_s2, t_cfg))
         })
-        .collect::<Vec<std::io::Result<JoinHandle<()>>>>();
+        .collect::<Vec<std::io::Result<JoinHandle<_>>>>();
 
     thread::Builder::new()
         .spawn(move || {
@@ -145,11 +150,18 @@ fn launch(qs: (InputPPQ, SkeletonQueue), worker_counts: (u8, u8, u8), cfg: Confi
     info!("Stage 2 Complete");
 
     backoff.reset();
+    let mut all_subs_seen = BTreeSet::new();
     for h in solver_handles {
-        h.unwrap().join().unwrap();
+        let s = h.unwrap().join().unwrap();
+        debug!("Saw {} substitutions from single thread", s.len());
+        all_subs_seen = all_subs_seen.union(&s).cloned().collect::<BTreeSet<u64>>();
         backoff.snooze();
         trace!("Thread finished stage 3");
     }
+    info!(
+        "Saw {} substitutions from all threads combined",
+        all_subs_seen.len()
+    );
     info!("Stage 3 Complete");
 }
 
@@ -296,9 +308,10 @@ fn bav_assign_worker(
     stage.finish();
 }
 
-fn solver_worker(qin: BavAssingedQ, prev_stage: StageCompleteA, cfg: Config) {
+fn solver_worker(qin: BavAssingedQ, prev_stage: StageCompleteA, cfg: Config) -> BTreeSet<u64> {
     let mut backoff = MyBackoff::new();
 
+    let mut seen_subs = BTreeSet::new();
     while !prev_stage.is_complete() || qin.len() > 0 {
         let (enforcemt, filepaths) = match qin.pop() {
             Ok(item) => item,
@@ -308,10 +321,12 @@ fn solver_worker(qin: BavAssingedQ, prev_stage: StageCompleteA, cfg: Config) {
             }
         };
         trace!("Solving {:?}", filepaths.0);
-        solver_fn(filepaths.clone(), enforcemt, &cfg);
+        solver_fn(filepaths.clone(), &mut seen_subs, enforcemt, &cfg);
         trace!("Done solving {:?}", filepaths.0);
     }
+    seen_subs
 }
+
 fn script_f_from_metadata_f(md_file: &PathBuf, fp: &FileProvider) -> Result<PathBuf, String> {
     trace!("Parsing MD file");
     let md_contents =
