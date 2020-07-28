@@ -328,12 +328,13 @@ fn resub_model(
         rv(&mut choles_script, &mut to_replace);
 
         let mut s = DefaultHasher::new();
-        choles_script.to_string().hash(&mut s);
+        let script_str = choles_script.to_string();
+        script_str.hash(&mut s);
         seen_subs.insert(s.finish());
 
         let resubbed_f = cfg
             .file_provider
-            .serialize_resub(&choles_script, &filepaths.0, &md)?;
+            .serialize_resub_str(script_str, &filepaths.0, &md)?;
 
         let results = profiles_solve(resubbed_f.to_str().unwrap_or("defaultname"), &cfg.profiles);
 

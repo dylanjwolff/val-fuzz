@@ -222,6 +222,17 @@ impl FileProvider {
         Ok((fs, fm))
     }
 
+    pub fn serialize_resub_str(
+        &self,
+        script_str: String,
+        iterfile: &Path,
+        md: &Metadata,
+    ) -> Result<PathBuf, io::Error> {
+        let f = self.resubfile(iterfile, md)?;
+        fs::write(&f, script_str)?;
+        Ok(f)
+    }
+
     pub fn serialize_resub(
         &self,
         script: &Script,
