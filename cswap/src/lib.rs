@@ -24,6 +24,7 @@ use crate::fuzzer::mutator;
 use crate::fuzzer::solver_fn;
 use crate::fuzzer::StatefulBavAssign;
 
+use crate::utils::RunStats;
 use crate::utils::StageComplete;
 
 use config::Config;
@@ -43,8 +44,6 @@ use utils::Timer;
 
 use std::cmp::max;
 use std::cmp::min;
-
-use std::collections::BTreeSet;
 
 use std::fs;
 use std::path::Path;
@@ -148,34 +147,15 @@ fn launch(qs: (InputPPQ, SkeletonQueue), worker_counts: (u8, u8, u8), cfg: Confi
     info!("Stage 2 Complete");
 
     backoff.reset();
-    let mut all_subs_seen = BTreeSet::new();
-    let mut all_subs = 0;
-    let mut all_iters = 0;
-    let mut all_tos = 0;
+    let mut all_stats = RunStats::new();
     for h in solver_handles {
-        let (t, i, r, s) = h.unwrap().join().unwrap();
-        debug!("Saw {} unique substitutions (of {} substitutions) from {} iterations on a single thread", s.len(), r, i);
-        all_subs_seen = all_subs_seen.union(&s).cloned().collect::<BTreeSet<u64>>();
-        all_iters = all_iters + i;
-        all_subs = all_subs + r;
-        all_tos = all_tos + t;
-        debug!(
-            "Saw {} of {} iterations time out completely on a single thread",
-            t, i
-        );
+        let stats = h.unwrap().join().unwrap();
+        debug!("Saw {:?} on a single thread", stats);
+        all_stats.merge_in_place(&stats);
         backoff.snooze();
         trace!("Thread finished stage 3");
     }
-    info!(
-        "Saw {} unique substitutions (of {} substitutions) from {} iterations across ALL threads",
-        all_subs_seen.len(),
-        all_subs,
-        all_iters
-    );
-    info!(
-        "Saw {} of {} iterations time out completely across ALL threads",
-        all_tos, all_iters
-    );
+    info!("Saw {:?} across ALL threads", all_stats);
     info!("Stage 3 Complete");
 }
 
@@ -322,17 +302,10 @@ fn bav_assign_worker(
     stage.finish();
 }
 
-fn solver_worker(
-    qin: BavAssingedQ,
-    prev_stage: StageCompleteA,
-    cfg: Config,
-) -> (u64, u64, u64, BTreeSet<u64>) {
+fn solver_worker(qin: BavAssingedQ, prev_stage: StageCompleteA, cfg: Config) -> RunStats {
     let mut backoff = MyBackoff::new();
 
-    let mut seen_subs = BTreeSet::new();
-    let mut iters = 0;
-    let mut resubs = 0;
-    let mut timeouts = 0;
+    let mut stats = RunStats::new();
 
     while !prev_stage.is_complete() || qin.len() > 0 {
         let (enforcemt, filepaths) = match qin.pop() {
@@ -342,17 +315,11 @@ fn solver_worker(
                 continue;
             }
         };
-        iters = iters + 1;
         trace!("Solving {:?}", filepaths.0);
-        solver_fn(
-            filepaths.clone(),
-            (&mut timeouts, &mut resubs, &mut seen_subs),
-            enforcemt,
-            &cfg,
-        );
+        solver_fn(filepaths.clone(), &mut stats, enforcemt, &cfg);
         trace!("Done solving {:?}", filepaths.0);
     }
-    (timeouts, iters, resubs, seen_subs)
+    stats
 }
 
 fn script_f_from_metadata_f(md_file: &PathBuf, fp: &FileProvider) -> Result<PathBuf, String> {

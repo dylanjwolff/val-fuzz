@@ -18,11 +18,8 @@ use crate::utils::RunStats;
 
 use crate::utils::RandUniqPermGen;
 
-use std::collections::hash_map::DefaultHasher;
 use std::collections::BTreeSet;
 use std::fs::OpenOptions;
-use std::hash::Hash;
-use std::hash::Hasher;
 use std::io;
 use walkdir::WalkDir;
 
@@ -56,15 +53,13 @@ pub fn exec_single_thread(dirname: &str, cfg: Config) {
         q.push(filepath);
     }
 
-    let mut seen_subs = BTreeSet::new();
-    let mut resubs = 0;
-    let mut tos = 0;
+    let mut stats = RunStats::new();
     for f in q.into_iter() {
         match mutator(f.clone(), &cfg)
             .and_then(|skel| single_thread_group_bav_assign(skel, &cfg))
             .map(|iters| {
                 for iter in iters.into_iter() {
-                    solver_fn(iter, (&mut tos, &mut resubs, &mut seen_subs), vec![], &cfg);
+                    solver_fn(iter, &mut stats, vec![], &cfg);
                 }
             }) {
             Err(e) => warn!("{} in file {:?}", e, f),
@@ -266,11 +261,10 @@ lazy_static! {
 }
 pub fn solver_fn(
     filepaths: (PathBuf, PathBuf),
-    stats: (&mut u64, &mut u64, &mut BTreeSet<u64>),
+    stats: &mut RunStats,
     enforcement: Vec<(String, bool)>,
     cfg: &Config,
 ) {
-    let (timeouts, resubs, seen_subs) = stats;
     let seed = cfg.get_specific_seed(&filepaths.0);
     let results = randomized_profiles_solve(
         filepaths.0.to_str().unwrap_or("defaultname"),
@@ -278,21 +272,15 @@ pub fn solver_fn(
         seed,
     );
 
+    stats.record_iter();
+    stats.record_stats_for_iter_results(&results);
+
     results.iter().filter(|r| r.has_sat()).for_each(|r| {
-        *resubs = *resubs + 1;
-        match resub_model(r, &filepaths, seen_subs, &enforcement, &cfg) {
+        match resub_model(r, &filepaths, stats, &enforcement, &cfg) {
             Ok(()) => (),
             Err(e) => warn!("Resub error {} for file {:?}", e, filepaths.0),
         }
     });
-
-    let mut non_err = results
-        .iter()
-        .filter(|r| !r.has_unrecoverable_error())
-        .peekable();
-    if non_err.peek().is_some() && non_err.all(|r| r.was_timeout()) {
-        *timeouts = *timeouts + 1;
-    }
 
     if !report_any_bugs(filepaths.0.as_path(), &results, &cfg.file_provider) {
         if cfg.remove_files {
@@ -304,7 +292,7 @@ pub fn solver_fn(
 fn resub_model(
     result: &RSolve,
     filepaths: &(PathBuf, PathBuf),
-    seen_subs: &mut BTreeSet<u64>,
+    stats: &mut RunStats,
     enforcemt: &Vec<(String, bool)>,
     cfg: &Config,
 ) -> io::Result<()> {
@@ -328,16 +316,15 @@ fn resub_model(
     if to_replace.len() > 0 {
         rv(&mut choles_script, &mut to_replace);
 
-        let mut s = DefaultHasher::new();
         let script_str = choles_script.to_string();
-        script_str.hash(&mut s);
-        seen_subs.insert(s.finish());
+        stats.record_sub(&script_str);
 
         let resubbed_f = cfg
             .file_provider
             .serialize_resub_str(script_str, &filepaths.0, &md)?;
 
         let results = profiles_solve(resubbed_f.to_str().unwrap_or("defaultname"), &cfg.profiles);
+        stats.record_stats_for_sub_results(&results);
 
         log_check_enforce(&results, enforcemt);
 

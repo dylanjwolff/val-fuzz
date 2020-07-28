@@ -20,6 +20,7 @@ use std::thread;
 use std::time::Duration;
 use std::time::SystemTime;
 
+#[derive(Debug, Eq, PartialEq, Clone)]
 pub struct RunStats {
     iter_subs: (u64, u64),
     all_non_errs_are_timeouts: (u64, u64),
@@ -41,18 +42,18 @@ impl RunStats {
         }
     }
 
-    pub fn sub(&mut self, sub_str: &str) {
+    pub fn record_sub(&mut self, sub_str: &str) {
         self.iter_subs.1 = self.iter_subs.1 + 1;
         let mut s = DefaultHasher::new();
         sub_str.hash(&mut s);
         self.unique_subs.insert(s.finish());
     }
 
-    pub fn iter(&mut self) {
+    pub fn record_iter(&mut self) {
         self.iter_subs.0 = self.iter_subs.0 + 1;
     }
 
-    pub fn stats_for_iter_results(&mut self, solver_results: &Vec<RSolve>) {
+    pub fn record_stats_for_iter_results(&mut self, solver_results: &Vec<RSolve>) {
         if solver_results.iter().any(|r| r.has_sat()) {
             self.has_sats.0 = self.has_sats.0 + 1;
         }
@@ -72,7 +73,7 @@ impl RunStats {
         }
     }
 
-    pub fn stats_for_sub_results(&mut self, solver_results: &Vec<RSolve>) {
+    pub fn record_stats_for_sub_results(&mut self, solver_results: &Vec<RSolve>) {
         if solver_results.iter().any(|r| r.has_sat()) {
             self.has_sats.1 = self.has_sats.1 + 1;
         }
