@@ -13,6 +13,7 @@ use std::collections::BTreeSet;
 
 use crate::solver::RSolve;
 use std::collections::hash_map::DefaultHasher;
+use std::fmt;
 use std::hash::Hash;
 use std::hash::Hasher;
 use std::sync::Mutex;
@@ -20,7 +21,7 @@ use std::thread;
 use std::time::Duration;
 use std::time::SystemTime;
 
-#[derive(Debug, Eq, PartialEq, Clone)]
+#[derive(Eq, PartialEq, Clone)]
 pub struct RunStats {
     iter_subs: (u64, u64),
     all_non_errs_are_timeouts: (u64, u64),
@@ -28,6 +29,12 @@ pub struct RunStats {
     has_sats: (u64, u64),
     has_unsats: (u64, u64),
     all_err: (u64, u64),
+}
+
+impl fmt::Debug for RunStats {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(f, "RunStats: {{ iter_subs: {:?}, unique_subs: {:?}, has_sats: {:?}, has_unsats: {:?}, all_non_errs_are_timeouts: {:?}, all_err: {:?} }}", self.iter_subs, self.unique_subs.len(), self.has_sats, self.has_unsats,self.all_non_errs_are_timeouts, self.all_err)
+    }
 }
 
 impl RunStats {
