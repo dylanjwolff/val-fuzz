@@ -11,10 +11,107 @@ use std::cmp::Ord;
 use std::collections::BTreeMap;
 use std::collections::BTreeSet;
 
+use crate::solver::RSolve;
+use std::collections::hash_map::DefaultHasher;
+use std::hash::Hash;
+use std::hash::Hasher;
 use std::sync::Mutex;
 use std::thread;
 use std::time::Duration;
 use std::time::SystemTime;
+
+pub struct RunStats {
+    iter_subs: (u64, u64),
+    all_non_errs_are_timeouts: (u64, u64),
+    unique_subs: BTreeSet<u64>,
+    has_sats: (u64, u64),
+    has_unsats: (u64, u64),
+    all_err: (u64, u64),
+}
+
+impl RunStats {
+    pub fn new() -> Self {
+        RunStats {
+            iter_subs: (0, 0),
+            all_non_errs_are_timeouts: (0, 0),
+            unique_subs: BTreeSet::new(),
+            has_sats: (0, 0),
+            has_unsats: (0, 0),
+            all_err: (0, 0),
+        }
+    }
+
+    pub fn sub(&mut self, sub_str: &str) {
+        self.iter_subs.1 = self.iter_subs.1 + 1;
+        let mut s = DefaultHasher::new();
+        sub_str.hash(&mut s);
+        self.unique_subs.insert(s.finish());
+    }
+
+    pub fn iter(&mut self) {
+        self.iter_subs.0 = self.iter_subs.0 + 1;
+    }
+
+    pub fn stats_for_iter_results(&mut self, solver_results: &Vec<RSolve>) {
+        if solver_results.iter().any(|r| r.has_sat()) {
+            self.has_sats.0 = self.has_sats.0 + 1;
+        }
+        if solver_results.iter().any(|r| r.has_unsat()) {
+            self.has_unsats.0 = self.has_unsats.0 + 1;
+        }
+        if solver_results
+            .iter()
+            .filter(|r| !r.has_unrecoverable_error())
+            .all(|r| r.was_timeout())
+            && solver_results.iter().any(|r| !r.has_unrecoverable_error())
+        {
+            self.all_non_errs_are_timeouts.0 = self.all_non_errs_are_timeouts.0 + 1;
+        }
+        if solver_results.iter().all(|r| r.has_unrecoverable_error()) {
+            self.all_err.0 = self.all_err.0 + 1;
+        }
+    }
+
+    pub fn stats_for_sub_results(&mut self, solver_results: &Vec<RSolve>) {
+        if solver_results.iter().any(|r| r.has_sat()) {
+            self.has_sats.1 = self.has_sats.1 + 1;
+        }
+        if solver_results.iter().any(|r| r.has_unsat()) {
+            self.has_unsats.1 = self.has_unsats.1 + 1;
+        }
+        if solver_results
+            .iter()
+            .filter(|r| !r.has_unrecoverable_error())
+            .all(|r| r.was_timeout())
+            && solver_results.iter().any(|r| !r.has_unrecoverable_error())
+        {
+            self.all_non_errs_are_timeouts.1 = self.all_non_errs_are_timeouts.1 + 1;
+        }
+        if solver_results.iter().all(|r| r.has_unrecoverable_error()) {
+            self.all_err.1 = self.all_err.1 + 1;
+        }
+    }
+
+    pub fn merge_in_place(&mut self, other: &Self) {
+        self.iter_subs = add_t(self.iter_subs, other.iter_subs);
+        self.has_sats = add_t(self.has_sats, other.has_sats);
+        self.has_unsats = add_t(self.has_unsats, other.has_unsats);
+        self.all_non_errs_are_timeouts = add_t(
+            self.all_non_errs_are_timeouts,
+            other.all_non_errs_are_timeouts,
+        );
+        self.all_err = add_t(self.all_err, other.all_err);
+        self.unique_subs = self
+            .unique_subs
+            .union(&other.unique_subs)
+            .cloned()
+            .collect();
+    }
+}
+
+fn add_t(a: (u64, u64), b: (u64, u64)) -> (u64, u64) {
+    (a.0 + b.0, a.1 + b.1)
+}
 
 pub struct MyBackoff {
     current_wait: Duration,

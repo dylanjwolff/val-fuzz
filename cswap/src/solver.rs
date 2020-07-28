@@ -203,7 +203,6 @@ impl CVC4_Command_Builder {
         next
     }
 
-
     fn models(&mut self) -> Self {
         self.cmd.push("--produce-models".to_owned());
         self.cmd.push("--check-models".to_owned());

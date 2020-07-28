@@ -14,6 +14,7 @@ use crate::transforms::rv;
 use crate::utils::dyn_fmt;
 use crate::utils::to_strs;
 use crate::utils::DFormatParseError;
+use crate::utils::RunStats;
 
 use crate::utils::RandUniqPermGen;
 
