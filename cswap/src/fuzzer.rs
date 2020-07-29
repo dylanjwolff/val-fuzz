@@ -102,6 +102,10 @@ impl<'a> StatefulBavAssign<'a> {
 
         report_any_bugs(&filepaths.0, &results, &cfg.file_provider);
 
+        if results.iter().any(|r| r.has_unsat() && !r.has_sat()) {
+            warn!("File {:?} has UNSAT skeleton!", filepaths.0);
+        }
+
         if results.iter().all(|r| r.has_unrecoverable_error()) {
             if cfg.remove_files {
                 fs::remove_file(&filepaths.0).unwrap_or(());
