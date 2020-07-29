@@ -394,8 +394,18 @@ fn log_check_enforce(results: &Vec<RSolve>, enforcemt: &Vec<(String, bool)>) {
 pub fn strip_and_transform(source_file: &Path, cfg: &Config) -> io::Result<(Script, Metadata)> {
     let mut script = script_from_f(source_file)?;
 
-    if script.is_unsupported_logic() {
-        return liftio!(Err("Unsupported Logic"));
+    let og_f_results = check_valid_solve(&liftio!(source_file.to_str().ok_or(
+        Err::<&str, String>(format!("Non-str Filename: {:?}!", source_file))
+    ))?);
+
+    if og_f_results
+        .iter()
+        .all(|r| r.has_unrecoverable_error() && !r.has_bug_error())
+    {
+        return liftio!(Err(format!(
+            "Unmodified file {:?} failed to pass initial validation check",
+            source_file
+        )));
     }
 
     let mut md = Metadata::new(source_file);
