@@ -61,7 +61,10 @@ pub fn exec_single_thread(dirname: &str, cfg: Config) {
             .and_then(|skel| single_thread_group_bav_assign(skel, &cfg))
             .map(|iters| {
                 for iter in iters.into_iter() {
-                    solver_fn(iter, &mut to_ctr, &mut stats, vec![], &cfg);
+                    match solver_fn(iter, &mut to_ctr, &mut stats, vec![], &cfg) {
+                        Err(e) => warn!("Solver Error: {} in file {:?}", e, f),
+                        _ => (),
+                    };
                 }
             }) {
             Err(e) => warn!("{} in file {:?}", e, f),
@@ -393,7 +396,7 @@ pub fn strip_and_transform(source_file: &Path, cfg: &Config) -> io::Result<(Scri
 
     let mut md = Metadata::new(source_file);
 
-    replace_constants_with_fresh_vars(&mut script, &mut md);
+    replace_constants_with_fresh_vars(&mut script, &mut md)?;
     let chf = cfg.file_provider.cholesfile(&mut md)?;
     fs::write(chf, script.to_string())?;
 
@@ -423,7 +426,7 @@ mod test {
             .unwrap()
             .1;
         let mut md = Metadata::new_empty();
-        replace_constants_with_fresh_vars(&mut script, &mut md);
+        replace_constants_with_fresh_vars(&mut script, &mut md).unwrap();
         script = ba_script(&mut script, &mut md).unwrap();
         assert_display_snapshot!(script);
     }
@@ -434,7 +437,7 @@ mod test {
             ((_ to_fp 11 53) roundNearestTiesToEven 0.5792861143265499723753464422770775854587554931640625 (- 1022))
             ((_ to_fp 11 53) roundNearestTiesToEven 1.3902774452208657152141313417814671993255615234375 (- 17)))))").unwrap().1;
         let mut md = Metadata::new_empty();
-        replace_constants_with_fresh_vars(&mut script, &mut md);
+        replace_constants_with_fresh_vars(&mut script, &mut md).unwrap();
         script = ba_script(&mut script, &mut md).unwrap();
         assert_display_snapshot!(script);
     }
