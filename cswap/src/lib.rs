@@ -37,6 +37,7 @@ use log::debug;
 use log::info;
 use log::trace;
 use log::warn;
+use std::collections::BTreeMap;
 
 use utils::MyBackoff;
 
@@ -305,6 +306,7 @@ fn bav_assign_worker(
 fn solver_worker(qin: BavAssingedQ, prev_stage: StageCompleteA, cfg: Config) -> RunStats {
     let mut backoff = MyBackoff::new();
 
+    let mut to_ctr = BTreeMap::new();
     let mut stats = RunStats::new();
 
     while !prev_stage.is_complete() || qin.len() > 0 {
@@ -316,7 +318,10 @@ fn solver_worker(qin: BavAssingedQ, prev_stage: StageCompleteA, cfg: Config) -> 
             }
         };
         trace!("Solving {:?}", filepaths.0);
-        solver_fn(filepaths.clone(), &mut stats, enforcemt, &cfg);
+        match solver_fn(filepaths.clone(), &mut to_ctr, &mut stats, enforcemt, &cfg) {
+            Err(e) => warn!("Solve Error: {}", e),
+            _ => (),
+        };
         trace!("Done solving {:?}", filepaths.0);
     }
     stats

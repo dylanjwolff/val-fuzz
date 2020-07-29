@@ -18,7 +18,7 @@ use crate::utils::RunStats;
 
 use crate::utils::RandUniqPermGen;
 
-use std::collections::BTreeSet;
+use std::collections::BTreeMap;
 use std::fs::OpenOptions;
 use std::io;
 use walkdir::WalkDir;
@@ -31,6 +31,7 @@ use std::collections::HashSet;
 
 use crate::liftio;
 use crate::liftio_e;
+use crate::solver::all_non_err_timed_out;
 use bit_vec::BitVec;
 use log::debug;
 use log::trace;
@@ -54,12 +55,16 @@ pub fn exec_single_thread(dirname: &str, cfg: Config) {
     }
 
     let mut stats = RunStats::new();
+    let mut to_ctr = BTreeMap::new();
     for f in q.into_iter() {
         match mutator(f.clone(), &cfg)
             .and_then(|skel| single_thread_group_bav_assign(skel, &cfg))
             .map(|iters| {
                 for iter in iters.into_iter() {
-                    solver_fn(iter, &mut stats, vec![], &cfg);
+                    match solver_fn(iter, &mut to_ctr, &mut stats, vec![], &cfg) {
+                        Err(e) => warn!("Solver Error: {} in file {:?}", e, f),
+                        _ => (),
+                    };
                 }
             }) {
             Err(e) => warn!("{} in file {:?}", e, f),
@@ -264,44 +269,58 @@ lazy_static! {
 }
 pub fn solver_fn(
     filepaths: (PathBuf, PathBuf),
+    to_ctr: &mut BTreeMap<String, u64>,
     stats: &mut RunStats,
     enforcement: Vec<(String, bool)>,
     cfg: &Config,
-) {
-    let seed = cfg.get_specific_seed(&filepaths.0);
+) -> io::Result<()> {
+    let (iter_file, md_file) = &filepaths;
+    let md: Metadata = liftio!(serde_lexpr::from_str(&fs::read_to_string(md_file)?))?;
+    if to_ctr.get(&md.seed_file).map(|sf| *sf > 3).unwrap_or(false) {
+        return liftio!(Err(format!("{:?} exceeded max consec timeouts", iter_file)));
+    }
+
+    let seed = cfg.get_specific_seed(iter_file);
     let results = randomized_profiles_solve(
         filepaths.0.to_str().unwrap_or("defaultname"),
         &SIMPLE_PROFILE,
         seed,
     );
 
+    let ct = to_ctr.entry(md.seed_file.clone()).or_insert(0);
+    if all_non_err_timed_out(&results) {
+        *ct = *ct + 1;
+    } else if *ct > 0 {
+        *ct = *ct - 1;
+    }
+
     stats.record_iter();
     stats.record_stats_for_iter_results(&results);
 
     results.iter().filter(|r| r.has_sat()).for_each(|r| {
-        match resub_model(r, &filepaths, stats, &enforcement, &cfg) {
+        match resub_model(r, &filepaths, &md, stats, &enforcement, &cfg) {
             Ok(()) => (),
-            Err(e) => warn!("Resub error {} for file {:?}", e, filepaths.0),
+            Err(e) => warn!("Resub error {} for file {:?}", e, iter_file),
         }
     });
 
     if !report_any_bugs(filepaths.0.as_path(), &results, &cfg.file_provider) {
         if cfg.remove_files {
-            fs::remove_file(&filepaths.0).unwrap_or(());
+            fs::remove_file(iter_file).unwrap_or(());
         }
     }
+    Ok(())
 }
 
 fn resub_model(
     result: &RSolve,
     filepaths: &(PathBuf, PathBuf),
+    md: &Metadata,
     stats: &mut RunStats,
     enforcemt: &Vec<(String, bool)>,
     cfg: &Config,
 ) -> io::Result<()> {
     debug!("RESUB! for file {:?}", filepaths.0);
-
-    let md: Metadata = liftio!(serde_lexpr::from_str(&fs::read_to_string(&filepaths.1)?))?;
 
     let f_to_replace = match md.ogwms_path(&cfg.file_provider) {
         Some(ogwms_f) => ogwms_f,
@@ -374,13 +393,23 @@ fn log_check_enforce(results: &Vec<RSolve>, enforcemt: &Vec<(String, bool)>) {
 pub fn strip_and_transform(source_file: &Path, cfg: &Config) -> io::Result<(Script, Metadata)> {
     let mut script = script_from_f(source_file)?;
 
-    if script.is_unsupported_logic() {
-        return liftio!(Err("Unsupported Logic"));
+    let og_f_results = check_valid_solve(&liftio!(source_file.to_str().ok_or(
+        Err::<&str, String>(format!("Non-str Filename: {:?}!", source_file))
+    ))?);
+
+    if og_f_results
+        .iter()
+        .all(|r| r.has_unrecoverable_error() && !r.has_bug_error())
+    {
+        return liftio!(Err(format!(
+            "Unmodified file {:?} failed to pass initial validation check",
+            source_file
+        )));
     }
 
     let mut md = Metadata::new(source_file);
 
-    replace_constants_with_fresh_vars(&mut script, &mut md);
+    replace_constants_with_fresh_vars(&mut script, &mut md)?;
     let chf = cfg.file_provider.cholesfile(&mut md)?;
     fs::write(chf, script.to_string())?;
 
@@ -410,7 +439,7 @@ mod test {
             .unwrap()
             .1;
         let mut md = Metadata::new_empty();
-        replace_constants_with_fresh_vars(&mut script, &mut md);
+        replace_constants_with_fresh_vars(&mut script, &mut md).unwrap();
         script = ba_script(&mut script, &mut md).unwrap();
         assert_display_snapshot!(script);
     }
@@ -421,7 +450,7 @@ mod test {
             ((_ to_fp 11 53) roundNearestTiesToEven 0.5792861143265499723753464422770775854587554931640625 (- 1022))
             ((_ to_fp 11 53) roundNearestTiesToEven 1.3902774452208657152141313417814671993255615234375 (- 17)))))").unwrap().1;
         let mut md = Metadata::new_empty();
-        replace_constants_with_fresh_vars(&mut script, &mut md);
+        replace_constants_with_fresh_vars(&mut script, &mut md).unwrap();
         script = ba_script(&mut script, &mut md).unwrap();
         assert_display_snapshot!(script);
     }

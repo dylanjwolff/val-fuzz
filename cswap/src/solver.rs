@@ -415,6 +415,14 @@ impl fmt::Display for Solver {
     }
 }
 
+pub fn all_non_err_timed_out(solver_results: &Vec<RSolve>) -> bool {
+    solver_results
+        .iter()
+        .filter(|r| !r.has_unrecoverable_error())
+        .all(|r| r.was_timeout())
+        && solver_results.iter().any(|r| !r.has_unrecoverable_error())
+}
+
 #[derive(Debug, Eq, PartialEq, Clone)]
 pub struct RSolve {
     was_timeout: bool,

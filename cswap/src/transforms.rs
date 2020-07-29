@@ -286,10 +286,17 @@ pub fn get_bav_assign_fmt_str(bavns: &Vec<(String, Sort)>) -> Vec<CommandRc> {
     many_assert(&mut baveq)
 }
 
-pub fn replace_constants_with_fresh_vars(script: &mut Script, md: &mut Metadata) {
+pub fn replace_constants_with_fresh_vars(script: &mut Script, md: &mut Metadata) -> io::Result<()> {
     let choles = choles(script);
-    if !try_all_rcholes(script, &choles, md, is_valid) {
-        rcholes(script, &choles, md, is_valid);
+
+    if choles.len() == 0 {
+        return liftio!(Err("No Constants to Replace!"));
+    }
+
+    if try_all_rcholes(script, &choles, md, is_valid).is_err() {
+        rcholes(script, &choles, md, is_valid)
+    } else {
+        Ok(())
     }
 }
 
@@ -679,7 +686,7 @@ pub fn try_all_rcholes(
     choles: &Vec<(Rcse, Sort)>,
     md: &mut Metadata,
     validator: fn(&Script) -> bool,
-) -> bool {
+) -> io::Result<()> {
     let mut vng = VarNameGenerator::new("GEN");
     let mut names = vec![];
     let mut ogvs = vec![];
@@ -694,13 +701,13 @@ pub fn try_all_rcholes(
 
     if validator(script) {
         md.constvns.extend(names);
-        true
+        Ok(())
     } else {
         for ((chole, _), ogv) in choles.iter().zip(ogvs.iter()) {
             chole.swap(ogv.clone());
         }
         rmv_cmds(inits);
-        false
+        liftio!(Err("Failed to replace ALL constants"))
     }
 }
 
@@ -709,7 +716,7 @@ pub fn rcholes(
     choles: &Vec<(Rcse, Sort)>,
     md: &mut Metadata,
     validator: fn(&Script) -> bool,
-) {
+) -> io::Result<()> {
     let timer = Timer::new_started(Duration::from_secs(60));
     let mut vng = VarNameGenerator::new("GEN");
     for (chole, sort) in choles {
@@ -733,6 +740,12 @@ pub fn rcholes(
                 chole.swap(o);
             }
         }
+    }
+
+    if md.constvns.len() > 0 {
+        Ok(())
+    } else {
+        liftio!(Err("Failed to Replace ANY Constants!"))
     }
 }
 
@@ -1132,8 +1145,8 @@ mod tests {
         let mut md = Metadata::new_empty();
         let choles = choles(&mut p);
 
-        try_all_rcholes(&mut p, &choles, &mut md, |_s| false);
-        rcholes(&mut p, &choles, &mut md, is_valid);
+        assert!(try_all_rcholes(&mut p, &choles, &mut md, |_s| false).is_err());
+        rcholes(&mut p, &choles, &mut md, is_valid).unwrap();
 
         assert_debug_snapshot!(p.to_string());
     }
@@ -1145,7 +1158,7 @@ mod tests {
         let mut md = Metadata::new_empty();
         let choles = choles(&mut p);
 
-        rcholes(&mut p, &choles, &mut md, is_valid);
+        rcholes(&mut p, &choles, &mut md, is_valid).unwrap();
         assert_debug_snapshot!(p.to_string());
     }
     #[test]
@@ -1155,7 +1168,7 @@ mod tests {
         let mut md = Metadata::new_empty();
         let choles = choles(&mut p);
 
-        rcholes(&mut p, &choles, &mut md, |_s| false);
+        assert!(rcholes(&mut p, &choles, &mut md, |_s| false).is_err());
 
         assert_debug_snapshot!(p.to_string());
     }
@@ -1167,7 +1180,7 @@ mod tests {
         let mut md = Metadata::new_empty();
         let choles = choles(&mut p);
 
-        assert!(!try_all_rcholes(&mut p, &choles, &mut md, |_s| false));
+        assert!(try_all_rcholes(&mut p, &choles, &mut md, |_s| false).is_err());
 
         assert_debug_snapshot!(p.to_string() + "\n" + &md.constvns.join("\n"));
     }
@@ -1179,7 +1192,7 @@ mod tests {
         let mut md = Metadata::new_empty();
         let choles = choles(&mut p);
 
-        assert!(try_all_rcholes(&mut p, &choles, &mut md, is_valid));
+        assert!(try_all_rcholes(&mut p, &choles, &mut md, is_valid).is_ok());
 
         assert_debug_snapshot!(p.to_string() + "\n" + &md.constvns.join("\n"));
     }
@@ -1191,7 +1204,7 @@ mod tests {
         let mut md = Metadata::new_empty();
         let choles = choles(&mut p);
 
-        rcholes(&mut p, &choles, &mut md, is_valid);
+        rcholes(&mut p, &choles, &mut md, is_valid).unwrap();
 
         assert_debug_snapshot!(p.to_string());
     }
@@ -1314,7 +1327,7 @@ mod tests {
             .unwrap()
             .1;
 
-        rl(&mut script);
+        rl(&mut script).unwrap();
         assert_display_snapshot!(script);
     }
 }
