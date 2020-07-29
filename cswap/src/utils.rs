@@ -11,6 +11,7 @@ use std::cmp::Ord;
 use std::collections::BTreeMap;
 use std::collections::BTreeSet;
 
+use crate::solver::all_non_err_timed_out;
 use crate::solver::RSolve;
 use std::collections::hash_map::DefaultHasher;
 use std::fmt;
@@ -67,12 +68,7 @@ impl RunStats {
         if solver_results.iter().any(|r| r.has_unsat()) {
             self.has_unsats.0 = self.has_unsats.0 + 1;
         }
-        if solver_results
-            .iter()
-            .filter(|r| !r.has_unrecoverable_error())
-            .all(|r| r.was_timeout())
-            && solver_results.iter().any(|r| !r.has_unrecoverable_error())
-        {
+        if all_non_err_timed_out(solver_results) {
             self.all_non_errs_are_timeouts.0 = self.all_non_errs_are_timeouts.0 + 1;
         }
         if solver_results.iter().all(|r| r.has_unrecoverable_error()) {
@@ -87,12 +83,7 @@ impl RunStats {
         if solver_results.iter().any(|r| r.has_unsat()) {
             self.has_unsats.1 = self.has_unsats.1 + 1;
         }
-        if solver_results
-            .iter()
-            .filter(|r| !r.has_unrecoverable_error())
-            .all(|r| r.was_timeout())
-            && solver_results.iter().any(|r| !r.has_unrecoverable_error())
-        {
+        if all_non_err_timed_out(solver_results) {
             self.all_non_errs_are_timeouts.1 = self.all_non_errs_are_timeouts.1 + 1;
         }
         if solver_results.iter().all(|r| r.has_unrecoverable_error()) {
