@@ -1,6 +1,6 @@
 ---
 source: cswap/src/fuzzer.rs
-expression: script
+expression: new_script
 ---
 (declare-const BAV1 Bool)
 (declare-const BDOM1 Bool)

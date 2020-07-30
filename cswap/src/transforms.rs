@@ -317,7 +317,7 @@ pub fn grab_all_decls(script: &Script) -> Vec<CommandRc> {
     decl_cmds
 }
 
-pub fn ba_script(script: &mut Script, md: &mut Metadata) -> io::Result<Script> {
+pub fn ba_script(script: &mut Script, md: &mut Metadata) -> io::Result<Vec<Script>> {
     rl(script)?;
 
     let mut vng = VarNameGenerator::new("BAV");
@@ -361,7 +361,7 @@ pub fn ba_script(script: &mut Script, md: &mut Metadata) -> io::Result<Script> {
     let mut ba_script = Script::Commands(decls);
     add_get_model(&mut ba_script);
 
-    Ok(script.clone())
+    Ok(vec![script.clone()])
 }
 
 pub fn add_get_model(script: &mut Script) {
@@ -1080,9 +1080,7 @@ mod tests {
     fn num_op_ba_script_snap() {
         let str_script = "(declare-fun x () Real)(assert (< (+ 4 3) x))";
         let mut p = script(str_script).unwrap().1;
-        let ba_str = ba_script(&mut p, &mut Metadata::new_empty())
-            .unwrap()
-            .to_string();
+        let ba_str = ba_script(&mut p, &mut Metadata::new_empty()).unwrap()[0].to_string();
 
         assert_display_snapshot!(ba_str);
     }
@@ -1092,9 +1090,7 @@ mod tests {
         let str_script =
             "(assert (exists ((a Int)) (< a 4)))(assert (exists ((a String)) (= a \"\")))";
         let mut p = script(str_script).unwrap().1;
-        let ba_str = ba_script(&mut p, &mut Metadata::new_empty())
-            .unwrap()
-            .to_string();
+        let ba_str = ba_script(&mut p, &mut Metadata::new_empty()).unwrap()[0].to_string();
 
         assert_display_snapshot!(ba_str);
     }
@@ -1104,9 +1100,7 @@ mod tests {
         let str_script =
             "(assert (forall ((a Int)) (< a 4)))(assert (exists ((a String)) (= a \"\")))";
         let mut p = script(str_script).unwrap().1;
-        let ba_str = ba_script(&mut p, &mut Metadata::new_empty())
-            .unwrap()
-            .to_string();
+        let ba_str = ba_script(&mut p, &mut Metadata::new_empty()).unwrap()[0].to_string();
 
         assert_display_snapshot!(ba_str);
     }
@@ -1115,9 +1109,7 @@ mod tests {
     fn ba_script_eqv() {
         let str_script = "(assert (exists ((a Int)) (< a 4)))";
         let mut p = script(str_script).unwrap().1;
-        let ba_str = ba_script(&mut p, &mut Metadata::new_empty())
-            .unwrap()
-            .to_string();
+        let ba_str = ba_script(&mut p, &mut Metadata::new_empty()).unwrap()[0].to_string();
 
         assert!(ba_str.contains("declare-const QUAL") || ba_str.contains("declare-fun QUAL"));
     }
@@ -1136,14 +1128,14 @@ mod tests {
         let str_script =
             "(declare-const x Int)(declare-const y Int)(assert (or (and (> x 3) (< y 7)) (= y x)))(assert (distinct y x))";
         let mut p = script(str_script).unwrap().1;
-        assert_display_snapshot!(ba_script(&mut p, &mut Metadata::new_empty()).unwrap());
+        assert_display_snapshot!(ba_script(&mut p, &mut Metadata::new_empty()).unwrap()[0]);
     }
 
     #[test]
     fn decl_order_ba_script_snap() {
         let str_script = "(define-sort FP () (_ FloatingPoint 11 53)) (assert  (exists ((x FP)) (fp.isInfinite (fp.sqrt RTN x))))";
         let mut p = script(str_script).unwrap().1;
-        assert_display_snapshot!(ba_script(&mut p, &mut Metadata::new_empty()).unwrap());
+        assert_display_snapshot!(ba_script(&mut p, &mut Metadata::new_empty()).unwrap()[0]);
     }
 
     #[test]

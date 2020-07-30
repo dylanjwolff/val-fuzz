@@ -1,6 +1,6 @@
 ---
 source: cswap/src/transforms.rs
-expression: "ba_script(&mut p, &mut Metadata::new_empty()).unwrap()"
+expression: "ba_script(&mut p, &mut Metadata::new_empty()).unwrap()[0]"
 ---
 (declare-const BAV1 Bool)
 (declare-const BAV2 Bool)

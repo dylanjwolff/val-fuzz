@@ -237,7 +237,11 @@ fn mutator_worker(qin: InputPPQ, qout: SkeletonQueue, stage: StageCompleteA, cfg
 
         backoff.reset();
         match mutator(filepath.clone(), &cfg) {
-            Ok((skelf, mdf)) => qout.push((skelf, mdf)),
+            Ok(skelfs) => {
+                for (skelf, mdf) in skelfs {
+                    qout.push((skelf, mdf))
+                }
+            }
             Err(e) => warn!("Mutator error: {} in files {:?}", e, filepath),
         };
     }

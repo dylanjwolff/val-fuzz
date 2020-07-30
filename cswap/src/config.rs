@@ -110,8 +110,8 @@ impl FileProvider {
     pub fn skelfile<'a>(&self, md: &'a mut Metadata) -> io::Result<PathBuf> {
         let tfile = Builder::new()
             .prefix("skel_")
-            .rand_bytes(0)
-            .suffix(&md.seed_file)
+            .rand_bytes(2)
+            .suffix(&format!("_{}", md.seed_file))
             .tempfile_in(&self.skeldir)?;
         let (_, pb) = liftio!(tfile.keep())?;
         md.skeleton_file = name(&pb);
@@ -121,8 +121,8 @@ impl FileProvider {
     pub fn mdfile<'a>(&self, md: &'a mut Metadata) -> io::Result<PathBuf> {
         let tfile = Builder::new()
             .prefix("md_")
-            .rand_bytes(0)
-            .suffix(&md.seed_file)
+            .rand_bytes(2)
+            .suffix(&format!("_{}", md.seed_file))
             .tempfile_in(&self.mddir)?;
         let (_, pb) = liftio!(tfile.keep())?;
         md.metadata_file = name(&pb);
@@ -133,7 +133,7 @@ impl FileProvider {
         let tfile = Builder::new()
             .prefix("iter_")
             .rand_bytes(10)
-            .suffix(&("_".to_owned() + &i.to_string() + "_" + &md.seed_file))
+            .suffix(&format!("_{}_{}", i, md.seed_file))
             .tempfile_in(&self.scratchdir)?;
         let (_, pb) = liftio!(tfile.keep())?;
         Ok(pb)
@@ -148,7 +148,7 @@ impl FileProvider {
         let tfile = Builder::new()
             .prefix("resub_")
             .rand_bytes(10)
-            .suffix(&("_".to_owned() + &stem))
+            .suffix(&format!("_{}", stem))
             .tempfile_in(&self.scratchdir)?;
         let (_, pb) = liftio!(tfile.keep())?;
         Ok(pb)

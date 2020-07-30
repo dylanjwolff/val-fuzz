@@ -58,7 +58,13 @@ pub fn exec_single_thread(dirname: &str, cfg: Config) {
     let mut to_ctr = BTreeMap::new();
     for f in q.into_iter() {
         match mutator(f.clone(), &cfg)
-            .and_then(|skel| single_thread_group_bav_assign(skel, &cfg))
+            .map(|skels| {
+                skels
+                    .into_iter()
+                    .flat_map(|skel| single_thread_group_bav_assign(skel, &cfg))
+                    .flat_map(|skelfs| skelfs)
+                    .collect::<Vec<(PathBuf, PathBuf)>>()
+            })
             .map(|iters| {
                 for iter in iters.into_iter() {
                     match solver_fn(iter, &mut to_ctr, &mut stats, vec![], &cfg) {
@@ -73,10 +79,15 @@ pub fn exec_single_thread(dirname: &str, cfg: Config) {
     }
 }
 
-pub fn mutator(filepath: PathBuf, cfg: &Config) -> io::Result<(PathBuf, PathBuf)> {
-    let (script, mut md) = strip_and_transform(&filepath, cfg)?;
-    let (skelf, mdf) = cfg.file_provider.serialize_skel_and_md(&script, &mut md)?;
-    Ok((skelf.to_path_buf(), mdf.to_path_buf()))
+pub fn mutator(filepath: PathBuf, cfg: &Config) -> io::Result<Vec<(PathBuf, PathBuf)>> {
+    let (scripts, mut md) = strip_and_transform(&filepath, cfg)?;
+
+    let mut mutatedfs = vec![];
+    for script in scripts {
+        let (skelf, mdf) = cfg.file_provider.serialize_skel_and_md(&script, &mut md)?;
+        mutatedfs.push((skelf.to_path_buf(), mdf.to_path_buf()));
+    }
+    Ok(mutatedfs)
 }
 
 pub struct StatefulBavAssign<'a> {
@@ -390,7 +401,10 @@ fn log_check_enforce(results: &Vec<RSolve>, enforcemt: &Vec<(String, bool)>) {
     });
 }
 
-pub fn strip_and_transform(source_file: &Path, cfg: &Config) -> io::Result<(Script, Metadata)> {
+pub fn strip_and_transform(
+    source_file: &Path,
+    cfg: &Config,
+) -> io::Result<(Vec<Script>, Metadata)> {
     let mut script = script_from_f(source_file)?;
 
     let og_f_results = check_valid_solve(&liftio!(source_file.to_str().ok_or(
@@ -440,8 +454,8 @@ mod test {
             .1;
         let mut md = Metadata::new_empty();
         replace_constants_with_fresh_vars(&mut script, &mut md).unwrap();
-        script = ba_script(&mut script, &mut md).unwrap();
-        assert_display_snapshot!(script);
+        let new_script = &ba_script(&mut script, &mut md).unwrap()[0];
+        assert_display_snapshot!(new_script);
     }
 
     #[test]
@@ -451,8 +465,8 @@ mod test {
             ((_ to_fp 11 53) roundNearestTiesToEven 1.3902774452208657152141313417814671993255615234375 (- 17)))))").unwrap().1;
         let mut md = Metadata::new_empty();
         replace_constants_with_fresh_vars(&mut script, &mut md).unwrap();
-        script = ba_script(&mut script, &mut md).unwrap();
-        assert_display_snapshot!(script);
+        let new_script = &ba_script(&mut script, &mut md).unwrap()[0];
+        assert_display_snapshot!(new_script);
     }
 
     #[test]
