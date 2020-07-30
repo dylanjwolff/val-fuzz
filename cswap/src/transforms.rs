@@ -344,24 +344,32 @@ pub fn ba_script(script: &mut Script, md: &mut Metadata) -> io::Result<Vec<Scrip
 
     let mut decls = grab_all_decls(script);
 
-    let mut bdom_inits = init_vars(script, bdomvs);
+    let mut bdom_inits = init_vars(script, bdomvs.clone());
     let mut vs = init_vars(script, vng.vars_generated);
     decls.append(&mut vs);
     decls.append(&mut bdom_inits);
     let mut ba = get_boolean_abstraction(bavs);
 
-    let iscript = script.invert();
+    let mut iscript = script.invert();
     script.insert_all(end_insert_pt(script), &ba);
     script.insert_all(end_insert_pt(script), &bdomcmds);
     add_get_model(script);
 
-    decls.append(&mut ba);
-    decls.append(&mut bdomcmds);
+    decls.append(&mut ba.clone());
+    decls.append(&mut bdomcmds.clone());
     decls.push(rccell!(Command::CheckSat()));
     let mut ba_script = Script::Commands(decls);
     add_get_model(&mut ba_script);
 
-    Ok(vec![script.clone()])
+    let CP_OG = true;
+    if !CP_OG {
+        Ok(vec![ba_script])
+    } else {
+        iscript.insert_all(end_insert_pt(&iscript), &ba);
+        iscript.insert_all(end_insert_pt(&iscript), &bdomcmds);
+        add_get_model(&mut iscript);
+        Ok(vec![iscript, script.clone()])
+    }
 }
 
 pub fn add_get_model(script: &mut Script) {
@@ -1100,9 +1108,10 @@ mod tests {
         let str_script =
             "(assert (forall ((a Int)) (< a 4)))(assert (exists ((a String)) (= a \"\")))";
         let mut p = script(str_script).unwrap().1;
-        let ba_str = ba_script(&mut p, &mut Metadata::new_empty()).unwrap()[0].to_string();
-
-        assert_display_snapshot!(ba_str);
+        let bas = ba_script(&mut p, &mut Metadata::new_empty()).unwrap();
+        let ba_stra = bas[0].to_string();
+        let ba_strb = bas[1].to_string();
+        assert_display_snapshot!(ba_stra + "\n\n ~~~~~~~~~~~~~~~~~~~~~~~ \n\n" + &ba_strb);
     }
 
     #[test]

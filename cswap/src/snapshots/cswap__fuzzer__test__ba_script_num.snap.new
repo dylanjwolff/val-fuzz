@@ -10,7 +10,7 @@ expression: new_script
 (declare-const GEN1 Int)
 (declare-const GEN2 Int)
 (declare-fun z () Real)
-(assert (= GEN1 (+ z GEN2)))
+(assert (not (= GEN1 (+ z GEN2))))
 (assert (= BAV1 (= GEN1 (+ z GEN2))))
 (assert (= BDOM1 BAV1))
 (assert (= (= z 0) BDOM2))

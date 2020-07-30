@@ -8,7 +8,7 @@ expression: ba_str
 (declare-const BDOM3 Bool)
 (declare-const BDOM4 Bool)
 (declare-fun x () Real)
-(assert (< (+ 4 3) x))
+(assert (not (< (+ 4 3) x)))
 (assert (= BAV1 (< (+ 4 3) x)))
 (assert (= BDOM1 BAV1))
 (assert (= (= x 0) BDOM2))
