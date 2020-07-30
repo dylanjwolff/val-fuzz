@@ -98,6 +98,7 @@ pub enum BoolOp {
     And(),
     Or(),
     Xor(),
+    Not(),
     Implies(),
     Distinct(),
     Gt(),
@@ -210,6 +211,24 @@ impl Script {
     #[allow(unused)]
     pub fn to_f(&mut self, filepath: &Path) {
         fs::write(filepath, self.to_string());
+    }
+
+    pub fn invert(&self) -> Self {
+        let Script::Commands(cmds) = self;
+        let ncmds = cmds
+            .iter()
+            .map(|cmd| {
+                if let Command::Assert(sexp) = &*cmd.borrow() {
+                    rccell!(Command::Assert(rccell!(SExp::BExp(
+                        rccell!(BoolOp::Not()),
+                        vec![Rc::clone(&sexp)]
+                    ))))
+                } else {
+                    Rc::clone(cmd)
+                }
+            })
+            .collect();
+        Script::Commands(ncmds)
     }
 
     pub fn insert(&mut self, i: usize, cmd: Command) {
@@ -751,6 +770,7 @@ impl fmt::Display for FpOp {
 impl fmt::Display for BoolOp {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         match self {
+            BoolOp::Not() => write!(f, "not"),
             BoolOp::And() => write!(f, "and"),
             BoolOp::Or() => write!(f, "or"),
             BoolOp::Xor() => write!(f, "xor"),

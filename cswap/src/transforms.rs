@@ -349,6 +349,8 @@ pub fn ba_script(script: &mut Script, md: &mut Metadata) -> io::Result<Script> {
     decls.append(&mut vs);
     decls.append(&mut bdom_inits);
     let mut ba = get_boolean_abstraction(bavs);
+
+    let iscript = script.invert();
     script.insert_all(end_insert_pt(script), &ba);
     script.insert_all(end_insert_pt(script), &bdomcmds);
     add_get_model(script);
@@ -1108,7 +1110,6 @@ mod tests {
 
         assert_display_snapshot!(ba_str);
     }
-
 
     #[test]
     fn ba_script_eqv() {
