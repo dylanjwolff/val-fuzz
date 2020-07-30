@@ -358,7 +358,8 @@ pub fn ba_script(script: &mut Script, md: &mut Metadata) -> io::Result<Script> {
     decls.push(rccell!(Command::CheckSat()));
     let mut ba_script = Script::Commands(decls);
     add_get_model(&mut ba_script);
-    Ok(ba_script)
+
+    Ok(script.clone())
 }
 
 pub fn add_get_model(script: &mut Script) {
@@ -1095,6 +1096,19 @@ mod tests {
 
         assert_display_snapshot!(ba_str);
     }
+
+    #[test]
+    fn forall_ba_snap() {
+        let str_script =
+            "(assert (forall ((a Int)) (< a 4)))(assert (exists ((a String)) (= a \"\")))";
+        let mut p = script(str_script).unwrap().1;
+        let ba_str = ba_script(&mut p, &mut Metadata::new_empty())
+            .unwrap()
+            .to_string();
+
+        assert_display_snapshot!(ba_str);
+    }
+
 
     #[test]
     fn ba_script_eqv() {

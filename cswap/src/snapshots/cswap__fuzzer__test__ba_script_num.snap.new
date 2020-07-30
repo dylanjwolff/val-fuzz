@@ -1,0 +1,19 @@
+---
+source: cswap/src/fuzzer.rs
+expression: script
+---
+(declare-const BAV1 Bool)
+(declare-const BDOM1 Bool)
+(declare-const BDOM2 Bool)
+(declare-const BDOM3 Bool)
+(declare-const BDOM4 Bool)
+(declare-const GEN1 Int)
+(declare-const GEN2 Int)
+(declare-fun z () Real)
+(assert (= GEN1 (+ z GEN2)))
+(assert (= BAV1 (= GEN1 (+ z GEN2))))
+(assert (= BDOM1 BAV1))
+(assert (= (= z 0) BDOM2))
+(assert (= (< z 0) BDOM3))
+(assert (= (> z 0) BDOM4))
+
