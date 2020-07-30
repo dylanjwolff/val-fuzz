@@ -13,6 +13,7 @@ use std::collections::BTreeSet;
 
 use crate::solver::all_non_err_timed_out;
 use crate::solver::RSolve;
+use std::cmp::min;
 use std::collections::hash_map::DefaultHasher;
 use std::fmt;
 use std::hash::Hash;
@@ -288,7 +289,8 @@ impl RandUniqPermGen {
         if self.numbits == 0 {
             return None;
         }
-        assert!(self.mask_size <= self.numbits, "mask larger than bits");
+
+        let mask_size = min(self.mask_size, self.numbits);
         if self.use_max && self.max <= self.num_seen() as u32 {
             return None;
         }
@@ -297,13 +299,13 @@ impl RandUniqPermGen {
         while (!self.use_retries && self.use_max) || (self.use_retries && attempt < self.retries) {
             // if the mask is filling more than half full, we will empty from full
             // Otherwise fill from empty
-            let desired = !(self.mask_size >= self.numbits / 2);
+            let desired = !(mask_size >= self.numbits / 2);
             let mut mask = BitVec::from_elem(self.numbits, !desired);
             let mut num_bits_in_desired_state = 0;
             let desired_state_has_this_many_desired_bits = if desired {
-                self.mask_size
+                mask_size
             } else {
-                self.numbits - self.mask_size
+                self.numbits - mask_size
             };
             while num_bits_in_desired_state != desired_state_has_this_many_desired_bits {
                 let i = self.rng.gen_range(0, self.numbits);
@@ -313,7 +315,7 @@ impl RandUniqPermGen {
                 }
             }
             if (Self::get_or_insert(&mut self.seen_masked, &mask).len() as f64).log2()
-                < self.mask_size as f64
+                < mask_size as f64
             {
                 return Some(mask);
             }
