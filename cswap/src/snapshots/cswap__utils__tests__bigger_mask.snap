@@ -1,0 +1,31 @@
+---
+source: cswap/src/utils.rs
+expression: ress
+---
+[
+    Some(
+        (
+            01,
+            11,
+        ),
+    ),
+    Some(
+        (
+            11,
+            11,
+        ),
+    ),
+    Some(
+        (
+            00,
+            11,
+        ),
+    ),
+    Some(
+        (
+            10,
+            11,
+        ),
+    ),
+    None,
+]

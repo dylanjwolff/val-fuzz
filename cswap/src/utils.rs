@@ -216,7 +216,7 @@ pub struct RandUniqPermGen {
     max: u32,
     use_max: bool,
     use_retries: bool,
-    mask_size: usize,
+    max_mask_size: usize,
 }
 
 impl RandUniqPermGen {
@@ -224,7 +224,7 @@ impl RandUniqPermGen {
         seed: u64,
         numbits: usize,
         maxiter: u32,
-        mask_size: usize,
+        max_mask_size: usize,
     ) -> Self {
         let buf = BitVec::from_elem(numbits, false).to_bytes();
         let seen_masked = BTreeMap::new();
@@ -245,7 +245,7 @@ impl RandUniqPermGen {
             max: true_max,
             use_max: true,
             use_retries: true,
-            mask_size: mask_size,
+            max_mask_size: max_mask_size,
         }
     }
 
@@ -269,7 +269,7 @@ impl RandUniqPermGen {
             max: true_max,
             use_max: true,
             use_retries: false,
-            mask_size: numbits,
+            max_mask_size: numbits,
         }
     }
 
@@ -282,7 +282,7 @@ impl RandUniqPermGen {
     }
 
     pub fn mask(&mut self) -> Option<BitVec> {
-        if self.mask_size != self.numbits {
+        if self.max_mask_size != self.numbits {
             assert!(self.use_retries, "must use retries with mask");
         }
 
@@ -290,7 +290,7 @@ impl RandUniqPermGen {
             return None;
         }
 
-        let mask_size = min(self.mask_size, self.numbits);
+        let mask_size = min(self.max_mask_size, self.numbits);
         if self.use_max && self.max <= self.num_seen() as u32 {
             return None;
         }
@@ -348,7 +348,7 @@ impl RandUniqPermGen {
         while (!self.use_retries && self.use_max) || (self.use_retries && attempt < self.retries) {
             self.rng.fill(&mut self.buf[..]);
             let mut bv = BitVec::from_bytes(&self.buf[..]);
-            bv.truncate(self.mask_size);
+            bv.truncate(min(self.max_mask_size, self.numbits));
             is_new = Self::get_or_insert(&mut self.seen_masked, &mask).insert(bv.clone());
             if is_new {
                 return Some((bv, mask));
@@ -434,6 +434,18 @@ mod tests {
     #[test]
     fn mask() {
         let mut ru = RandUniqPermGen::new_masked_with_retries(1, 2, 100, 1);
+        let mut ress = vec![];
+        ress.push(ru.sample_and_mask());
+        ress.push(ru.sample_and_mask());
+        ress.push(ru.sample_and_mask());
+        ress.push(ru.sample_and_mask());
+        ress.push(ru.sample_and_mask());
+        assert_debug_snapshot!(ress);
+    }
+
+    #[test]
+    fn bigger_mask() {
+        let mut ru = RandUniqPermGen::new_masked_with_retries(1, 2, 100, 3);
         let mut ress = vec![];
         ress.push(ru.sample_and_mask());
         ress.push(ru.sample_and_mask());
