@@ -319,7 +319,13 @@ fn solver_worker(qin: BavAssingedQ, prev_stage: StageCompleteA, cfg: Config) -> 
         };
         trace!("Solving {:?}", filepaths.0);
         match solver_fn(filepaths.clone(), &mut to_ctr, &mut stats, enforcemt, &cfg) {
-            Err(e) => warn!("Solve Error: {}", e),
+            Err(e) => {
+                if cfg.remove_files {
+                    fs::remove_file(&filepaths.0).unwrap_or(());
+                    fs::remove_file(&filepaths.1).unwrap_or(());
+                }
+                warn!("Solve Error: {}", e)
+            }
             _ => (),
         };
         trace!("Done solving {:?}", filepaths.0);
