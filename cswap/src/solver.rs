@@ -198,8 +198,8 @@ impl CVC4_Command_Builder {
     }
     fn randomize(&self, seed: u64) -> Self {
         let mut next = self.clone();
-        next.cmd.push(format!("random-seed={}", seed));
-        next.cmd.push(format!("seed={}", seed));
+        next.cmd.push(format!("--random-seed={}", seed >> 0x30));
+        next.cmd.push(format!("--seed={}", seed));
         next
     }
 
@@ -751,6 +751,15 @@ mod tests {
             .ematching(false)
             .flat_rw(false)
             .run_on(Path::new("test/2548.smt2")));
+    }
+
+    #[test]
+    fn run_real_profiles_snap() {
+        let mut pis = HashSet::new();
+        vec![1, 5].into_iter().for_each(|i| {
+            pis.insert(ProfileIndex::new(i));
+        });
+        assert_debug_snapshot!(profiles_solve("test/strings20.smt2", &pis));
     }
 
     #[test]

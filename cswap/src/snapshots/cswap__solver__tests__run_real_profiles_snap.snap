@@ -1,0 +1,59 @@
+---
+source: cswap/src/solver.rs
+expression: "profiles_solve(\"test/strings20.smt2\", &pis)"
+---
+[
+    RSolve {
+        was_timeout: false,
+        was_segv: false,
+        stdout: "sat\n(model\n(define-fun s () String \"\\\"\")\n)\n",
+        stderr: "",
+        lines: [
+            Sat,
+            Generic(
+                "(model",
+            ),
+            Generic(
+                "(define-fun s () String \"\\\"\")",
+            ),
+            Generic(
+                ")",
+            ),
+        ],
+        solver: CVC4(
+            CVC4_Command_Builder {
+                cmd: [
+                    "cvc4",
+                    "--tlimit",
+                    "6000",
+                    "--produce-models",
+                    "--check-models",
+                    "--incremental",
+                    "--strings-exp",
+                ],
+                to: 6s,
+            },
+        ),
+    },
+    RSolve {
+        was_timeout: false,
+        was_segv: false,
+        stdout: "(error \"line 16 column 1: unexpected end of string\")\n",
+        stderr: "",
+        lines: [
+            Error(
+                "line 16 column 1: unexpected end of string",
+            ),
+        ],
+        solver: Z3(
+            Z3_Command_Builder {
+                cmd: [
+                    "z3",
+                    "model_validate=true",
+                    "-T:6",
+                ],
+                to: 6s,
+            },
+        ),
+    },
+]
