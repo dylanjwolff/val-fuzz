@@ -561,6 +561,10 @@ impl RSolve {
     }
 
     fn propogate_diff(a: &Vec<ResultLine>, b: &Vec<ResultLine>) -> Result<Vec<ResultLine>, ()> {
+        if a.len() != b.len() {
+            return Err(());
+        }
+
         a.iter()
             .zip(b.iter())
             .map(|pair| match pair {
@@ -590,6 +594,7 @@ impl RSolve {
                     .map(|l| l.clone()) // TODO
                     .collect::<Vec<ResultLine>>()
             })
+            .filter(|l| l.len() > 0)
             .fold(None, |acc, lines| match acc {
                 None => Some(Ok(lines)),
                 Some(r_acc_lines) => {
