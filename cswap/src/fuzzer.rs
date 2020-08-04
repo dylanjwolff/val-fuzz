@@ -124,6 +124,14 @@ impl<'a> StatefulBavAssign<'a> {
             return liftio!(Err(errmsg));
         }
 
+        if results
+            .iter()
+            .filter(|r| !r.has_unrecoverable_error())
+            .any(|r| r.has_unsat() && !r.has_sat() && !r.has_unknown())
+        {
+            return liftio!(Err("File has unsat skeleton!"));
+        }
+
         let (top, bottom) = Self::split(script);
         let num_bavs = md.bavns.len();
 
