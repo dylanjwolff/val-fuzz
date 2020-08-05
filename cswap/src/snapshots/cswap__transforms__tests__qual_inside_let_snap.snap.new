@@ -1,0 +1,9 @@
+---
+source: cswap/src/transforms.rs
+expression: script
+---
+(declare-const RL_LET1 Real)
+(declare-const QUAL_PRE_REPLACE1 Int)
+(assert (> QUAL_PRE_REPLACE1 RL_LET1))
+(assert (= RL_LET1 (+ QUAL_PRE_REPLACE1 c1)))
+

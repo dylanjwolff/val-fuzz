@@ -959,7 +959,7 @@ impl QualedVars {
     }
 }
 
-const UNIVERSAL_AS_EXISTENTIAL: bool = false;
+const UNIVERSAL_AS_EXISTENTIAL: bool = true;
 
 fn bav_se(
     _is_root: bool,
@@ -1029,6 +1029,9 @@ fn bav_se(
         }
         SExp::Let(_, _) => panic!("Let statments should be filtered out!"),
         SExp::QForAll(vbs, rest) => {
+            if UNIVERSAL_AS_EXISTENTIAL {
+                panic!("Universal Quantifiers should be filtered out!");
+            }
             let num_vbs = vbs.len();
             qvars.add_universals(vbs);
             bav_se(
@@ -1042,19 +1045,7 @@ fn bav_se(
             qvars.pop_n_universal(num_vbs);
             Ok(())
         }
-        SExp::QExists(vbs, rest) => {
-            qvars.add_existentials(vbs);
-            bav_se(
-                false,
-                &mut *rest.borrow_mut(),
-                vng,
-                bavs,
-                qvars,
-                timer.clone(),
-            )?;
-            qvars.pop_all_e(vbs);
-            Ok(())
-        }
+        SExp::QExists(_, _) => panic!("Existential Quantifiers should be filtered out!"),
         SExp::Constant(_) => Ok(()),
         SExp::Symbol(s) => {
             qvars.replace_if_necessary(s);
