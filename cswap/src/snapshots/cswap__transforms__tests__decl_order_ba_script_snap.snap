@@ -2,11 +2,11 @@
 source: cswap/src/transforms.rs
 expression: "ba_script(&mut p, &mut Metadata::new_empty()).unwrap()"
 ---
+(declare-const QUAL_PRE_REPLACE1 FP)
 (define-sort FP  () (_ FloatingPoint 11 53))
 (declare-const BAV1 Bool)
-(declare-const QUAL_REPLACE1 FP)
 (declare-const BDOM1 Bool)
-(assert (= BAV1 (fp.isInfinite (fp.sqrt RTN QUAL_REPLACE1))))
+(assert (= BAV1 (fp.isInfinite (fp.sqrt RTN QUAL_PRE_REPLACE1))))
 (assert (= BDOM1 BAV1))
 (check-sat)
 (get-model)
