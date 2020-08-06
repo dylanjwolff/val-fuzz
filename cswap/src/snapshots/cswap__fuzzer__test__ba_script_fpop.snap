@@ -1,12 +1,7 @@
 ---
 source: cswap/src/fuzzer.rs
-expression: script
+expression: new_script
 ---
-(declare-const GEN1 Real)
-(declare-const GEN2 Int)
-(declare-const GEN3 Real)
-(declare-const GEN4 Int)
-(declare-const mpfx (_ FloatingPoint 11 53))
 (declare-const BAV1 Bool)
 (declare-const BDOM1 Bool)
 (declare-const BDOM2 Bool)
@@ -16,6 +11,12 @@ expression: script
 (declare-const BDOM6 Bool)
 (declare-const BDOM7 Bool)
 (declare-const BDOM8 Bool)
+(declare-const GEN1 Real)
+(declare-const GEN2 Int)
+(declare-const GEN3 Real)
+(declare-const GEN4 Int)
+(declare-const mpfx (_ FloatingPoint 11 53))
+(assert (not (= mpfx (fp.mul roundTowardPositive ((_ to_fp 11 53) roundNearestTiesToEven GEN1 (- GEN2)) ((_ to_fp 11 53) roundNearestTiesToEven GEN3 (- GEN4))))))
 (assert (= BAV1 (= mpfx (fp.mul roundTowardPositive ((_ to_fp 11 53) roundNearestTiesToEven GEN1 (- GEN2)) ((_ to_fp 11 53) roundNearestTiesToEven GEN3 (- GEN4))))))
 (assert (= BDOM1 BAV1))
 (assert (= (= mpfx (_ -oo 11 53)) BDOM2))
@@ -25,6 +26,4 @@ expression: script
 (assert (= (and (fp.gt mpfx (_ +zero 11 53)) (fp.lt mpfx (_ +oo 11 53))) BDOM6))
 (assert (= (= mpfx (_ +oo 11 53)) BDOM7))
 (assert (= (= mpfx (_ NaN 11 53)) BDOM8))
-(check-sat)
-(get-model)
 

@@ -1,9 +1,7 @@
 ---
 source: cswap/src/transforms.rs
-expression: "ba_script(&mut p, &mut Metadata::new_empty()).unwrap()"
+expression: "ba_script(&mut p, &mut Metadata::new_empty()).unwrap()[0]"
 ---
-(declare-const x Int)
-(declare-const y Int)
 (declare-const BAV1 Bool)
 (declare-const BAV2 Bool)
 (declare-const BAV3 Bool)
@@ -22,6 +20,10 @@ expression: "ba_script(&mut p, &mut Metadata::new_empty()).unwrap()"
 (declare-const BDOM10 Bool)
 (declare-const BDOM11 Bool)
 (declare-const BDOM12 Bool)
+(declare-const x Int)
+(declare-const y Int)
+(assert (not (or (and (> x 3) (< y 7)) (= y x))))
+(assert (not (distinct y x)))
 (assert (= BAV1 (> x 3)))
 (assert (= BAV2 (< y 7)))
 (assert (= BAV3 (and (> x 3) (< y 7))))
@@ -40,6 +42,4 @@ expression: "ba_script(&mut p, &mut Metadata::new_empty()).unwrap()"
 (assert (= (= y 0) BDOM10))
 (assert (= (< y 0) BDOM11))
 (assert (= (> y 0) BDOM12))
-(check-sat)
-(get-model)
 

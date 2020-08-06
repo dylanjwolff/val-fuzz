@@ -2,17 +2,16 @@
 source: cswap/src/transforms.rs
 expression: ba_str
 ---
-(declare-fun x () Real)
 (declare-const BAV1 Bool)
 (declare-const BDOM1 Bool)
 (declare-const BDOM2 Bool)
 (declare-const BDOM3 Bool)
 (declare-const BDOM4 Bool)
+(declare-fun x () Real)
+(assert (not (< (+ 4 3) x)))
 (assert (= BAV1 (< (+ 4 3) x)))
 (assert (= BDOM1 BAV1))
 (assert (= (= x 0) BDOM2))
 (assert (= (< x 0) BDOM3))
 (assert (= (> x 0) BDOM4))
-(check-sat)
-(get-model)
 
