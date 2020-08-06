@@ -3,6 +3,7 @@ source: cswap/src/transforms.rs
 expression: script
 ---
 (declare-const RL_LET1 Real)
-(assert (forall ((u Int)) (> u RL_LET1)))
-(assert (forall ((u Int)) (= RL_LET1 (+ u c1))))
+(declare-const QUAL_PRE_REPLACE1 Int)
+(assert (> QUAL_PRE_REPLACE1 RL_LET1))
+(assert (= RL_LET1 (+ QUAL_PRE_REPLACE1 c1)))
 
