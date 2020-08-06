@@ -254,7 +254,7 @@ impl FileProvider {
 #[derive(Serialize, Deserialize, Debug, Eq, PartialEq, Clone)]
 pub struct Metadata {
     pub bavns: Vec<(String, Sort)>,
-    pub constvns: Vec<String>,
+    pub constvns: Vec<(String, Sort)>,
     pub seed_file: String,
     pub skeleton_file: String,
     pub og_w_monitors_skel_file: Option<String>,

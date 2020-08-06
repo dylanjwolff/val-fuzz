@@ -717,7 +717,7 @@ pub fn try_all_rcholes(
         ogvs.push(chole.clone_v());
         let name = vng.get_name(sort.clone());
         chole.swap(SExp::Symbol(rccell!(Symbol::Token(name.clone()))));
-        names.push(name);
+        names.push((name, sort.clone()));
     }
 
     let inits = init_vars(script, vng.vars_generated);
@@ -754,11 +754,11 @@ pub fn rcholes(
         let inits = init_vars(script, vec![vng.vars_generated.pop().unwrap()]);
 
         if validator(script) {
-            md.constvns.push(name.clone())
+            md.constvns.push((name.clone(), sort.clone()))
         } else {
             rmv_cmds(inits);
             if retry_coerce_hole(script, name.clone(), sort, validator) {
-                md.constvns.push(name.clone())
+                md.constvns.push((name.clone(), sort.clone()));
             } else {
                 chole.swap(o);
             }
@@ -1206,7 +1206,16 @@ mod tests {
 
         assert!(try_all_rcholes(&mut p, &choles, &mut md, |_s| false).is_err());
 
-        assert_debug_snapshot!(p.to_string() + "\n" + &md.constvns.join("\n"));
+        assert_debug_snapshot!(
+            p.to_string()
+                + "\n"
+                + &md
+                    .constvns
+                    .iter()
+                    .map(|c| c.0.clone())
+                    .collect::<Vec<String>>()
+                    .join("\n")
+        );
     }
 
     #[test]
@@ -1218,7 +1227,16 @@ mod tests {
 
         assert!(try_all_rcholes(&mut p, &choles, &mut md, is_valid).is_ok());
 
-        assert_debug_snapshot!(p.to_string() + "\n" + &md.constvns.join("\n"));
+        assert_debug_snapshot!(
+            p.to_string()
+                + "\n"
+                + &md
+                    .constvns
+                    .iter()
+                    .map(|c| c.0.clone())
+                    .collect::<Vec<String>>()
+                    .join("\n")
+        );
     }
 
     #[test]
