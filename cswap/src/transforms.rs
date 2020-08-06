@@ -330,6 +330,12 @@ pub fn ba_script(script: &mut Script, md: &mut Metadata) -> io::Result<Vec<Scrip
         .map(|(a, b)| (a.to_string(), b))
         .filter(|(name, _sort)| !name.contains("GEN")); // TODO dont do string compares here
 
+    rl(script)?;
+
+    let mut vng = VarNameGenerator::new("BAV");
+    let mut bavs = vec![];
+    bav(script, &mut vng, &mut bavs)?;
+
     let bavns = vng
         .vars_generated
         .clone()
@@ -386,6 +392,7 @@ pub fn rl(script: &mut Script) -> io::Result<()> {
     let timer = Timer::new_started(Duration::from_secs(5));
     let mut vng = VarNameGenerator::new("RL_LET");
     let mut new_vv = vec![];
+    let mut qvars = QualedVars::new_named("QUAL_PRE_REPLACE");
     match script {
         Script::Commands(cmds) => {
             for cmd in cmds.iter_mut() {
@@ -394,12 +401,14 @@ pub fn rl(script: &mut Script) -> io::Result<()> {
                     &mut scoped_vars,
                     &mut vng,
                     &mut new_vv,
+                    &mut qvars,
                     &timer,
                 )?;
             }
         }
     };
 
+    vng.merge_generated(qvars.vng);
     init_vars(script, vng.vars_generated);
     let cmds = many_assert(&mut new_vv.into_iter().map(|v| v.borrow().clone()));
 
@@ -412,25 +421,26 @@ fn rl_c(
     scoped_vars: &mut BTreeMap<String, Vec<SExp>>,
     vng: &mut VarNameGenerator,
     new_var_vals: &mut Vec<SExpRc>,
+    qvars: &mut QualedVars,
     timer: &Timer,
 ) -> io::Result<()> {
     if timer.is_done() {
         return liftio!(Err("Timeout Replacing 'Let' statements"));
     }
 
-    let mut qvars = QualedVars::new();
     match cmd {
         Command::Assert(s) | Command::CheckSatAssuming(s) => rl_s(
             &mut *s.borrow_mut(),
             scoped_vars,
             vng,
             new_var_vals,
-            &mut qvars,
+            qvars,
             timer,
             0,
         ),
         _ => Ok(()),
-    }
+    }?;
+    Ok(())
 }
 
 fn fresh_eq_val_sexp(fresh_name: String, val: &SExpRc, qvars: &QualedVars) -> (SExpRc, SExpRc) {
@@ -541,6 +551,7 @@ fn rl_s(
             Ok(())
         }
         SExp::Symbol(s) => {
+            qvars.replace_if_necessary(s);
             let new_s = scoped_vars
                 .get(&s.borrow().to_string()[..])
                 .and_then(|v| v.last());
@@ -575,7 +586,11 @@ fn rl_s(
         }
         SExp::QForAll(vbs, s) => {
             let num_vbs = vbs.len();
-            qvars.add_universals(vbs);
+            if !UNIVERSAL_AS_EXISTENTIAL {
+                qvars.add_universals(vbs);
+            } else {
+                qvars.add_existentials(vbs);
+            }
             rl_s(
                 &mut s.borrow_mut(),
                 scoped_vars,
@@ -585,18 +600,32 @@ fn rl_s(
                 timer,
                 recur_count,
             )?;
-            qvars.pop_n_universal(num_vbs);
+
+            if !UNIVERSAL_AS_EXISTENTIAL {
+                qvars.pop_n_universal(num_vbs);
+            } else {
+                qvars.pop_all_e(vbs);
+                let b = (**s.borrow()).clone();
+                *sexp = b; // replace existential
+            }
             Ok(())
         }
-        SExp::QExists(_, s) => rl_s(
-            &mut s.borrow_mut(),
-            scoped_vars,
-            vng,
-            new_var_vals,
-            qvars,
-            timer,
-            recur_count,
-        ),
+        SExp::QExists(vbs, s) => {
+            qvars.add_existentials(vbs);
+            rl_s(
+                &mut s.borrow_mut(),
+                scoped_vars,
+                vng,
+                new_var_vals,
+                qvars,
+                timer,
+                recur_count,
+            )?;
+            qvars.pop_all_e(vbs);
+            let b = (**s.borrow()).clone();
+            *sexp = b; // replace existential
+            Ok(())
+        }
         SExp::Constant(_) => Ok(()),
     }
 }
@@ -886,6 +915,14 @@ struct QualedVars {
 }
 
 impl QualedVars {
+    pub fn new_named(s: &str) -> Self {
+        QualedVars {
+            uqvars: vec![],
+            replacer: BTreeMap::new(),
+            vng: VarNameGenerator::new(s),
+        }
+    }
+
     pub fn new() -> Self {
         QualedVars {
             uqvars: vec![],
@@ -938,6 +975,8 @@ impl QualedVars {
         to_pop.iter().for_each(|(ntp, _)| self.pop_e(ntp));
     }
 }
+
+const UNIVERSAL_AS_EXISTENTIAL: bool = true;
 
 fn bav_se(
     _is_root: bool,
@@ -1007,6 +1046,9 @@ fn bav_se(
         }
         SExp::Let(_, _) => panic!("Let statments should be filtered out!"),
         SExp::QForAll(vbs, rest) => {
+            if UNIVERSAL_AS_EXISTENTIAL {
+                panic!("Universal Quantifiers should be filtered out!");
+            }
             let num_vbs = vbs.len();
             qvars.add_universals(vbs);
             bav_se(
@@ -1020,19 +1062,7 @@ fn bav_se(
             qvars.pop_n_universal(num_vbs);
             Ok(())
         }
-        SExp::QExists(vbs, rest) => {
-            qvars.add_existentials(vbs);
-            bav_se(
-                false,
-                &mut *rest.borrow_mut(),
-                vng,
-                bavs,
-                qvars,
-                timer.clone(),
-            )?;
-            qvars.pop_all_e(vbs);
-            Ok(())
-        }
+        SExp::QExists(_, _) => panic!("Existential Quantifiers should be filtered out!"),
         SExp::Constant(_) => Ok(()),
         SExp::Symbol(s) => {
             qvars.replace_if_necessary(s);
