@@ -69,30 +69,43 @@ fn get_inter_relation_constant_monitors(
     let mut vng = VarNameGenerator::new("INTER_CMON");
     let mut eq_sexps = vec![];
     for (i, (cname, csort)) in constants.iter().enumerate() {
-        for j in (i+1..constants.len()) { 
+        for j in (i + 1..constants.len()) {
             let (ocname, ocsort) = &constants[j];
             match (csort, ocsort) {
-                (Sort::Str(), Sort::Str()) |
-                (Sort::UInt(), Sort::Dec()) |
-                (Sort::Dec(), Sort::UInt()) |
-                (Sort::Dec(), Sort::Dec()) |
-                (Sort::Bool(), Sort::Bool()) |
-                (Sort::UInt(), Sort::UInt()) => {
+                (Sort::Str(), Sort::Str())
+                | (Sort::UInt(), Sort::Dec())
+                | (Sort::Dec(), Sort::UInt())
+                | (Sort::Dec(), Sort::Dec())
+                | (Sort::Bool(), Sort::Bool())
+                | (Sort::UInt(), Sort::UInt()) => {
                     let monitor = vng.get_name(Sort::Bool());
-                    let eq_sexp = eq_se(SExp::var(&monitor), eq_se(SExp::var(cname), SExp::var(ocname)));
+                    let eq_sexp = eq_se(
+                        SExp::var(&monitor),
+                        eq_se(SExp::var(cname), SExp::var(ocname)),
+                    );
                     eq_sexps.push(eq_sexp);
                 }
-                (Sort::Fp(a, b), Sort::Fp(aa, bb)) =>  if a == aa && b == bb {
-                    let monitor = vng.get_name(Sort::Bool());
-                    let eq_sexp = eq_se(SExp::var(&monitor), eq_se(SExp::var(cname), SExp::var(ocname)));
-                    eq_sexps.push(eq_sexp);
+                (Sort::Fp(a, b), Sort::Fp(aa, bb)) => {
+                    if a == aa && b == bb {
+                        let monitor = vng.get_name(Sort::Bool());
+                        let eq_sexp = eq_se(
+                            SExp::var(&monitor),
+                            eq_se(SExp::var(cname), SExp::var(ocname)),
+                        );
+                        eq_sexps.push(eq_sexp);
+                    }
                 }
-                (Sort::BitVec(a), Sort::BitVec(aa)) =>  if a == aa {
-                    let monitor = vng.get_name(Sort::Bool());
-                    let eq_sexp = eq_se(SExp::var(&monitor), eq_se(SExp::var(cname), SExp::var(ocname)));
-                    eq_sexps.push(eq_sexp);
+                (Sort::BitVec(a), Sort::BitVec(aa)) => {
+                    if a == aa {
+                        let monitor = vng.get_name(Sort::Bool());
+                        let eq_sexp = eq_se(
+                            SExp::var(&monitor),
+                            eq_se(SExp::var(cname), SExp::var(ocname)),
+                        );
+                        eq_sexps.push(eq_sexp);
+                    }
                 }
-                _ => ()
+                _ => (),
             }
         }
     }
@@ -101,13 +114,9 @@ fn get_inter_relation_constant_monitors(
     (vng.vars_generated, cmds)
 }
 
-fn eq_se(a : SExp, b : SExp) -> SExp {
-    SExp::BExp(
-        rccell!(BoolOp::Equals()),
-        vec![rccell!(a), rccell!(b)],
-    )
+fn eq_se(a: SExp, b: SExp) -> SExp {
+    SExp::BExp(rccell!(BoolOp::Equals()), vec![rccell!(a), rccell!(b)])
 }
-
 
 fn init_vars(script: &mut Script, vars: Vec<(String, Sort)>) -> Vec<CommandRc> {
     let Script::Commands(cmds) = script;
@@ -402,9 +411,13 @@ pub fn ba_script(script: &mut Script, md: &mut Metadata) -> io::Result<Script> {
         .collect();
 
     let (bdomvs, mut bdomcmds) = get_boolean_domain_monitors(bavns);
-    let (subset_constvs) = get_subset_consts(md.constvns.clone(), 15, &Config::default()).unwrap_or(vec![]);
+
+    let num_const_to_relate = if USE_RELATIONAL_CONST_MONITORS { 15 } else { 0 };
+    let (subset_constvs) =
+        get_subset_consts(md.constvns.clone(), num_const_to_relate, &Config::default())
+            .unwrap_or(vec![]);
     let (intervs, mut intercmds) = get_inter_relation_constant_monitors(subset_constvs);
-    
+
     md.bavns.append(&mut bdomvs.clone());
     md.bavns.append(&mut intervs.clone());
 
@@ -1034,6 +1047,7 @@ impl QualedVars {
     }
 }
 
+const USE_RELATIONAL_CONST_MONITORS: bool = true;
 const UNIVERSAL_AS_EXISTENTIAL: bool = true;
 
 fn bav_se(
@@ -1160,10 +1174,22 @@ mod tests {
             ("222".to_string(), Sort::Dec()),
             ("mmmm".to_string(), Sort::Str()),
             ("nnnn".to_string(), Sort::Str()),
-            ("AAAAA".to_string(), Sort::Fp("2".to_string(), "2".to_string())),
-            ("BBBBB".to_string(), Sort::Fp("2".to_string(), "2".to_string())),
-            ("CCCCC".to_string(), Sort::Fp("2".to_string(), "3".to_string())),
-            ("DDDDD".to_string(), Sort::Fp("3".to_string(), "2".to_string())),
+            (
+                "AAAAA".to_string(),
+                Sort::Fp("2".to_string(), "2".to_string()),
+            ),
+            (
+                "BBBBB".to_string(),
+                Sort::Fp("2".to_string(), "2".to_string()),
+            ),
+            (
+                "CCCCC".to_string(),
+                Sort::Fp("2".to_string(), "3".to_string()),
+            ),
+            (
+                "DDDDD".to_string(),
+                Sort::Fp("3".to_string(), "2".to_string()),
+            ),
             ("XXXXX".to_string(), Sort::BitVec(3)),
             ("YYYYY".to_string(), Sort::BitVec(3)),
             ("ZZZZZ".to_string(), Sort::BitVec(2)),
@@ -1172,7 +1198,7 @@ mod tests {
         let idm = get_inter_relation_constant_monitors(consts);
         assert_display_snapshot!(Script::Commands(idm.1));
     }
-    
+
     #[test]
     fn get_subset_consts_snap() {
         let consts = vec![
