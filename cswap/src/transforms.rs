@@ -1,8 +1,10 @@
 use crate::ast::{BoolOp, Command, Constant, FPConst, SExp, Script, Sort, Symbol};
 use crate::ast::{CommandRc, SExpRc, SortRc, SymbolRc};
 
+use crate::config::Config;
 use crate::liftio;
 use crate::solver::check_valid_solve_as_temp;
+use crate::utils::RandUniqPermGen;
 use crate::Metadata;
 use crate::Timer;
 use log::warn;
@@ -44,6 +46,21 @@ impl VarNameGenerator {
     pub fn merge_generated(&mut self, other: Self) {
         self.vars_generated.extend(other.vars_generated);
     }
+}
+
+fn get_subset_consts(
+    consts: Vec<(String, Sort)>,
+    num: usize,
+    cfg: &Config,
+) -> Option<Vec<(String, Sort)>> {
+    let mut permgen = RandUniqPermGen::new_masked_with_retries(0, consts.len(), 1000, num);
+    // seed, numbits, iter, mask size
+    permgen.mask().map(|mask| {
+        mask.iter()
+            .zip(consts.into_iter())
+            .filter_map(|(tv, c)| if tv { Some(c) } else { None })
+            .collect()
+    })
 }
 
 fn init_vars(script: &mut Script, vars: Vec<(String, Sort)>) -> Vec<CommandRc> {
@@ -1073,6 +1090,23 @@ mod tests {
     use crate::parser::sexp;
     use insta::assert_debug_snapshot;
     use insta::assert_display_snapshot;
+
+    #[test]
+    fn get_subset_consts_snap() {
+        let consts = vec![
+            ("a".to_string(), Sort::Bool()),
+            ("b".to_string(), Sort::Bool()),
+            ("c".to_string(), Sort::Bool()),
+            ("d".to_string(), Sort::UInt()),
+            ("e".to_string(), Sort::UInt()),
+            ("f".to_string(), Sort::UInt()),
+        ];
+
+        let cfg = Config::default();
+
+        let subset = get_subset_consts(consts, 3, &cfg);
+        assert_debug_snapshot!(subset);
+    }
 
     #[test]
     fn fp_eq_snap() {
