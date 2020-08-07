@@ -3,6 +3,12 @@ source: cswap/src/fuzzer.rs
 expression: new_script
 ---
 (declare-const BAV1 Bool)
+(declare-const INTER_CMON1 Bool)
+(declare-const INTER_CMON2 Bool)
+(declare-const INTER_CMON3 Bool)
+(declare-const INTER_CMON4 Bool)
+(declare-const INTER_CMON5 Bool)
+(declare-const INTER_CMON6 Bool)
 (declare-const BDOM1 Bool)
 (declare-const BDOM2 Bool)
 (declare-const BDOM3 Bool)
@@ -26,4 +32,10 @@ expression: new_script
 (assert (= (and (fp.gt mpfx (_ +zero 11 53)) (fp.lt mpfx (_ +oo 11 53))) BDOM6))
 (assert (= (= mpfx (_ +oo 11 53)) BDOM7))
 (assert (= (= mpfx (_ NaN 11 53)) BDOM8))
+(assert (= INTER_CMON1 (= GEN1 GEN2)))
+(assert (= INTER_CMON2 (= GEN1 GEN3)))
+(assert (= INTER_CMON3 (= GEN1 GEN4)))
+(assert (= INTER_CMON4 (= GEN2 GEN3)))
+(assert (= INTER_CMON5 (= GEN2 GEN4)))
+(assert (= INTER_CMON6 (= GEN3 GEN4)))
 

@@ -1,0 +1,15 @@
+---
+source: cswap/src/transforms.rs
+expression: "Script::Commands(idm.1)"
+---
+(assert (= INTER_CMON1 (= a b)))
+(assert (= INTER_CMON2 (= yy zz)))
+(assert (= INTER_CMON3 (= yy 111)))
+(assert (= INTER_CMON4 (= yy 222)))
+(assert (= INTER_CMON5 (= zz 111)))
+(assert (= INTER_CMON6 (= zz 222)))
+(assert (= INTER_CMON7 (= 111 222)))
+(assert (= INTER_CMON8 (= mmmm nnnn)))
+(assert (= INTER_CMON9 (= AAAAA BBBBB)))
+(assert (= INTER_CMON10 (= XXXXX YYYYY)))
+

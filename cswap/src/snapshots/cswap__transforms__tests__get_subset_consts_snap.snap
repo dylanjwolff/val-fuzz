@@ -1,0 +1,20 @@
+---
+source: cswap/src/transforms.rs
+expression: subset
+---
+Some(
+    [
+        (
+            "c",
+            Bool,
+        ),
+        (
+            "d",
+            UInt,
+        ),
+        (
+            "e",
+            UInt,
+        ),
+    ],
+)

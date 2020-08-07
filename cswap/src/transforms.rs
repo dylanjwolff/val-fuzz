@@ -1,8 +1,10 @@
 use crate::ast::{BoolOp, Command, Constant, FPConst, SExp, Script, Sort, Symbol};
 use crate::ast::{CommandRc, SExpRc, SortRc, SymbolRc};
 
+use crate::config::Config;
 use crate::liftio;
 use crate::solver::check_valid_solve_as_temp;
+use crate::utils::RandUniqPermGen;
 use crate::Metadata;
 use crate::Timer;
 use log::warn;
@@ -44,6 +46,76 @@ impl VarNameGenerator {
     pub fn merge_generated(&mut self, other: Self) {
         self.vars_generated.extend(other.vars_generated);
     }
+}
+
+fn get_subset_consts(
+    consts: Vec<(String, Sort)>,
+    num: usize,
+    cfg: &Config,
+) -> Option<Vec<(String, Sort)>> {
+    let mut permgen = RandUniqPermGen::new_masked_with_retries(0, consts.len(), 1000, num);
+    // seed, numbits, iter, mask size
+    permgen.mask().map(|mask| {
+        mask.iter()
+            .zip(consts.into_iter())
+            .filter_map(|(tv, c)| if tv { Some(c) } else { None })
+            .collect()
+    })
+}
+
+fn get_inter_relation_constant_monitors(
+    constants: Vec<(String, Sort)>,
+) -> (Vec<(String, Sort)>, Vec<CommandRc>) {
+    let mut vng = VarNameGenerator::new("INTER_CMON");
+    let mut eq_sexps = vec![];
+    for (i, (cname, csort)) in constants.iter().enumerate() {
+        for j in (i + 1..constants.len()) {
+            let (ocname, ocsort) = &constants[j];
+            match (csort, ocsort) {
+                (Sort::Str(), Sort::Str())
+                | (Sort::UInt(), Sort::Dec())
+                | (Sort::Dec(), Sort::UInt())
+                | (Sort::Dec(), Sort::Dec())
+                | (Sort::Bool(), Sort::Bool())
+                | (Sort::UInt(), Sort::UInt()) => {
+                    let monitor = vng.get_name(Sort::Bool());
+                    let eq_sexp = eq_se(
+                        SExp::var(&monitor),
+                        eq_se(SExp::var(cname), SExp::var(ocname)),
+                    );
+                    eq_sexps.push(eq_sexp);
+                }
+                (Sort::Fp(a, b), Sort::Fp(aa, bb)) => {
+                    if a == aa && b == bb {
+                        let monitor = vng.get_name(Sort::Bool());
+                        let eq_sexp = eq_se(
+                            SExp::var(&monitor),
+                            eq_se(SExp::var(cname), SExp::var(ocname)),
+                        );
+                        eq_sexps.push(eq_sexp);
+                    }
+                }
+                (Sort::BitVec(a), Sort::BitVec(aa)) => {
+                    if a == aa {
+                        let monitor = vng.get_name(Sort::Bool());
+                        let eq_sexp = eq_se(
+                            SExp::var(&monitor),
+                            eq_se(SExp::var(cname), SExp::var(ocname)),
+                        );
+                        eq_sexps.push(eq_sexp);
+                    }
+                }
+                _ => (),
+            }
+        }
+    }
+
+    let cmds = many_assert(&mut eq_sexps.into_iter());
+    (vng.vars_generated, cmds)
+}
+
+fn eq_se(a: SExp, b: SExp) -> SExp {
+    SExp::BExp(rccell!(BoolOp::Equals()), vec![rccell!(a), rccell!(b)])
 }
 
 fn init_vars(script: &mut Script, vars: Vec<(String, Sort)>) -> Vec<CommandRc> {
@@ -346,23 +418,39 @@ pub fn ba_script(script: &mut Script, md: &mut Metadata) -> io::Result<Vec<Scrip
 
     let (bdomvs, mut bdomcmds) = get_boolean_domain_monitors(bavns);
 
+    let num_const_to_relate = if USE_RELATIONAL_CONST_MONITORS { 15 } else { 0 };
+    let (subset_constvs) =
+        get_subset_consts(md.constvns.clone(), num_const_to_relate, &Config::default())
+            .unwrap_or(vec![]);
+    let (intervs, mut intercmds) = get_inter_relation_constant_monitors(subset_constvs);
+
     md.bavns.append(&mut bdomvs.clone());
+    md.bavns.append(&mut intervs.clone());
 
     let mut decls = grab_all_decls(script);
 
     let mut bdom_inits = init_vars(script, bdomvs.clone());
+    let mut inter_inits = init_vars(script, intervs.clone());
+
     let mut vs = init_vars(script, vng.vars_generated);
+
     decls.append(&mut vs);
     decls.append(&mut bdom_inits);
-    let mut ba = get_boolean_abstraction(bavs);
+    decls.append(&mut inter_inits);
 
+    let mut ba = get_boolean_abstraction(bavs);
     let mut iscript = script.invert();
+
     script.insert_all(end_insert_pt(script), &ba);
     script.insert_all(end_insert_pt(script), &bdomcmds);
+    script.insert_all(end_insert_pt(script), &intercmds);
+
     add_get_model(script);
 
     decls.append(&mut ba.clone());
     decls.append(&mut bdomcmds.clone());
+    decls.append(&mut intercmds.clone());
+
     decls.push(rccell!(Command::CheckSat()));
     let mut ba_script = Script::Commands(decls);
     add_get_model(&mut ba_script);
@@ -373,6 +461,7 @@ pub fn ba_script(script: &mut Script, md: &mut Metadata) -> io::Result<Vec<Scrip
     } else {
         iscript.insert_all(end_insert_pt(&iscript), &ba);
         iscript.insert_all(end_insert_pt(&iscript), &bdomcmds);
+        iscript.insert_all(end_insert_pt(&iscript), &intercmds);
         add_get_model(&mut iscript);
         Ok(vec![iscript, script.clone()])
     }
@@ -734,7 +823,7 @@ pub fn try_all_rcholes(
         ogvs.push(chole.clone_v());
         let name = vng.get_name(sort.clone());
         chole.swap(SExp::Symbol(rccell!(Symbol::Token(name.clone()))));
-        names.push(name);
+        names.push((name, sort.clone()));
     }
 
     let inits = init_vars(script, vng.vars_generated);
@@ -771,11 +860,11 @@ pub fn rcholes(
         let inits = init_vars(script, vec![vng.vars_generated.pop().unwrap()]);
 
         if validator(script) {
-            md.constvns.push(name.clone())
+            md.constvns.push((name.clone(), sort.clone()))
         } else {
             rmv_cmds(inits);
             if retry_coerce_hole(script, name.clone(), sort, validator) {
-                md.constvns.push(name.clone())
+                md.constvns.push((name.clone(), sort.clone()));
             } else {
                 chole.swap(o);
             }
@@ -976,6 +1065,7 @@ impl QualedVars {
     }
 }
 
+const USE_RELATIONAL_CONST_MONITORS: bool = true;
 const UNIVERSAL_AS_EXISTENTIAL: bool = true;
 
 fn bav_se(
@@ -1090,6 +1180,59 @@ mod tests {
     use crate::parser::sexp;
     use insta::assert_debug_snapshot;
     use insta::assert_display_snapshot;
+
+    #[test]
+    fn get_idm_consts_snap() {
+        let consts = vec![
+            ("a".to_string(), Sort::Bool()),
+            ("b".to_string(), Sort::Bool()),
+            ("yy".to_string(), Sort::UInt()),
+            ("zz".to_string(), Sort::UInt()),
+            ("111".to_string(), Sort::Dec()),
+            ("222".to_string(), Sort::Dec()),
+            ("mmmm".to_string(), Sort::Str()),
+            ("nnnn".to_string(), Sort::Str()),
+            (
+                "AAAAA".to_string(),
+                Sort::Fp("2".to_string(), "2".to_string()),
+            ),
+            (
+                "BBBBB".to_string(),
+                Sort::Fp("2".to_string(), "2".to_string()),
+            ),
+            (
+                "CCCCC".to_string(),
+                Sort::Fp("2".to_string(), "3".to_string()),
+            ),
+            (
+                "DDDDD".to_string(),
+                Sort::Fp("3".to_string(), "2".to_string()),
+            ),
+            ("XXXXX".to_string(), Sort::BitVec(3)),
+            ("YYYYY".to_string(), Sort::BitVec(3)),
+            ("ZZZZZ".to_string(), Sort::BitVec(2)),
+        ];
+
+        let idm = get_inter_relation_constant_monitors(consts);
+        assert_display_snapshot!(Script::Commands(idm.1));
+    }
+
+    #[test]
+    fn get_subset_consts_snap() {
+        let consts = vec![
+            ("a".to_string(), Sort::Bool()),
+            ("b".to_string(), Sort::Bool()),
+            ("c".to_string(), Sort::Bool()),
+            ("d".to_string(), Sort::UInt()),
+            ("e".to_string(), Sort::UInt()),
+            ("f".to_string(), Sort::UInt()),
+        ];
+
+        let cfg = Config::default();
+
+        let subset = get_subset_consts(consts, 3, &cfg);
+        assert_debug_snapshot!(subset);
+    }
 
     #[test]
     fn fp_eq_snap() {
@@ -1228,7 +1371,16 @@ mod tests {
 
         assert!(try_all_rcholes(&mut p, &choles, &mut md, |_s| false).is_err());
 
-        assert_debug_snapshot!(p.to_string() + "\n" + &md.constvns.join("\n"));
+        assert_debug_snapshot!(
+            p.to_string()
+                + "\n"
+                + &md
+                    .constvns
+                    .iter()
+                    .map(|c| c.0.clone())
+                    .collect::<Vec<String>>()
+                    .join("\n")
+        );
     }
 
     #[test]
@@ -1240,7 +1392,16 @@ mod tests {
 
         assert!(try_all_rcholes(&mut p, &choles, &mut md, is_valid).is_ok());
 
-        assert_debug_snapshot!(p.to_string() + "\n" + &md.constvns.join("\n"));
+        assert_debug_snapshot!(
+            p.to_string()
+                + "\n"
+                + &md
+                    .constvns
+                    .iter()
+                    .map(|c| c.0.clone())
+                    .collect::<Vec<String>>()
+                    .join("\n")
+        );
     }
 
     #[test]

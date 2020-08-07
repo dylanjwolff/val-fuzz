@@ -618,6 +618,10 @@ impl SExp {
             SExp::Symbol(_) | SExp::Compound(_) => None,
         }
     }
+
+    pub fn var(name : &str) -> SExp {
+        SExp::Symbol(rccell!(Symbol::Token(name.to_owned())))
+    }
 }
 
 impl fmt::Display for SExp {

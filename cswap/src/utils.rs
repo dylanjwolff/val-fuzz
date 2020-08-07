@@ -277,6 +277,15 @@ impl RandUniqPermGen {
         Self::new_definite_seeded(0, numbits, maxiter)
     }
 
+    pub fn rand_perm(numbits: usize, seed: u64) -> BitVec {
+        let mut buf = BitVec::from_elem(numbits, false).to_bytes();
+        let mut rng = Xoshiro256Plus::seed_from_u64(seed);
+        rng.fill(&mut buf[..]);
+        let mut bv = BitVec::from_bytes(&buf[..]);
+        bv.truncate(numbits);
+        bv
+    }
+
     fn num_seen(&self) -> usize {
         self.seen_masked.values().fold(0, |a, set| set.len() + a)
     }

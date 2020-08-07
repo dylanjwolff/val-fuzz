@@ -3,6 +3,7 @@ source: cswap/src/fuzzer.rs
 expression: new_script
 ---
 (declare-const BAV1 Bool)
+(declare-const INTER_CMON1 Bool)
 (declare-const BDOM1 Bool)
 (declare-const BDOM2 Bool)
 (declare-const BDOM3 Bool)
@@ -16,4 +17,5 @@ expression: new_script
 (assert (= (= z 0) BDOM2))
 (assert (= (< z 0) BDOM3))
 (assert (= (> z 0) BDOM4))
+(assert (= INTER_CMON1 (= GEN1 GEN2)))
 

@@ -349,7 +349,7 @@ fn resub_model(
     let mut choles_script = script_from_f_unsanitized(&f_to_replace)?;
 
     let mut to_replace: Vec<(String, SExp)> = result
-        .extract_const_var_vals(&md.constvns)
+        .extract_const_var_vals(&md.constvns.iter().map(|c| c.0.clone()).collect())
         .into_iter()
         .map(|(sym, val)| (sym.to_string(), val.clone()))
         .collect();

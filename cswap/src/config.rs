@@ -7,6 +7,7 @@ use std::path::PathBuf;
 use crate::ast::Sort;
 
 use tempfile::Builder;
+use tempfile::TempDir;
 
 use crate::solver::ProfileIndex;
 use log::warn;
@@ -43,6 +44,19 @@ macro_rules! liftio_e {
 }
 
 impl Config {
+    pub fn default() -> Self {
+        Config {
+            file_provider: FileProvider::new_tmp(),
+            rng_seed: 0,
+            max_iter: 20,
+            stack_size: 500,
+            remove_files: true,
+            mask_size: 1,
+            profiles: HashSet::new(),
+            monitors_in_final: false,
+        }
+    }
+
     pub fn get_specific_seed<T: Hash>(&self, t: &T) -> u64 {
         let mut s = DefaultHasher::new();
         t.hash(&mut s);
@@ -62,14 +76,19 @@ pub struct FileProvider {
 }
 
 impl FileProvider {
-    pub fn new(dirname: &str) -> FileProvider {
+    pub fn new_tmp() -> FileProvider {
+        FileProvider::new_existing(TempDir::new().unwrap().into_path().to_str().unwrap(), true)
+    }
+    pub fn new_existing(dirname: &str, existing: bool) -> FileProvider {
         let dirpath = Path::new(dirname).to_path_buf();
         let cholesdir = Self::get_subdir(&dirpath, "choles");
         let skeldir = Self::get_subdir(&dirpath, "skel");
         let mddir = Self::get_subdir(&dirpath, "md");
         let scratchdir = Self::get_subdir(&dirpath, "scratch");
         let bugdir = Self::get_subdir(&dirpath, "bugs");
-        fs::create_dir(&dirpath).unwrap();
+        if !existing {
+            fs::create_dir(&dirpath).unwrap();
+        }
         fs::create_dir(&skeldir).unwrap();
         fs::create_dir(&cholesdir).unwrap();
         fs::create_dir(&mddir).unwrap();
@@ -83,6 +102,10 @@ impl FileProvider {
             scratchdir: scratchdir,
             bugdir: bugdir,
         }
+    }
+
+    pub fn new(dirname: &str) -> FileProvider {
+        FileProvider::new_existing(dirname, false)
     }
 
     pub fn og_w_monitors<'a>(&self, md: &'a mut Metadata) -> io::Result<PathBuf> {
@@ -254,7 +277,7 @@ impl FileProvider {
 #[derive(Serialize, Deserialize, Debug, Eq, PartialEq, Clone)]
 pub struct Metadata {
     pub bavns: Vec<(String, Sort)>,
-    pub constvns: Vec<String>,
+    pub constvns: Vec<(String, Sort)>,
     pub seed_file: String,
     pub skeleton_file: String,
     pub og_w_monitors_skel_file: Option<String>,
