@@ -402,22 +402,34 @@ pub fn ba_script(script: &mut Script, md: &mut Metadata) -> io::Result<Script> {
         .collect();
 
     let (bdomvs, mut bdomcmds) = get_boolean_domain_monitors(bavns);
-
+    let (subset_constvs) = get_subset_consts(md.constvns.clone(), 15, &Config::default()).unwrap_or(vec![]);
+    let (intervs, mut intercmds) = get_inter_relation_constant_monitors(subset_constvs);
+    
     md.bavns.append(&mut bdomvs.clone());
+    md.bavns.append(&mut intervs.clone());
 
     let mut decls = grab_all_decls(script);
 
     let mut bdom_inits = init_vars(script, bdomvs);
+    let mut inter_inits = init_vars(script, intervs);
     let mut vs = init_vars(script, vng.vars_generated);
+
     decls.append(&mut vs);
     decls.append(&mut bdom_inits);
+    decls.append(&mut inter_inits);
+
     let mut ba = get_boolean_abstraction(bavs);
+
     script.insert_all(end_insert_pt(script), &ba);
     script.insert_all(end_insert_pt(script), &bdomcmds);
+    script.insert_all(end_insert_pt(script), &intercmds);
+
     add_get_model(script);
 
     decls.append(&mut ba);
     decls.append(&mut bdomcmds);
+    decls.append(&mut intercmds);
+
     decls.push(rccell!(Command::CheckSat()));
     let mut ba_script = Script::Commands(decls);
     add_get_model(&mut ba_script);
