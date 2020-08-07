@@ -63,6 +63,52 @@ fn get_subset_consts(
     })
 }
 
+fn get_inter_relation_constant_monitors(
+    constants: Vec<(String, Sort)>,
+) -> (Vec<(String, Sort)>, Vec<CommandRc>) {
+    let mut vng = VarNameGenerator::new("INTER_CMON");
+    let mut eq_sexps = vec![];
+    for (i, (cname, csort)) in constants.iter().enumerate() {
+        for j in (i+1..constants.len()) { 
+            let (ocname, ocsort) = &constants[j];
+            match (csort, ocsort) {
+                (Sort::Str(), Sort::Str()) |
+                (Sort::UInt(), Sort::Dec()) |
+                (Sort::Dec(), Sort::UInt()) |
+                (Sort::Dec(), Sort::Dec()) |
+                (Sort::Bool(), Sort::Bool()) |
+                (Sort::UInt(), Sort::UInt()) => {
+                    let monitor = vng.get_name(Sort::Bool());
+                    let eq_sexp = eq_se(SExp::var(&monitor), eq_se(SExp::var(cname), SExp::var(ocname)));
+                    eq_sexps.push(eq_sexp);
+                }
+                (Sort::Fp(a, b), Sort::Fp(aa, bb)) =>  if a == aa && b == bb {
+                    let monitor = vng.get_name(Sort::Bool());
+                    let eq_sexp = eq_se(SExp::var(&monitor), eq_se(SExp::var(cname), SExp::var(ocname)));
+                    eq_sexps.push(eq_sexp);
+                }
+                (Sort::BitVec(a), Sort::BitVec(aa)) =>  if a == aa {
+                    let monitor = vng.get_name(Sort::Bool());
+                    let eq_sexp = eq_se(SExp::var(&monitor), eq_se(SExp::var(cname), SExp::var(ocname)));
+                    eq_sexps.push(eq_sexp);
+                }
+                _ => ()
+            }
+        }
+    }
+
+    let cmds = many_assert(&mut eq_sexps.into_iter());
+    (vng.vars_generated, cmds)
+}
+
+fn eq_se(a : SExp, b : SExp) -> SExp {
+    SExp::BExp(
+        rccell!(BoolOp::Equals()),
+        vec![rccell!(a), rccell!(b)],
+    )
+}
+
+
 fn init_vars(script: &mut Script, vars: Vec<(String, Sort)>) -> Vec<CommandRc> {
     let Script::Commands(cmds) = script;
     if cmds.len() == 0 {
@@ -1091,6 +1137,30 @@ mod tests {
     use insta::assert_debug_snapshot;
     use insta::assert_display_snapshot;
 
+    #[test]
+    fn get_idm_consts_snap() {
+        let consts = vec![
+            ("a".to_string(), Sort::Bool()),
+            ("b".to_string(), Sort::Bool()),
+            ("yy".to_string(), Sort::UInt()),
+            ("zz".to_string(), Sort::UInt()),
+            ("111".to_string(), Sort::Dec()),
+            ("222".to_string(), Sort::Dec()),
+            ("mmmm".to_string(), Sort::Str()),
+            ("nnnn".to_string(), Sort::Str()),
+            ("AAAAA".to_string(), Sort::Fp("2".to_string(), "2".to_string())),
+            ("BBBBB".to_string(), Sort::Fp("2".to_string(), "2".to_string())),
+            ("CCCCC".to_string(), Sort::Fp("2".to_string(), "3".to_string())),
+            ("DDDDD".to_string(), Sort::Fp("3".to_string(), "2".to_string())),
+            ("XXXXX".to_string(), Sort::BitVec(3)),
+            ("YYYYY".to_string(), Sort::BitVec(3)),
+            ("ZZZZZ".to_string(), Sort::BitVec(2)),
+        ];
+
+        let idm = get_inter_relation_constant_monitors(consts);
+        assert_display_snapshot!(Script::Commands(idm.1));
+    }
+    
     #[test]
     fn get_subset_consts_snap() {
         let consts = vec![
