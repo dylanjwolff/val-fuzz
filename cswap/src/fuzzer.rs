@@ -358,7 +358,9 @@ fn resub_model(
         rv(&mut choles_script, &mut to_replace);
 
         let script_str = choles_script.to_string();
-        stats.record_sub(&script_str);
+        if !stats.record_sub(&script_str) {
+            return Ok(()); // Reporting this as an error is probably a bit too noisy
+        }
 
         let resubbed_f = cfg
             .file_provider
