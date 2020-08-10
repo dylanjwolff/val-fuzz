@@ -51,11 +51,11 @@ impl RunStats {
         }
     }
 
-    pub fn record_sub(&mut self, sub_str: &str) {
+    pub fn record_sub(&mut self, sub_str: &str) -> bool {
         self.iter_subs.1 = self.iter_subs.1 + 1;
         let mut s = DefaultHasher::new();
         sub_str.hash(&mut s);
-        self.unique_subs.insert(s.finish());
+        self.unique_subs.insert(s.finish())
     }
 
     pub fn record_iter(&mut self) {
