@@ -72,12 +72,38 @@ fn get_inter_relation_constant_monitors(
         for j in (i + 1..constants.len()) {
             let (ocname, ocsort) = &constants[j];
             match (csort, ocsort) {
-                (Sort::Str(), Sort::Str())
-                | (Sort::UInt(), Sort::Dec())
+                (Sort::UInt(), Sort::Dec())
                 | (Sort::Dec(), Sort::UInt())
                 | (Sort::Dec(), Sort::Dec())
-                | (Sort::Bool(), Sort::Bool())
                 | (Sort::UInt(), Sort::UInt()) => {
+                    let eq_monitor = vng.get_name(Sort::Bool());
+                    let eq_sexp = eq_se(
+                        SExp::var(&eq_monitor),
+                        eq_se(SExp::var(cname), SExp::var(ocname)),
+                    );
+                    let lt_monitor = vng.get_name(Sort::Bool());
+                    let lt_sexp = eq_se(
+                        SExp::var(&lt_monitor),
+                        SExp::BExp(
+                            rccell!(BoolOp::Lt()),
+                            vec![rccell!(SExp::var(cname)), rccell!(SExp::var(ocname))],
+                        ),
+                    );
+                    let gt_monitor = vng.get_name(Sort::Bool());
+                    let gt_sexp = eq_se(
+                        SExp::var(&gt_monitor),
+                        SExp::BExp(
+                            rccell!(BoolOp::Gt()),
+                            vec![rccell!(SExp::var(cname)), rccell!(SExp::var(ocname))],
+                        ),
+                    );
+
+                    eq_sexps.push(eq_sexp);
+                    eq_sexps.push(lt_sexp);
+                    eq_sexps.push(gt_sexp);
+                }
+
+                (Sort::Str(), Sort::Str()) | (Sort::Bool(), Sort::Bool()) => {
                     let monitor = vng.get_name(Sort::Bool());
                     let eq_sexp = eq_se(
                         SExp::var(&monitor),
@@ -87,12 +113,34 @@ fn get_inter_relation_constant_monitors(
                 }
                 (Sort::Fp(a, b), Sort::Fp(aa, bb)) => {
                     if a == aa && b == bb {
-                        let monitor = vng.get_name(Sort::Bool());
+                        let eq_monitor = vng.get_name(Sort::Bool());
                         let eq_sexp = eq_se(
-                            SExp::var(&monitor),
-                            eq_se(SExp::var(cname), SExp::var(ocname)),
+                            SExp::var(&eq_monitor),
+                            SExp::BExp(
+                                rccell!(BoolOp::Fpeq()),
+                                vec![rccell!(SExp::var(cname)), rccell!(SExp::var(ocname))],
+                            ),
                         );
+                        let lt_monitor = vng.get_name(Sort::Bool());
+                        let lt_sexp = eq_se(
+                            SExp::var(&lt_monitor),
+                            SExp::BExp(
+                                rccell!(BoolOp::Fplt()),
+                                vec![rccell!(SExp::var(cname)), rccell!(SExp::var(ocname))],
+                            ),
+                        );
+                        let gt_monitor = vng.get_name(Sort::Bool());
+                        let gt_sexp = eq_se(
+                            SExp::var(&gt_monitor),
+                            SExp::BExp(
+                                rccell!(BoolOp::Fpgt()),
+                                vec![rccell!(SExp::var(cname)), rccell!(SExp::var(ocname))],
+                            ),
+                        );
+
                         eq_sexps.push(eq_sexp);
+                        eq_sexps.push(lt_sexp);
+                        eq_sexps.push(gt_sexp);
                     }
                 }
                 (Sort::BitVec(a), Sort::BitVec(aa)) => {
