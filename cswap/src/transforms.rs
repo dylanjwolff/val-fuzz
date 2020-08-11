@@ -1049,6 +1049,7 @@ impl QualedVars {
 
 const USE_RELATIONAL_CONST_MONITORS: bool = true;
 const UNIVERSAL_AS_EXISTENTIAL: bool = true;
+const LEAF_OPT: bool = true;
 
 fn bav_se(
     _is_root: bool,
@@ -1066,7 +1067,7 @@ fn bav_se(
         SExp::BExp(bop, sexps) => {
             let sec = SExp::BExp(Rc::clone(bop), sexps.clone());
             let pre_uqvars = qvars.uqvars.clone();
-            let _before_exploration_num_bavs = bavs.len();
+            let before_exploration_num_bavs = bavs.len();
             for sexp in sexps {
                 bav_se(
                     false,
@@ -1077,16 +1078,13 @@ fn bav_se(
                     timer.clone(),
                 )?;
             }
-            // NOTE removing "leaf optimization" temporarily as it's unclear how that should
-            // interact with abstract domains
-            // if bavs.len() <= before_exploration_num_bavs {
-            let name = vng.get_name(Sort::Bool());
-            bavs.push((name, sec, pre_uqvars));
-            // }
+            if bavs.len() <= before_exploration_num_bavs || !LEAF_OPT {
+                let name = vng.get_name(Sort::Bool());
+                bavs.push((name, sec, pre_uqvars));
+            }
             Ok(())
         }
         SExp::StrExp(_, sexps) | SExp::NExp(_, sexps) | SExp::FPExp(_, _, sexps) => {
-            let _before_exploration_num_bavs = bavs.len();
             for sexp in sexps {
                 bav_se(
                     false,
@@ -1097,10 +1095,6 @@ fn bav_se(
                     timer.clone(),
                 )?;
             }
-            // NOTE removing "leaf optimization" temporarily as it's unclear how that should
-            // interact with abstract domains
-            // if bavs.len() <= before_exploration_num_bavs {
-            // }
             Ok(())
         }
         SExp::Compound(sexps) => {
