@@ -294,8 +294,11 @@ pub fn solver_fn(
     cfg: &Config,
 ) -> io::Result<()> {
     let (iter_file, md_file) = &filepaths;
-    let md: Metadata = liftio!(serde_lexpr::from_str(&fs::read_to_string(md_file)?))?;
+    let mdstr = fs::read_to_string(md_file)
+        .map_err(|e| io::Error::new(io::ErrorKind::Other, format!("File {:?} {:?}", md_file, e)))?;
+    let md: Metadata = liftio!(serde_lexpr::from_str(&mdstr))?;
     if to_ctr.get(&md.seed_file).map(|sf| *sf > 3).unwrap_or(false) {
+        fs::remove_file(md_file).unwrap_or(()); // TODO Hack! Prevents other threads from using the file
         return liftio!(Err(format!("{:?} exceeded max consec timeouts", iter_file)));
     }
 

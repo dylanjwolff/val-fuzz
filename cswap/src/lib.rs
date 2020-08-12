@@ -326,7 +326,6 @@ fn solver_worker(qin: BavAssingedQ, prev_stage: StageCompleteA, cfg: Config) -> 
             Err(e) => {
                 if cfg.remove_files {
                     fs::remove_file(&filepaths.0).unwrap_or(());
-                    fs::remove_file(&filepaths.1).unwrap_or(());
                 }
                 warn!("Solve Error: {}", e)
             }
