@@ -1,0 +1,8 @@
+(set-option :cbqi-innermost false)
+(set-option :cbqi-lit-dep false)
+(assert (forall ((x Real)) (exists ((y Int)) (xor (> y x) (>= y (* 2 x))))))
+(check-sat)
+(reset)
+(assert (forall ((x Real)) (exists ((y Int)) (xor (> y x) (>= y (* 2 x))))))
+(check-sat)
+(exit)
