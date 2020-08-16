@@ -1,0 +1,6 @@
+(set-logic QF_UFLIRAFS)
+(declare-fun a () (Set Real))
+(declare-fun b () (Set Int))
+(declare-fun c () (Set Int))
+(assert (= (intersection b c) (intersection a (singleton 0))))
+(check-sat)
