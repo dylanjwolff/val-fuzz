@@ -1,8 +1,0 @@
-(set-logic ALL)
-(declare-const BAV1 Bool)
-(declare-fun a () (Set (_ BitVec 2)))
-(declare-fun b () (Set (_ BitVec 2)))
-(assert (= a b))
-(assert (= BAV1 (= a b)))
-(check-sat)
-(get-model)

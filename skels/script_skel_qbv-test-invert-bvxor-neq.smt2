@@ -1,7 +1,0 @@
-(set-logic ALL)
-(declare-const BAV1 Bool)
-(declare-fun a () (_ BitVec 8))
-(assert (forall ((x (_ BitVec 8))) (not (= (bvxor x a) (bvmul a a)))))
-(assert (= BAV1 (forall ((x (_ BitVec 8))) (= (bvxor x a) (bvmul a a)))))
-(check-sat)
-(get-model)

@@ -1,8 +1,0 @@
-(set-logic ALL)
-(declare-const BAV1 Bool)
-(declare-const GEN1 Int)
-(declare-fun x () Real)
-(assert (>= (to_int x) (+ x GEN1)))
-(assert (= BAV1 (>= (to_int x) (+ x GEN1))))
-(check-sat)
-(get-model)

@@ -1,7 +1,0 @@
-(declare-const BAV1 Bool)
-(declare-const GEN1 Real)
-(declare-const x1 Real)
-(assert (< (* x1 x1) GEN1))
-(assert (= BAV1 (< (* x1 x1) GEN1)))
-(check-sat)
-(get-model)

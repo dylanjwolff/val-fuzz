@@ -1,0 +1,5 @@
+(declare-fun a () Real)
+(declare-fun b () Real)
+(assert (>= a b 1))
+(assert (= a (ite (= a 1) 0 (ite (> b 0) 1 0))))
+(assert (not (= a 1)))

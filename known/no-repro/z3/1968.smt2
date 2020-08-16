@@ -1,0 +1,7 @@
+(set-option :produce-models true)
+(set-logic ALL)
+(declare-fun s () String)
+(define-fun match () Bool (str.in.re s ((_ re.loop 2 5) (str.to.re "xyz"))))
+(assert (not (=> match (>= (str.len s) 6))))
+(check-sat)
+(get-value (s))

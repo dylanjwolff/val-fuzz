@@ -1,5 +1,0 @@
-(set-logic ALL)
-(declare-const GEN1 Int)
-(assert (member GEN1 (as emptyset (Set Int))))
-(check-sat)
-(get-model)

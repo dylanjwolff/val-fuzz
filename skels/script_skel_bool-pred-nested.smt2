@@ -1,5 +1,0 @@
-(set-logic ALL)
-(declare-fun P (Bool Bool) Bool)
-(assert (P (P true (P false false)) (P false true)))
-(check-sat)
-(get-model)

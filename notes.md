@@ -63,3 +63,8 @@ or
 @TODO 21st July
 [x] Only do abstract domains for functions without args
 [] Parse FP and Boolean Sorts (and maybe others?) properly
+
+Notes from going through cvc4/z3 issues:
+- arith solvers and threads on z3 source of many bugs, may want to prioritize these flags
+- looks like only soundness bugs / TRUE invalid model bugs are worth doing
+- cvc4 has updated fuzzing guidelines; take another look

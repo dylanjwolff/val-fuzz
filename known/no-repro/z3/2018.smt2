@@ -1,0 +1,8 @@
+(set-option :produce-models true)
+(set-logic ALL)
+(declare-fun s0 () String)
+(define-fun s1 () Bool (str.in.re s0 (re.+ (re.range "0" "9"))))
+(define-fun s3 () Bool (str.in.re s0 (re.* (re.union (re.range "a" "z") (re.range "A" "Z")))))
+(assert (and s1 s3))
+(check-sat)
+(get-model)

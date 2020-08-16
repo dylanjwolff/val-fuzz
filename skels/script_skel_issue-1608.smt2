@@ -1,6 +1,0 @@
-(declare-const GEN1 Int)
-(declare-const x Real)
-(assert (is_int x))
-(assert (not (is_int (+ x GEN1))))
-(check-sat)
-(get-model)

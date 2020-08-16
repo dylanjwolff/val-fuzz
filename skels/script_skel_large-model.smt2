@@ -1,8 +1,0 @@
-(set-logic ALL)
-(declare-const BAV1 Bool)
-(declare-const GEN1 Int)
-(declare-fun x () String)
-(assert (> (str.len x) GEN1))
-(assert (= BAV1 (> (str.len x) GEN1)))
-(check-sat)
-(get-model)

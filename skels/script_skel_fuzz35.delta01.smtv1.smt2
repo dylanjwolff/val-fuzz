@@ -1,8 +1,0 @@
-(set-option :incremental false)
-(set-logic ALL)
-(declare-const GEN3 Int)
-(declare-const GEN2 Int)
-(declare-const GEN1 Int)
-(declare-fun v0 () (_ BitVec 4))
-(check-sat-assuming ((bvsgt (bvadd (bvmul v0 (bvsub (_ bv4 4) (_ bv12 4))) (bvmul v0 (bvsub (_ bv4 4) (_ bv12 4)))) (_ bv0 4))))
-(get-model)

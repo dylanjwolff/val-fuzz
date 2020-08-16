@@ -1,0 +1,7 @@
+(set-option :produce-models true)
+(set-logic ALL)
+(declare-fun s () String)
+(define-fun  l  () Int (str.to.int s))
+(assert (not (=> (and (>= l 0) (< l 10)) (= (str.len s) 1))))
+(check-sat)
+(get-model)

@@ -1,8 +1,0 @@
-(set-logic ALL)
-(declare-const BAV1 Bool)
-(declare-const GEN1 Real)
-(declare-fun a () Real)
-(assert (= a (sin GEN1)))
-(assert (= BAV1 (= a (sin GEN1))))
-(check-sat)
-(get-model)

@@ -1,7 +1,0 @@
-(set-logic ALL)
-(declare-const GEN1 Int)
-(declare-fun P (Real) Bool)
-(assert (forall ((x Real)) (P x)))
-(assert (not (P GEN1)))
-(check-sat)
-(get-model)

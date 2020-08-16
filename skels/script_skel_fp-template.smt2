@@ -1,5 +1,0 @@
-(set-info :source "Handcrafted by C.M. Wintersteiger")
-(check-sat)
-(get-model)
-(check-sat-using smt)
-(exit)

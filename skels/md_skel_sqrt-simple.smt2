@@ -1,1 +1,0 @@
-#(((bavns "BAV1" "BAV2") (constvns "GEN1") (seed_file . "") (skeleton_file . "") (metadata_file . "")) "script_skel_sqrt-simple.smt2")

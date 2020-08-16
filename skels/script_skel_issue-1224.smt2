@@ -1,6 +1,0 @@
-(declare-const GEN2 String)
-(declare-const GEN1 String)
-(declare-fun X () String)
-(assert (not (str.in.re X (re.* (re.range GEN1 GEN2)))))
-(check-sat)
-(get-model)

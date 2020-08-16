@@ -1,7 +1,0 @@
-(set-logic ALL)
-(declare-const BAV1 Bool)
-(declare-const x Float32)
-(assert (not (= x (fp.neg (fp.neg x)))))
-(assert (= BAV1 (= x (fp.neg (fp.neg x)))))
-(check-sat)
-(get-model)

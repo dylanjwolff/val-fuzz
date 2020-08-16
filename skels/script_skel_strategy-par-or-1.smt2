@@ -1,7 +1,0 @@
-(declare-const BAV1 Bool)
-(declare-const GEN1 Int)
-(set-info :source |Written by D. B. Staple for GitHub issue #623.|)
-(declare-fun n () Int)
-(assert (not (< n GEN1)))
-(check-sat-using (par-or qflia smt))
-(assert (= BAV1 (< n GEN1)))

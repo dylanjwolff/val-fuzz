@@ -1,8 +1,0 @@
-(set-logic ALL)
-(declare-const BAV1 Bool)
-(declare-datatypes ((nat 0)) (( (Suc (pred nat)) (zero))))
-(declare-fun y () nat)
-(assert (forall ((x nat)) (not (= y (Suc x)))))
-(assert (= BAV1 (forall ((x nat)) (= y (Suc x)))))
-(check-sat)
-(get-model)
