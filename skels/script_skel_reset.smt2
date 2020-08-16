@@ -1,5 +1,0 @@
-(get-option :produce-models)
-(set-option :produce-models false)
-(get-option :produce-models)
-(reset)
-(get-option :produce-models)

@@ -1,2 +1,0 @@
-(help simplify)
-(help eval)

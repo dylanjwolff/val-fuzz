@@ -1,1 +1,0 @@
-#(((bavns) (constvns) (seed_file . "") (skeleton_file . "") (metadata_file . "")) "script_skel_stacks0.hs.78.cvc4.smt2")

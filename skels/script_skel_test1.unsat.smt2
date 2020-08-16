@@ -1,8 +1,0 @@
-(set-logic ALL)
-(declare-const BAV1 Bool)
-(declare-fun x () Real)
-(assert (forall ((y Real)) (> x y)))
-(assert (= BAV1 (forall ((y Real)) (> x y))))
-(check-sat)
-(get-model)
-(exit)

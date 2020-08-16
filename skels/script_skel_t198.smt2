@@ -1,6 +1,0 @@
-(declare-datatypes () ((T A B)))
-(declare-const x T)
-(assert ((_ is A) x))
-(assert ((_ is B) x))
-(check-sat)
-(get-model)

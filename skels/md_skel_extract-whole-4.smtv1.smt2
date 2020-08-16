@@ -1,1 +1,0 @@
-#(((bavns "BAV1") (constvns) (seed_file . "") (skeleton_file . "") (metadata_file . "")) "script_skel_extract-whole-4.smtv1.smt2")

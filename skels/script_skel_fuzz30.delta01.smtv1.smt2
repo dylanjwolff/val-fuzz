@@ -1,8 +1,0 @@
-(set-option :incremental false)
-(set-logic ALL)
-(declare-const BAV1 Bool)
-(declare-fun v2 () (_ BitVec 4))
-(declare-fun v1 () (_ BitVec 4))
-(assert (= BAV1 (distinct (bvmul v1 v2) (bvneg (bvmul v1 v2)))))
-(check-sat-assuming ((distinct (bvmul v1 v2) (bvneg (bvmul v1 v2)))))
-(get-model)

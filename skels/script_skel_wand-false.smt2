@@ -1,5 +1,0 @@
-(set-logic ALL)
-(declare-fun x () Int)
-(assert (wand (pto x x) false))
-(check-sat)
-(get-model)

@@ -1,1 +1,0 @@
-#(((bavns "BAV1" "BAV2") (constvns) (seed_file . "") (skeleton_file . "") (metadata_file . "")) "script_skel_NEQ016_size5_reduced2a.smtv1.smt2")

@@ -1,7 +1,0 @@
-(declare-const BAV1 Bool)
-(set-info :source |Written by D. B. Staple to test export of default tactic.|)
-(declare-fun x () Real)
-(declare-fun y () Real)
-(assert (= x (* y y)))
-(check-sat-using default)
-(assert (= BAV1 (= x (* y y))))

@@ -1,1 +1,0 @@
-#(((bavns "BAV1") (constvns) (seed_file . "") (skeleton_file . "") (metadata_file . "")) "script_skel_bv_to_int_mask_array_2.smt2")

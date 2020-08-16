@@ -1,6 +1,0 @@
-(set-logic ALL)
-(declare-sort U 0)
-(declare-sort Index 0)
-(declare-sort Element 0)
-(declare-fun memory_0 () (Array (_ BitVec 32) (_ BitVec 8)))
-(set-info :status sat)

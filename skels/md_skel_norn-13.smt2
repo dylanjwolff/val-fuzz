@@ -1,1 +1,0 @@
-#(((bavns) (constvns "GEN1" "GEN3" "GEN4" "GEN5" "GEN6" "GEN7" "GEN8" "GEN9") (seed_file . "") (skeleton_file . "") (metadata_file . "")) "script_skel_norn-13.smt2")

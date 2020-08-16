@@ -1,8 +1,0 @@
-(set-logic ALL)
-(declare-const BAV1 Bool)
-(declare-fun x () Bool)
-(declare-fun y () Bool)
-(assert (xor y x))
-(assert (= BAV1 (xor y x)))
-(check-sat)
-(get-model)

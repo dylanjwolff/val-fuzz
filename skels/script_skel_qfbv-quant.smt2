@@ -1,5 +1,0 @@
-(declare-const BAV1 Bool)
-(declare-const GEN1 Int)
-(assert (forall ((X (_ BitVec 32))) (exists ((Y (_ BitVec 32))) (= X (bvmul Y Y)))))
-(apply qfbv)
-(assert (= BAV1 (forall ((X (_ BitVec 32))) (= X (bvmul Y Y)))))

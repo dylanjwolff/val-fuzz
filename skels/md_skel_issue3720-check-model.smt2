@@ -1,1 +1,0 @@
-#(((bavns) (constvns) (seed_file . "") (skeleton_file . "") (metadata_file . "")) "script_skel_issue3720-check-model.smt2")

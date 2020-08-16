@@ -1,6 +1,0 @@
-(set-logic ALL)
-(declare-const GEN1 (_ BitVec 1))
-(declare-fun a () (_ BitVec 1))
-(assert (bvsgt (bvsmod a a) GEN1))
-(check-sat)
-(get-model)

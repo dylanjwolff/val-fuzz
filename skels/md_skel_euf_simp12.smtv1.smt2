@@ -1,1 +1,0 @@
-#(((bavns "BAV1" "BAV2" "BAV3" "BAV4" "BAV5" "BAV6" "BAV7") (constvns) (seed_file . "") (skeleton_file . "") (metadata_file . "")) "script_skel_euf_simp12.smtv1.smt2")
