@@ -23,9 +23,11 @@ use std::fs::OpenOptions;
 use std::io;
 use walkdir::WalkDir;
 
+use crate::ast::BoolOp;
 use crate::ast::SExp;
 use crate::transforms::{
-    ba_script, end_insert_pt, get_bav_assign_fmt_str, replace_constants_with_fresh_vars,
+    ba_script, end_insert_pt, get_bav_assign_fmt_str, many_assert,
+    replace_constants_with_fresh_vars,
 };
 use std::collections::HashSet;
 
@@ -350,6 +352,14 @@ fn resub_model(
     };
 
     let mut choles_script = script_from_f_unsanitized(&f_to_replace)?;
+    // add enforcement here
+    let efcmt_cmds = many_assert(&mut enforcemt.iter().map(|(name, val)| {
+        SExp::BExp(
+            rccell!(BoolOp::Equals()),
+            vec![rccell!(SExp::var(&name)), rccell!(SExp::bool_sexp(*val))],
+        )
+    }));
+    choles_script.insert_all(end_insert_pt(&choles_script), &efcmt_cmds);
 
     let mut to_replace: Vec<(String, SExp)> = result
         .extract_const_var_vals(&md.constvns.iter().map(|c| c.0.clone()).collect())

@@ -143,7 +143,7 @@ fn main() {
         remove_files: !matches.is_present(KEEP_FILES),
         mask_size: 1,
         profiles,
-        monitors_in_final: false,
+        monitors_in_final: true,
     };
 
     if matches.is_present(NO_MULTITHREAD) {

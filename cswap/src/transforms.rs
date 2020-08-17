@@ -283,7 +283,7 @@ fn get_boolean_domain_monitors(
     (vng.vars_generated, cmds)
 }
 
-fn many_assert(iter: &mut dyn Iterator<Item = SExp>) -> Vec<CommandRc> {
+pub fn many_assert(iter: &mut dyn Iterator<Item = SExp>) -> Vec<CommandRc> {
     iter.map(|bexp| rccell!(Command::Assert(rccell!(bexp))))
         .collect()
 }

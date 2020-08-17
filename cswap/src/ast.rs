@@ -579,6 +579,14 @@ impl fmt::Display for Sort {
 }
 
 impl SExp {
+    pub fn bool_sexp(val: bool) -> SExp {
+        if val {
+            SExp::true_sexp()
+        } else {
+            SExp::false_sexp()
+        }
+    }
+
     pub fn true_sexp() -> SExp {
         SExp::Symbol(rccell!(Symbol::Token("true".to_owned())))
     }
@@ -619,7 +627,7 @@ impl SExp {
         }
     }
 
-    pub fn var(name : &str) -> SExp {
+    pub fn var(name: &str) -> SExp {
         SExp::Symbol(rccell!(Symbol::Token(name.to_owned())))
     }
 }
