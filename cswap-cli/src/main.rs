@@ -143,8 +143,14 @@ fn main() {
         remove_files: !matches.is_present(KEEP_FILES),
         mask_size: 1,
         profiles,
-        monitors_in_final: true,
+        monitors_in_final: false,
+        enforce_on_resub: false,
     };
+
+    assert!(
+        !cfg.enforce_on_resub || cfg.monitors_in_final,
+        "Must have monitors in final to enforce resub!"
+    );
 
     if matches.is_present(NO_MULTITHREAD) {
         cswap::fuzzer::exec_single_thread(dir_name, cfg);

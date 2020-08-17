@@ -27,6 +27,7 @@ pub struct Config {
     pub profiles: HashSet<ProfileIndex>,
     pub mask_size: usize,
     pub monitors_in_final: bool,
+    pub enforce_on_resub: bool,
 }
 
 #[macro_export]
@@ -54,6 +55,7 @@ impl Config {
             mask_size: 1,
             profiles: HashSet::new(),
             monitors_in_final: false,
+            enforce_on_resub: false,
         }
     }
 
