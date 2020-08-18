@@ -51,6 +51,23 @@ impl RunStats {
         }
     }
 
+    pub fn to_csv_string(&self) -> String {
+        format!(
+            "{}, {}, {}, {}, {}, {}, {}, {}, {}, {}, {}",
+            self.iter_subs.0,
+            self.iter_subs.1,
+            self.unique_subs.len(),
+            self.has_sats.0,
+            self.has_sats.1,
+            self.has_unsats.0,
+            self.has_unsats.1,
+            self.all_non_errs_are_timeouts.0,
+            self.all_non_errs_are_timeouts.1,
+            self.all_err.0,
+            self.all_err.1
+        )
+    }
+
     pub fn record_sub(&mut self, sub_str: &str) -> bool {
         self.iter_subs.1 = self.iter_subs.1 + 1;
         let mut s = DefaultHasher::new();

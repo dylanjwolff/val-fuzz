@@ -157,6 +157,7 @@ fn launch(qs: (InputPPQ, SkeletonQueue), worker_counts: (u8, u8, u8), cfg: Confi
         trace!("Thread finished stage 3");
     }
     info!("Saw {:?} across ALL threads", all_stats);
+    info!("CSVRUNSTATS:{}", all_stats.to_csv_string());
     info!("Stage 3 Complete");
 }
 

@@ -6,6 +6,7 @@ import sys
 o = sp.getoutput("ls ~/known/repro").split("\n")
 solv_hashes = [l.split("-") for l in o]
 print(solv_hashes)
+cum_runstats = [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0]
 
 reprod = {}
 for zsh in solv_hashes:
@@ -18,10 +19,12 @@ for zsh in solv_hashes:
     print(cmdstr)
     o = sp.getstatusoutput(cmdstr)
 
-    cmdstr = "cswap-cli -v -i 1 ~/known/repro/" + zsh[0] + "-" + zsh[1]
+    cmdstr = "cswap-cli -v -i 500 ~/known/repro/" + zsh[0] + "-" + zsh[1]
     print(cmdstr)
-    o = sp.getstatusoutput(cmdstr)
-    print(o)
+    (s, o) = sp.getstatusoutput(cmdstr)
+    runstats = [l for l in o.split("\n") if "CSVRUNSTATS:" in l][0].split(':')[-1]
+    numstats = [int(n.strip()) for n in runstats.split(',')]
+    cum_runstats = [x + y for (x, y) in zip(numstats, cum_runstats)]
 
     cmdstr = "ls 0-cswap-fuzz-run-out/bugs"
     print(cmdstr)
@@ -49,10 +52,9 @@ for zsh in solv_hashes:
 
 
 
-print("Found following bugs")
-print(reprod)
 sortedks = sorted(reprod.keys())
 
+print("csv runstats: " +str(cum_runstats))
 
 print("csv header:")
 for k in sortedks:
