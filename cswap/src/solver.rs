@@ -560,12 +560,23 @@ impl RSolve {
             })
     }
 
-    fn propogate_diff(a: &Vec<ResultLine>, b: &Vec<ResultLine>) -> Result<Vec<ResultLine>, ()> {
-        if a.len() != b.len() {
+    pub fn has_mnp_error(&self) -> bool {
+        self.lines.iter().any(|l| match l {
+            ResultLine::Error(s) => s.contains(MNP_CVC4),
+            _ => false,
+        })
+    }
+
+    fn propogate_diff(
+        (a, a_has_mnp_err): &(Vec<ResultLine>, bool),
+        (b, b_has_mnp_err): &(Vec<ResultLine>, bool),
+    ) -> Result<(Vec<ResultLine>, bool), ()> {
+        if a.len() != b.len() && !a_has_mnp_err && !b_has_mnp_err {
             return Err(());
         }
 
-        a.iter()
+        let zipped: Result<Vec<ResultLine>, ()> = a
+            .iter()
             .zip(b.iter())
             .map(|pair| match pair {
                 (ResultLine::Sat, ResultLine::Unsat) | (ResultLine::Unsat, ResultLine::Sat) => {
@@ -575,7 +586,18 @@ impl RSolve {
                 (ResultLine::Unsat, _) | (_, ResultLine::Unsat) => Ok(ResultLine::Unsat),
                 _ => Ok(ResultLine::Unknown),
             })
-            .collect()
+            .collect();
+
+        if a.len() == b.len() || zipped.is_err() {
+            // if there is a discrepancy, or no mnp error, return normally
+            zipped.map(|v| (v, *a_has_mnp_err && *b_has_mnp_err))
+        } else if a.len() > b.len() {
+            // otherwise, there is no discrepency, so return the longest results
+            Ok((a.clone(), *a_has_mnp_err))
+        } else {
+            // if a.len() < b.len()
+            Ok((b.clone(), *b_has_mnp_err))
+        }
     }
 
     pub fn differential_test(results: &Vec<Self>) -> Result<Vec<ResultLine>, ()> {
@@ -588,13 +610,15 @@ impl RSolve {
             .iter()
             .filter(|r| !(r.has_unrecoverable_error() || r.was_timeout()))
             .map(|r| {
-                r.lines
+                let outs = r
+                    .lines
                     .iter()
                     .filter(|l| is_out_result(&l))
                     .map(|l| l.clone()) // TODO
-                    .collect::<Vec<ResultLine>>()
+                    .collect::<Vec<ResultLine>>();
+                (outs, r.has_mnp_error())
             })
-            .filter(|l| l.len() > 0)
+            .filter(|(l, _)| l.len() > 0)
             .fold(None, |acc, lines| match acc {
                 None => Some(Ok(lines)),
                 Some(r_acc_lines) => {
@@ -603,7 +627,7 @@ impl RSolve {
             });
 
         match propogated {
-            Some(r) => r,
+            Some(r) => r.map(|(v, _)| v),
             None => Ok(vec![]),
         }
     }
@@ -726,10 +750,50 @@ mod tests {
     }
 
     #[test]
+    fn propagate_w_mnp_err_snap() {
+        assert_debug_snapshot!(RSolve::propogate_diff(
+            &(vec![ResultLine::Sat, ResultLine::Unsat], false),
+            &(vec![ResultLine::Sat], true)
+        ));
+    }
+
+    #[test]
+    fn propagate_w_mnp_err_rev_snap() {
+        assert_debug_snapshot!(RSolve::propogate_diff(
+            &(vec![ResultLine::Sat], true),
+            &(vec![ResultLine::Sat, ResultLine::Unsat], false)
+        ));
+    }
+
+    #[test]
+    fn propagate_wout_mnp_err_rev_snap() {
+        assert_debug_snapshot!(RSolve::propogate_diff(
+            &(vec![ResultLine::Sat], false),
+            &(vec![ResultLine::Sat, ResultLine::Unsat], false)
+        ));
+    }
+
+    #[test]
+    fn propagate_w_diff_snap() {
+        assert_debug_snapshot!(RSolve::propogate_diff(
+            &(vec![ResultLine::Unsat], true),
+            &(vec![ResultLine::Sat], false)
+        ));
+    }
+
+    #[test]
     fn propagate_snap() {
         assert_debug_snapshot!(RSolve::propogate_diff(
-            &vec![ResultLine::Unsat],
-            &vec![ResultLine::Unsat]
+            &(vec![ResultLine::Unsat], false),
+            &(vec![ResultLine::Unsat], false)
+        ));
+    }
+
+    #[test]
+    fn propagate_unknown_snap() {
+        assert_debug_snapshot!(RSolve::propogate_diff(
+            &(vec![ResultLine::Unsat], false),
+            &(vec![ResultLine::Unknown], false)
         ));
     }
 

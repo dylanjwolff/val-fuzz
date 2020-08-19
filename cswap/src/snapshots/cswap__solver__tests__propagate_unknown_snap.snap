@@ -1,0 +1,12 @@
+---
+source: cswap/src/solver.rs
+expression: "RSolve::propogate_diff(&(vec![ResultLine :: Unsat], false),\n                       &(vec![ResultLine :: Unknown], false))"
+---
+Ok(
+    (
+        [
+            Unsat,
+        ],
+        false,
+    ),
+)

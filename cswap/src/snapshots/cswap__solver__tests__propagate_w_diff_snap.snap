@@ -1,0 +1,7 @@
+---
+source: cswap/src/solver.rs
+expression: "RSolve::propogate_diff(&(vec![ResultLine :: Unsat], true),\n                       &(vec![ResultLine :: Sat], false))"
+---
+Err(
+    (),
+)
