@@ -503,7 +503,6 @@ pub fn ba_script(script: &mut Script, md: &mut Metadata) -> io::Result<Vec<Scrip
     let mut ba_script = Script::Commands(decls);
     add_get_model(&mut ba_script);
 
-    let CP_OG = true;
     if !CP_OG {
         Ok(vec![ba_script])
     } else {
@@ -1116,6 +1115,13 @@ impl QualedVars {
 const USE_RELATIONAL_CONST_MONITORS: bool = true;
 const UNIVERSAL_AS_EXISTENTIAL: bool = true;
 const LEAF_OPT: bool = true;
+const CP_OG: bool = true;
+pub const STATIC_FFLAGS: [bool; 4] = [
+    USE_RELATIONAL_CONST_MONITORS,
+    UNIVERSAL_AS_EXISTENTIAL,
+    LEAF_OPT,
+    CP_OG,
+];
 
 fn bav_se(
     _is_root: bool,

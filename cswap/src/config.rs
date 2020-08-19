@@ -65,6 +65,18 @@ impl Config {
         self.rng_seed.hash(&mut s);
         s.finish()
     }
+
+    pub fn to_csv_string(&self) -> String {
+        format!(
+            "{}, {}, {}, {}, {}, {}",
+            self.max_iter,
+            self.rng_seed,
+            self.stack_size,
+            self.mask_size,
+            self.monitors_in_final,
+            self.enforce_on_resub
+        )
+    }
 }
 
 #[derive(Debug, Eq, PartialEq, Clone)]

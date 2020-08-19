@@ -23,6 +23,7 @@ pub mod utils;
 use crate::fuzzer::mutator;
 use crate::fuzzer::solver_fn;
 use crate::fuzzer::StatefulBavAssign;
+use crate::transforms::STATIC_FFLAGS;
 
 use crate::utils::RunStats;
 use crate::utils::StageComplete;
@@ -158,7 +159,19 @@ fn launch(qs: (InputPPQ, SkeletonQueue), worker_counts: (u8, u8, u8), cfg: Confi
     }
     info!("Saw {:?} across ALL threads", all_stats);
     info!("CSVRUNSTATS:{}", all_stats.to_csv_string());
+    info!(
+        "CSVCONFIG:{}, {}",
+        cfg.to_csv_string(),
+        to_csv(&STATIC_FFLAGS)
+    );
     info!("Stage 3 Complete");
+}
+
+fn to_csv(bs: &[bool]) -> String {
+    bs.iter()
+        .map(|b| b.to_string())
+        .collect::<Vec<String>>()
+        .join(", ")
 }
 
 pub fn from_skels(dirname: &str, worker_counts: (u8, u8), mut cfg: Config) {
