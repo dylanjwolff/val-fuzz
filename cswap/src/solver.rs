@@ -54,12 +54,12 @@ lazy_static! {
         Z3_Command_Builder::new()
             .ematching(false)
             .flat_rw(false)
-            .udiv2mul(),
-        Z3_Command_Builder::new().z3str3(),
+            .arith(6),
         Z3_Command_Builder::new()
             .ematching(false)
             .flat_rw(false)
-            .z3str3(),
+            .udiv2mul(),
+        Z3_Command_Builder::new().z3str3(),
     ];
     pub static ref CVC4_PROFILES: [CVC4_Command_Builder; 5] = [
         CVC4_Command_Builder::new().models(),
@@ -67,20 +67,14 @@ lazy_static! {
             .models()
             .incremental()
             .strings_exp(),
-        CVC4_Command_Builder::new()
-            .strings_exp()
-            .unconstrained_simp(),
-        CVC4_Command_Builder::new()
-            .models()
-            .incremental()
-            .strings_exp()
-            .check_unsat_cores(),
+        CVC4_Command_Builder::new().unconstrained_simp(),
         CVC4_Command_Builder::new()
             .models()
             .incremental()
             .strings_exp()
             .check_unsat_cores()
             .dump_all(),
+        CVC4_Command_Builder::new().models().incremental().ho_elim()
     ];
 }
 
@@ -203,6 +197,16 @@ impl CVC4_Command_Builder {
         next
     }
 
+    fn parse_only(&mut self) -> Self {
+        self.cmd.push("--parse-only".to_owned());
+        self.clone()
+    }
+
+    fn ho_elim(&mut self) -> Self {
+        self.cmd.push("--ho-elim".to_owned());
+        self.clone()
+    }
+
     fn models(&mut self) -> Self {
         self.cmd.push("--produce-models".to_owned());
         self.cmd.push("--check-models".to_owned());
@@ -289,6 +293,12 @@ impl Z3_Command_Builder {
             .push(format!("smt.arith.random_initial_value=true"));
         next.cmd.push(format!("smt.phase_selection=5"));
         next
+    }
+
+    fn arith(&mut self, solver: u16) -> Self {
+        assert!(solver < 7);
+        self.cmd.push(format!("smt.arith.solver={}", solver));
+        self.clone()
     }
 
     fn ematching(&mut self, should_ematch: bool) -> Self {
@@ -690,7 +700,7 @@ pub fn check_valid_solve(filename: &str) -> Vec<RSolve> {
             .run_on(&filepath),
         CVC4_Command_Builder::new()
             .timeout(Duration::from_secs(1))
-            .incremental()
+            .parse_only()
             .run_on(&filepath),
     ]
 }
