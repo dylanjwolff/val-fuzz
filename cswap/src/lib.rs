@@ -248,6 +248,7 @@ pub fn exec_randomized(dirname: &str, worker_count: u8, cfg: Config) {
     q.push(Err(PoisonPill {}));
 
     let aq = Arc::new(q);
+
     let handles = (0..worker_count)
         .map(|_| {
             let t_q = Arc::clone(&aq);
@@ -258,6 +259,16 @@ pub fn exec_randomized(dirname: &str, worker_count: u8, cfg: Config) {
                 .spawn(move || randomized_worker(t_q, &t_cfg))
         })
         .collect::<Vec<std::io::Result<JoinHandle<_>>>>();
+
+    thread::Builder::new()
+        .spawn(move || {
+            let mut b = MyBackoff::new();
+            loop {
+                b.snooze();
+                info!("QLEN: {}", max(1, aq.len()) - 1);
+            }
+        })
+        .unwrap();
 
     let mut backoff = MyBackoff::new();
     backoff.reset();

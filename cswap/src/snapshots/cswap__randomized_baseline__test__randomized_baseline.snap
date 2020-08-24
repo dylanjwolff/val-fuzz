@@ -1,0 +1,7 @@
+---
+source: cswap/src/randomized_baseline.rs
+expression: script
+---
+(assert (= -24076450876586747000000000 "o"))
+(assert (= #b101000001101 (+ #b010 493062418185688632 (fp #b1 #b00 #b000))))
+

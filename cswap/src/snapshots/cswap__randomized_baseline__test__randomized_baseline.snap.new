@@ -1,7 +1,0 @@
----
-source: cswap/src/randomized_baseline.rs
-expression: script
----
-(declare-fun z () Real)
-(assert (= "}" #b000101111110 (+ #b110 633686159 (fp #b0 #b10 #b111))))
-

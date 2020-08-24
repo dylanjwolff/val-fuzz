@@ -50,7 +50,7 @@ impl Config {
             file_provider: FileProvider::new_tmp(),
             rng_seed: 0,
             max_iter: 20,
-            stack_size: 500,
+            stack_size: 50,
             remove_files: true,
             mask_size: 1,
             profiles: HashSet::new(),
@@ -257,6 +257,17 @@ impl FileProvider {
         let fs = self.serialize_skel(script, md)?;
         let fm = self.serialize_md(md)?;
         Ok((fs, fm))
+    }
+
+    pub fn serialize_iterfile_str(
+        &self,
+        script_str: &str,
+        iteration: u64,
+        md: &Metadata,
+    ) -> Result<PathBuf, io::Error> {
+        let f = self.iterfile(iteration, md)?;
+        fs::write(&f, script_str)?;
+        Ok(f)
     }
 
     pub fn serialize_iterfile(

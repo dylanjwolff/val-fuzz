@@ -17,10 +17,12 @@ use clap::ArgMatches;
 use cswap::config::Config;
 use cswap::config::FileProvider;
 use cswap::exec;
+use cswap::exec_randomized;
 use cswap::from_skels;
 use cswap::solver::all_profiles;
 use cswap::solver::profiles_to_string;
 use cswap::solver::ProfileIndex;
+use std::cmp::max;
 use std::collections::HashSet;
 
 const KEEP_FILES: &'static str = "keep-files";
@@ -34,6 +36,7 @@ const PROFILES: &'static str = "profiles";
 const LIST_PROFILES: &'static str = "list-profiles";
 const NO_MULTITHREAD: &'static str = "no-multithreading";
 const VERBOSITY: &'static str = "verbosity";
+const RBASE: &'static str = "randomized-baseline";
 
 fn main() {
     let matches: ArgMatches = App::new("Value Constant Mutation Fuzzer for SMTlib2 Solvers")
@@ -53,6 +56,11 @@ fn main() {
             Arg::with_name(FROM_SKELS)
                 .short("f")
                 .help("Use skeleton files from pre-processing or previous run"),
+        )
+        .arg(
+            Arg::with_name(RBASE)
+                .short("r")
+                .help("Use a completely randomized constant value replacement strategy"),
         )
         .arg(
             Arg::with_name(WORKERS)
@@ -157,9 +165,12 @@ fn main() {
         return;
     }
 
-    match matches.is_present(FROM_SKELS) {
-        true => from_skels(dir_name, (workers.1, workers.2), cfg),
-        false => exec(dir_name, workers, cfg),
+    if matches.is_present(RBASE) {
+        exec_randomized(dir_name, max(workers.2, max(workers.0, workers.1)), cfg)
+    } else if matches.is_present(FROM_SKELS) {
+        from_skels(dir_name, (workers.1, workers.2), cfg)
+    } else {
+        exec(dir_name, workers, cfg)
     }
 }
 
