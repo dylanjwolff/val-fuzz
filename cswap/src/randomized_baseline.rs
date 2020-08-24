@@ -21,9 +21,13 @@ use rand_xoshiro::Xoshiro256Plus;
 use std::fmt;
 use std::fs;
 use std::io;
-use std::path::PathBuf;
+use std::path::Path;
 
-pub fn fuzz_iter_and_solve(seed_f: PathBuf, cfg: &Config, stats: &mut RunStats) -> io::Result<()> {
+pub fn rand_fuzz_iter_and_solve(
+    seed_f: &Path,
+    cfg: &Config,
+    stats: &mut RunStats,
+) -> io::Result<()> {
     let mut md = Metadata::new(&seed_f);
     let mut script = script_from_f(&seed_f)?;
     let mut rng = Xoshiro256Plus::seed_from_u64(1);

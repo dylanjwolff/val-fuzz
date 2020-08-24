@@ -27,6 +27,7 @@ use crate::fuzzer::solver_fn;
 use crate::fuzzer::StatefulBavAssign;
 use crate::transforms::STATIC_FFLAGS;
 
+use crate::randomized_baseline::rand_fuzz_iter_and_solve;
 use crate::utils::RunStats;
 use crate::utils::StageComplete;
 
@@ -247,9 +248,60 @@ pub fn exec_randomized(dirname: &str, worker_count: u8, cfg: Config) {
     q.push(Err(PoisonPill {}));
 
     let aq = Arc::new(q);
+    let handles = (0..worker_count)
+        .map(|_| {
+            let t_q = Arc::clone(&aq);
+            let t_cfg = cfg.clone();
+
+            thread::Builder::new()
+                .stack_size(cfg.stack_size)
+                .spawn(move || randomized_worker(t_q, &t_cfg))
+        })
+        .collect::<Vec<std::io::Result<JoinHandle<_>>>>();
+
+    let mut backoff = MyBackoff::new();
+    backoff.reset();
+    let mut all_stats = RunStats::new();
+    for h in handles {
+        let stats = h.unwrap().join().unwrap();
+        debug!("Saw {:?} on a single thread", stats);
+        all_stats.merge_in_place(&stats);
+        backoff.snooze();
+        trace!("Thread finished");
+    }
+    info!("Saw {:?} across ALL threads", all_stats);
+    info!("CSVRUNSTATS:{}", all_stats.to_csv_string());
+    info!(
+        "CSVCONFIG:{}, {}",
+        cfg.to_csv_string(),
+        to_csv(&STATIC_FFLAGS)
+    );
+    info!("Stage 3 Complete");
 }
 
-fn randomized_worker(qin: InputPPQ, cfg: &Config) {}
+fn randomized_worker(qin: InputPPQ, cfg: &Config) -> RunStats {
+    let mut stats = RunStats::new();
+    let mut backoff = MyBackoff::new();
+    loop {
+        let filepath = match qin.pop() {
+            Ok(Ok(filepath)) => filepath,
+            Ok(Err(poison_pill)) => {
+                qin.push(Err(poison_pill));
+                break;
+            }
+            Err(_) => {
+                backoff.snooze();
+                continue;
+            }
+        };
+        backoff.reset();
+        match rand_fuzz_iter_and_solve(&filepath, cfg, &mut stats) {
+            Err(e) => warn!("Error on seed {}: {}", filepath.to_str().unwrap(), e),
+            _ => (),
+        }
+    }
+    stats
+}
 
 pub struct PoisonPill {}
 fn mutator_worker(qin: InputPPQ, qout: SkeletonQueue, stage: StageCompleteA, cfg: Config) {
