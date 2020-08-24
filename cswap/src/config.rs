@@ -259,6 +259,17 @@ impl FileProvider {
         Ok((fs, fm))
     }
 
+    pub fn serialize_iterfile(
+        &self,
+        script: &Script,
+        iteration: u64,
+        md: &Metadata,
+    ) -> Result<PathBuf, io::Error> {
+        let f = self.iterfile(iteration, md)?;
+        fs::write(&f, script.to_string())?;
+        Ok(f)
+    }
+
     pub fn serialize_resub_str(
         &self,
         script_str: String,

@@ -1,3 +1,4 @@
+extern crate arbitrary;
 extern crate log;
 extern crate nom;
 extern crate rand;
@@ -16,6 +17,7 @@ pub mod ast;
 pub mod config;
 pub mod fuzzer;
 pub mod parser;
+pub mod randomized_baseline;
 pub mod solver;
 pub mod transforms;
 pub mod utils;
@@ -230,6 +232,24 @@ pub fn exec(dirname: &str, worker_counts: (u8, u8, u8), cfg: Config) {
 
     launch((aq, aq2), worker_counts, cfg);
 }
+
+pub fn exec_randomized(dirname: &str, worker_count: u8, cfg: Config) {
+    let q = SegQueue::new();
+    for entry in WalkDir::new(dirname)
+        .into_iter()
+        .filter_map(Result::ok)
+        .filter(|e| !e.file_type().is_dir())
+    {
+        let filepath = entry.into_path();
+        debug!("push {:?}", filepath);
+        q.push(Ok(filepath));
+    }
+    q.push(Err(PoisonPill {}));
+
+    let aq = Arc::new(q);
+}
+
+fn randomized_worker(qin: InputPPQ, cfg: &Config) {}
 
 pub struct PoisonPill {}
 fn mutator_worker(qin: InputPPQ, qout: SkeletonQueue, stage: StageCompleteA, cfg: Config) {

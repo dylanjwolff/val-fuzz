@@ -251,7 +251,7 @@ fn slim_dynfmt_err_msg(e: DFormatParseError) -> String {
     }
 }
 
-fn report_any_bugs(file: &Path, results: &Vec<RSolve>, fp: &FileProvider) -> bool {
+pub fn report_any_bugs(file: &Path, results: &Vec<RSolve>, fp: &FileProvider) -> bool {
     results
         .iter()
         .find(|r| r.has_bug_error())

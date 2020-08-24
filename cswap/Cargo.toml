@@ -24,6 +24,7 @@ criterion = "0.3.2"
 log = "0.4.8"
 env_logger = "0.7.1"
 subprocess = "0.2.4"
+arbitrary = "0.4.5"
 
 [[bench]]
 name = "my_benchmark"

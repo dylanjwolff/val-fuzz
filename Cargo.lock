@@ -25,6 +25,12 @@ dependencies = [
 ]
 
 [[package]]
+name = "arbitrary"
+version = "0.4.6"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "0922a3e746b5a44e111e5603feb6704e5cc959116f66737f50bb5cbd264e9d87"
+
+[[package]]
 name = "arc-swap"
 version = "0.4.7"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -310,6 +316,7 @@ dependencies = [
 name = "cswap"
 version = "0.1.0"
 dependencies = [
+ "arbitrary",
  "bit-vec",
  "criterion",
  "crossbeam",
