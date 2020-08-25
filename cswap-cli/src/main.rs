@@ -166,7 +166,7 @@ fn main() {
     }
 
     if matches.is_present(RBASE) {
-        exec_randomized(dir_name, max(workers.2, max(workers.0, workers.1)), cfg)
+        exec_randomized(dir_name, (max(workers.0, workers.1), workers.2), cfg)
     } else if matches.is_present(FROM_SKELS) {
         from_skels(dir_name, (workers.1, workers.2), cfg)
     } else {

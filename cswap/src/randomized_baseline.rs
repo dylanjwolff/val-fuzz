@@ -26,75 +26,107 @@ use std::fmt;
 use std::fs;
 use std::io;
 use std::path::Path;
+use std::path::PathBuf;
 
-pub fn rand_fuzz_iter_and_solve(
-    seed_f: &Path,
-    cfg: &Config,
-    stats: &mut RunStats,
-) -> io::Result<()> {
-    let mut md = Metadata::new(&seed_f);
-    if check_valid_solve(seed_f.to_str().unwrap())
-        .iter()
-        .all(|r| r.has_unrecoverable_error() && !r.has_bug_error())
-    {
-        return liftio!(Err(format!(
-            "Unmodified file {} failed to pass initial validation check",
-            md.seed_file
-        )));
-    }
+pub struct StatefulRandBaseFuzzer<'a> {
+    script: Script,
+    md_file: PathBuf,
+    md: Metadata,
+    cfg: &'a Config,
+    rng: Xoshiro256Plus,
+    stats: &'a mut RunStats,
+    current_iter: u64,
+}
 
-    let mut to_ctr = BTreeMap::new(); //: &mut BTreeMap<String, u64>,
-    let mut script = script_from_f(&seed_f)?;
-    let mut rng = Xoshiro256Plus::seed_from_u64(cfg.get_specific_seed(&seed_f));
-    for i in 0..cfg.max_iter as u64 {
-        if to_ctr.get(&md.seed_file).map(|sf| *sf > 3).unwrap_or(false) {
+impl<'a> StatefulRandBaseFuzzer<'a> {
+    pub fn new(seed_f: &'a Path, cfg: &'a Config, stats: &'a mut RunStats) -> io::Result<Self> {
+        let mut md = Metadata::new(&seed_f);
+        if check_valid_solve(seed_f.to_str().unwrap())
+            .iter()
+            .all(|r| r.has_unrecoverable_error() && !r.has_bug_error())
+        {
             return liftio!(Err(format!(
-                "{} exceeded max consec timeouts",
+                "Unmodified file {} failed to pass initial validation check",
                 md.seed_file
             )));
         }
 
-        let consts = fuzz(&mut script, &mut rng);
-        if consts == 0 {
-            return liftio!(Err(format!("{} has no constants to replace", md.seed_file)));
-        }
-
-        let script_str = script.to_string();
-        if !stats.record_sub(&script_str) {
-            continue; // Reporting this as an error is probably a bit too noisy
-        }
-        let iter_f = match cfg
-            .file_provider
-            .serialize_iterfile_str(&script_str, i, &mut md)
-        {
-            Err(e) => {
-                warn!("Serialization error {} for {}", e, md.seed_file);
-                continue;
-            }
-            Ok(iter_f) => iter_f,
-        };
-
-        let results = profiles_solve(iter_f.to_str().unwrap_or("defaultname"), &cfg.profiles);
-        stats.record_stats_for_sub_results(&results);
-
-        let ct = to_ctr.entry(md.seed_file.clone()).or_insert(0);
-        if all_non_err_timed_out(&results) {
-            *ct = *ct + 1;
-        } else if *ct > 0 {
-            *ct = *ct - 1;
-        }
-
-        if !report_any_bugs(&iter_f, &results, &cfg.file_provider) {
-            if cfg.remove_files {
-                fs::remove_file(&iter_f).unwrap_or(());
-            }
-        }
+        let mut script = script_from_f(&seed_f)?;
+        let mut rng = Xoshiro256Plus::seed_from_u64(cfg.get_specific_seed(&seed_f));
+        let md_file = cfg.file_provider.serialize_md(&mut md)?;
+        Ok(StatefulRandBaseFuzzer {
+            script: script,
+            md_file: md_file,
+            md: md,
+            cfg: cfg,
+            rng: rng,
+            stats: stats,
+            current_iter: 0,
+        })
     }
 
+    pub fn next(&mut self) -> io::Result<Option<(PathBuf, PathBuf)>> {
+        if self.current_iter >= self.cfg.max_iter as u64 {
+            return liftio!(Err("done")); // TODO hack
+        }
+        self.current_iter = self.current_iter + 1;
+
+        let consts = fuzz(&mut self.script, &mut self.rng);
+        if consts == 0 {
+            return liftio!(Err(format!(
+                "{} has no constants to replace",
+                self.md.seed_file
+            )));
+        }
+
+        let script_str = self.script.to_string();
+        if !self.stats.record_sub(&script_str) {
+            return Ok(None);
+        }
+
+        self.cfg
+            .file_provider
+            .serialize_iterfile_str(&script_str, self.current_iter, &mut self.md)
+            .map(|r| Some((r, self.md_file.clone())))
+    }
+}
+
+pub fn rand_fuzz_solve(
+    iter_f: &Path,
+    md_f: &Path,
+    cfg: &Config,
+    stats: &mut RunStats,
+    to_ctr: &mut BTreeMap<String, u64>,
+) -> io::Result<()> {
+    let md_contents = fs::read_to_string(md_f)?;
+    let md: Metadata = liftio!(serde_lexpr::from_str(&md_contents))?;
+
+    if to_ctr.get(&md.seed_file).map(|sf| *sf > 3).unwrap_or(false) {
+        return liftio!(Err(format!(
+            "{} exceeded max consec timeouts",
+            md.seed_file
+        )));
+    }
+
+    let results = profiles_solve(iter_f.to_str().unwrap_or("defaultname"), &cfg.profiles);
+    stats.record_stats_for_sub_results(&results);
+
+    let ct = to_ctr.entry(md.seed_file.clone()).or_insert(0);
+    if all_non_err_timed_out(&results) {
+        *ct = *ct + 1;
+    } else if *ct > 0 {
+        *ct = *ct - 1;
+    }
+
+    if !report_any_bugs(&iter_f, &results, &cfg.file_provider) {
+        if cfg.remove_files {
+            fs::remove_file(&iter_f).unwrap_or(());
+        }
+    }
     Ok(())
 }
 
-pub fn fuzz(script: &mut Script, rng: &mut Xoshiro256Plus) -> u64 {
+fn fuzz(script: &mut Script, rng: &mut Xoshiro256Plus) -> u64 {
     let Script::Commands(cmds) = script;
     let mut count = 0;
     for cmd in cmds {

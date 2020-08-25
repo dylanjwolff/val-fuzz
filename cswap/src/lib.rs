@@ -27,7 +27,8 @@ use crate::fuzzer::solver_fn;
 use crate::fuzzer::StatefulBavAssign;
 use crate::transforms::STATIC_FFLAGS;
 
-use crate::randomized_baseline::rand_fuzz_iter_and_solve;
+use crate::randomized_baseline::rand_fuzz_solve;
+use crate::randomized_baseline::StatefulRandBaseFuzzer;
 use crate::utils::RunStats;
 use crate::utils::StageComplete;
 
@@ -234,7 +235,7 @@ pub fn exec(dirname: &str, worker_counts: (u8, u8, u8), cfg: Config) {
     launch((aq, aq2), worker_counts, cfg);
 }
 
-pub fn exec_randomized(dirname: &str, worker_count: u8, cfg: Config) {
+pub fn exec_randomized(dirname: &str, worker_count: (u8, u8), cfg: Config) {
     let q = SegQueue::new();
     for entry in WalkDir::new(dirname)
         .into_iter()
@@ -248,15 +249,36 @@ pub fn exec_randomized(dirname: &str, worker_count: u8, cfg: Config) {
     q.push(Err(PoisonPill {}));
 
     let aq = Arc::new(q);
+    let stage0 = match worker_count.0 {
+        0 => Arc::new(StageComplete::finished()),
+        _ => Arc::new(StageComplete::new(worker_count.0)),
+    };
 
-    let handles = (0..worker_count)
+    let q2 = SegQueue::new();
+    let aq2 = Arc::new(q2);
+
+    let handles = (0..worker_count.0)
         .map(|_| {
             let t_q = Arc::clone(&aq);
+            let t_q2 = Arc::clone(&aq2);
             let t_cfg = cfg.clone();
+            let t_stage0 = Arc::clone(&stage0);
 
             thread::Builder::new()
                 .stack_size(cfg.stack_size)
-                .spawn(move || randomized_worker(t_q, &t_cfg))
+                .spawn(move || randomized_worker(t_q, t_stage0, t_q2, &t_cfg))
+        })
+        .collect::<Vec<std::io::Result<JoinHandle<_>>>>();
+
+    let solver_handles = (0..worker_count.1)
+        .map(|_| {
+            let t_q2 = Arc::clone(&aq2);
+            let t_cfg = cfg.clone();
+            let t_stage0 = Arc::clone(&stage0);
+
+            thread::Builder::new()
+                .stack_size(cfg.stack_size)
+                .spawn(move || randomized_solver_worker(t_stage0, t_q2, &t_cfg))
         })
         .collect::<Vec<std::io::Result<JoinHandle<_>>>>();
 
@@ -265,7 +287,7 @@ pub fn exec_randomized(dirname: &str, worker_count: u8, cfg: Config) {
             let mut b = MyBackoff::new();
             loop {
                 b.snooze();
-                info!("QLEN: {}", max(1, aq.len()) - 1);
+                info!("QLENS {} {}", max(1, aq.len()) - 1, aq2.len());
             }
         })
         .unwrap();
@@ -273,7 +295,7 @@ pub fn exec_randomized(dirname: &str, worker_count: u8, cfg: Config) {
     let mut backoff = MyBackoff::new();
     backoff.reset();
     let mut all_stats = RunStats::new();
-    for h in handles {
+    for h in handles.into_iter().chain(solver_handles.into_iter()) {
         let stats = h.unwrap().join().unwrap();
         debug!("Saw {:?} on a single thread", stats);
         all_stats.merge_in_place(&stats);
@@ -290,7 +312,40 @@ pub fn exec_randomized(dirname: &str, worker_count: u8, cfg: Config) {
     info!("Stage 3 Complete");
 }
 
-fn randomized_worker(qin: InputPPQ, cfg: &Config) -> RunStats {
+fn randomized_solver_worker(
+    prev_stage_complete: StageCompleteA,
+    qin: SkeletonQueue,
+    cfg: &Config,
+) -> RunStats {
+    let mut backoff = MyBackoff::new();
+    let mut stats = RunStats::new();
+    let mut to_ctr = BTreeMap::new();
+    loop {
+        let (file, mdfile) = match qin.pop() {
+            Ok(r) => r,
+            Err(_) => {
+                if prev_stage_complete.is_complete() {
+                    break;
+                } else {
+                    backoff.snooze();
+                    continue;
+                }
+            }
+        };
+        match rand_fuzz_solve(&file, &mdfile, cfg, &mut stats, &mut to_ctr) {
+            Err(e) => warn!("Solver Error {} on file {:?}", e, file),
+            Ok(()) => (),
+        };
+    }
+    stats
+}
+
+fn randomized_worker(
+    qin: InputPPQ,
+    stage_complete: StageCompleteA,
+    qout: SkeletonQueue,
+    cfg: &Config,
+) -> RunStats {
     let mut stats = RunStats::new();
     let mut backoff = MyBackoff::new();
     loop {
@@ -306,11 +361,34 @@ fn randomized_worker(qin: InputPPQ, cfg: &Config) -> RunStats {
             }
         };
         backoff.reset();
-        match rand_fuzz_iter_and_solve(&filepath, cfg, &mut stats) {
-            Err(e) => warn!("Error on seed {}: {}", filepath.to_str().unwrap(), e),
-            _ => (),
+
+        let mut fuzzer = match StatefulRandBaseFuzzer::new(&filepath, cfg, &mut stats) {
+            Ok(f) => f,
+            Err(e) => {
+                warn!(
+                    "Initial iteration error on seed {}: {}",
+                    filepath.to_str().unwrap(),
+                    e
+                );
+                continue;
+            }
+        };
+        loop {
+            match fuzzer.next() {
+                Ok(Some(iter)) => qout.push(iter),
+                Ok(None) => continue,
+                Err(e) => {
+                    warn!(
+                        "Iteration error on seed {}: {}",
+                        filepath.to_str().unwrap(),
+                        e
+                    );
+                    break;
+                }
+            }
         }
     }
+    stage_complete.finish();
     stats
 }
 
