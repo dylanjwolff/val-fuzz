@@ -578,10 +578,10 @@ impl RSolve {
     }
 
     fn propogate_diff(
-        (a, a_has_mnp_err): &(Vec<ResultLine>, bool),
-        (b, b_has_mnp_err): &(Vec<ResultLine>, bool),
+        (a, a_has_mnp_or_bug_err): &(Vec<ResultLine>, bool),
+        (b, b_has_mnp_or_bug_err): &(Vec<ResultLine>, bool),
     ) -> Result<(Vec<ResultLine>, bool), ()> {
-        if a.len() != b.len() && !a_has_mnp_err && !b_has_mnp_err {
+        if a.len() != b.len() && !a_has_mnp_or_bug_err && !b_has_mnp_or_bug_err {
             return Err(());
         }
 
@@ -599,14 +599,14 @@ impl RSolve {
             .collect();
 
         if a.len() == b.len() || zipped.is_err() {
-            // if there is a discrepancy, or no mnp error, return normally
-            zipped.map(|v| (v, *a_has_mnp_err && *b_has_mnp_err))
+            // if they were the same length or there was a discrepancy, return the result propogating the mnp-error if both contained it
+            zipped.map(|v| (v, *a_has_mnp_or_bug_err && *b_has_mnp_or_bug_err))
         } else if a.len() > b.len() {
-            // otherwise, there is no discrepency, so return the longest results
-            Ok((a.clone(), *a_has_mnp_err))
+            // otherwise, there is no discrepency and there was an mnp error, so we can safely return the longest results as both should agree
+            Ok((a.clone(), *a_has_mnp_or_bug_err))
         } else {
             // if a.len() < b.len()
-            Ok((b.clone(), *b_has_mnp_err))
+            Ok((b.clone(), *b_has_mnp_or_bug_err))
         }
     }
 
@@ -626,7 +626,7 @@ impl RSolve {
                     .filter(|l| is_out_result(&l))
                     .map(|l| l.clone()) // TODO
                     .collect::<Vec<ResultLine>>();
-                (outs, r.has_mnp_error())
+                (outs, r.has_mnp_error() || r.has_bug_error())
             })
             .filter(|(l, _)| l.len() > 0)
             .fold(None, |acc, lines| match acc {
