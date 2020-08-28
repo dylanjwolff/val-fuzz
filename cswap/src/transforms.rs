@@ -197,17 +197,22 @@ fn get_var_inits(vars: Vec<(String, Sort)>) -> Vec<CommandRc> {
 // Get sub-exp monitors
 fn get_boolean_abstraction(bavs: Vec<(String, SExp, VarBindings)>) -> Vec<CommandRc> {
     let mut baveq_iter = bavs.into_iter().map(|(vname, sexp, vbs)| {
-        let rhs = SExp::BExp(
-            rccell!(BoolOp::Equals()),
-            vec![
-                rccell!(SExp::Symbol(rccell!(Symbol::Token(vname)))),
-                rccell!(sexp),
-            ],
-        );
         if vbs.len() > 0 {
-            SExp::QForAll(vbs, rccell!(Box::new(rhs)))
+            SExp::BExp(
+                rccell!(BoolOp::Equals()),
+                vec![
+                    rccell!(SExp::Symbol(rccell!(Symbol::Token(vname)))),
+                    rccell!(SExp::QForAll(vbs, rccell!(Box::new(sexp)))),
+                ],
+            )
         } else {
-            rhs
+            SExp::BExp(
+                rccell!(BoolOp::Equals()),
+                vec![
+                    rccell!(SExp::Symbol(rccell!(Symbol::Token(vname)))),
+                    rccell!(sexp),
+                ],
+            )
         }
     });
 
@@ -581,21 +586,20 @@ fn rl_c(
 
 fn fresh_eq_val_sexp(fresh_name: String, val: &SExpRc, qvars: &QualedVars) -> (SExpRc, SExpRc) {
     let new_name_sexp = rccell!(SExp::Symbol(rccell!(Symbol::Token(fresh_name))));
+
+    let rhs = if qvars.uqvars.len() > 0 {
+        rccell!(SExp::QForAll(
+            qvars.uqvars.clone(),
+            rccell!(Box::new(val.borrow().clone())),
+        ))
+    } else {
+        Rc::clone(val)
+    };
     let equiv = SExp::BExp(
         rccell!(BoolOp::Equals()),
-        vec![Rc::clone(&new_name_sexp), Rc::clone(val)],
+        vec![Rc::clone(&new_name_sexp), rhs],
     );
-    if qvars.uqvars.len() > 0 {
-        (
-            new_name_sexp,
-            rccell!(SExp::QForAll(
-                qvars.uqvars.clone(),
-                rccell!(Box::new(equiv))
-            )),
-        )
-    } else {
-        (new_name_sexp, rccell!(equiv))
-    }
+    (new_name_sexp, rccell!(equiv))
 }
 
 static RECUR_LIMIT: u8 = 10;
@@ -1113,7 +1117,7 @@ impl QualedVars {
 }
 
 const USE_RELATIONAL_CONST_MONITORS: bool = true;
-const UNIVERSAL_AS_EXISTENTIAL: bool = true;
+const UNIVERSAL_AS_EXISTENTIAL: bool = false;
 const LEAF_OPT: bool = true;
 const CP_OG: bool = true;
 pub const STATIC_FFLAGS: [bool; 4] = [
