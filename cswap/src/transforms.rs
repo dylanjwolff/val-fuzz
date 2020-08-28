@@ -223,6 +223,9 @@ fn get_boolean_abstraction(bavs: Vec<(String, SExp, VarBindings)>) -> Vec<Comman
 fn get_boolean_domain_monitors(
     subexp_monitors: Vec<(String, Sort)>,
 ) -> (Vec<(String, Sort)>, Vec<CommandRc>) {
+    if !USE_BDOM_VS {
+        return (vec![], vec![]);
+    }
     let mut vng = VarNameGenerator::new("BDOM");
     let mut baveq = subexp_monitors
         .into_iter()
@@ -1116,11 +1119,13 @@ impl QualedVars {
     }
 }
 
+const USE_BDOM_VS: bool = true;
 const USE_RELATIONAL_CONST_MONITORS: bool = true;
 const UNIVERSAL_AS_EXISTENTIAL: bool = false;
 const LEAF_OPT: bool = true;
 const CP_OG: bool = true;
-pub const STATIC_FFLAGS: [bool; 4] = [
+pub const STATIC_FFLAGS: [bool; 5] = [
+    USE_BDOM_VS,
     USE_RELATIONAL_CONST_MONITORS,
     UNIVERSAL_AS_EXISTENTIAL,
     LEAF_OPT,
