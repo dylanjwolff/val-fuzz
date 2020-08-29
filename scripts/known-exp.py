@@ -3,25 +3,43 @@ import subprocess as sp
 import os
 import sys
 
+base_cvc4 = "0675545"
+base_z3 = "a35d00e"
+
 o = sp.getoutput("ls ~/known/repro").split("\n")
 solv_hashes = [l.split("-") for l in o]
 print(solv_hashes)
 cum_runstats = [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0]
+total_elapsed = 0
 
 reprod = {}
-for zsh in solv_hashes:
+for zsh in [solv_hashes[0]]:
     cmdstr = "python3 ./smtvm.py " + zsh[0] + " install " + zsh[1]
     print(cmdstr)
     o = sp.getoutput(cmdstr)
-    print(o)
+
+    if zsh[0].strip() == "z3":
+        cmdstr = "python3 ./smtvm.py cvc4 install " + base_cvc4
+        print(cmdstr)
+        o = sp.getoutput(cmdstr)
+    elif zsh[0].strip() == "cvc4":
+        cmdstr = "python3 ./smtvm.py z3 install " + base_z3
+        print(cmdstr)
+        o = sp.getoutput(cmdstr)
+    else:
+        sys.exit("didn't recognize solver version")
+
 
     cmdstr = "rm -r 0-cswap-fuzz-run-out"
     print(cmdstr)
     o = sp.getstatusoutput(cmdstr)
 
-    cmdstr = "cswap-cli -v -i 500 ~/known/repro/" + zsh[0] + "-" + zsh[1]
+    cmdstr = "cswap-cli -v -i 1 ~/known/repro/" + zsh[0] + "-" + zsh[1]
     print(cmdstr)
     (s, o) = sp.getstatusoutput(cmdstr)
+    elapsed = int([l for l in o.split("\n") if "Elapsed Time" in l][0].split(':')[-1].strip())
+    total_elapsed = elapsed + total_elapsed
+
     runstats = [l for l in o.split("\n") if "CSVRUNSTATS:" in l][0].split(':')[-1]
     numstats = [int(n.strip()) for n in runstats.split(',')]
     cum_runstats = [x + y for (x, y) in zip(numstats, cum_runstats)]
@@ -62,3 +80,5 @@ for k in sortedks:
 print("\ncsv row:")
 for k in sortedks:
     print(str(reprod[k]) + ", ", end = '')
+print("")
+print("total elapsed time " + str(total_elapsed))
