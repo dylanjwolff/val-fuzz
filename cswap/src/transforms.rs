@@ -195,25 +195,23 @@ fn get_var_inits(vars: Vec<(String, Sort)>) -> Vec<CommandRc> {
 }
 
 // Get sub-exp monitors
-fn get_boolean_abstraction(bavs: Vec<(String, SExp, VarBindings)>) -> Vec<CommandRc> {
-    let mut baveq_iter = bavs.into_iter().map(|(vname, sexp, vbs)| {
-        if vbs.len() > 0 {
-            SExp::BExp(
-                rccell!(BoolOp::Equals()),
-                vec![
-                    rccell!(SExp::Symbol(rccell!(Symbol::Token(vname)))),
-                    rccell!(SExp::QForAll(vbs, rccell!(Box::new(sexp)))),
-                ],
-            )
-        } else {
-            SExp::BExp(
-                rccell!(BoolOp::Equals()),
-                vec![
-                    rccell!(SExp::Symbol(rccell!(Symbol::Token(vname)))),
-                    rccell!(sexp),
-                ],
-            )
+fn get_boolean_abstraction(bavs: Vec<(String, SExp, QVarBindings)>) -> Vec<CommandRc> {
+    let mut baveq_iter = bavs.into_iter().map(|(vname, sexp, qvbs)| {
+        let mut rhs = sexp;
+        for (vbs, q) in qvbs.into_iter().rev() {
+            rhs = match q {
+                Q::Exists() => SExp::QExists(vbs, rccell!(Box::new(rhs))),
+                Q::ForAll() => SExp::QForAll(vbs, rccell!(Box::new(rhs))),
+            };
         }
+
+        SExp::BExp(
+            rccell!(BoolOp::Equals()),
+            vec![
+                rccell!(SExp::Symbol(rccell!(Symbol::Token(vname)))),
+                rccell!(rhs),
+            ],
+        )
     });
 
     many_assert(&mut baveq_iter)
@@ -591,17 +589,18 @@ fn rl_c(
 fn fresh_eq_val_sexp(fresh_name: String, val: &SExpRc, qvars: &QualedVars) -> (SExpRc, SExpRc) {
     let new_name_sexp = rccell!(SExp::Symbol(rccell!(Symbol::Token(fresh_name))));
 
-    let rhs = if qvars.uqvars.len() > 0 {
-        rccell!(SExp::QForAll(
-            qvars.uqvars.clone(),
-            rccell!(Box::new(val.borrow().clone())),
-        ))
-    } else {
-        Rc::clone(val)
-    };
+    let qvbs = qvars.no_skolems.clone();
+    let mut rhs = val.borrow().clone();
+    for (vbs, q) in qvbs.into_iter().rev() {
+        rhs = match q {
+            Q::Exists() => SExp::QExists(vbs, rccell!(Box::new(rhs))),
+            Q::ForAll() => SExp::QForAll(vbs, rccell!(Box::new(rhs))),
+        };
+    }
+
     let equiv = SExp::BExp(
         rccell!(BoolOp::Equals()),
-        vec![Rc::clone(&new_name_sexp), rhs],
+        vec![Rc::clone(&new_name_sexp), rccell!(rhs)],
     );
     (new_name_sexp, rccell!(equiv))
 }
@@ -751,7 +750,7 @@ fn rl_s(
             )?;
 
             if !cfg.skolemize_universal {
-                qvars.pop_n_universal(num_vbs);
+                qvars.pop_non_skolem();
             } else {
                 qvars.pop_all_e(vbs);
                 let b = (**s.borrow()).clone();
@@ -760,7 +759,11 @@ fn rl_s(
             Ok(())
         }
         SExp::QExists(vbs, s) => {
-            qvars.add_existentials(vbs);
+            if true {
+                qvars.add_existentials_no_skolem(vbs);
+            } else {
+                qvars.add_existentials(vbs);
+            }
             rl_s(
                 &mut s.borrow_mut(),
                 scoped_vars,
@@ -771,9 +774,13 @@ fn rl_s(
                 recur_count,
                 cfg,
             )?;
-            qvars.pop_all_e(vbs);
-            let b = (**s.borrow()).clone();
-            *sexp = b; // replace existential
+            if true {
+                qvars.pop_non_skolem();
+            } else {
+                qvars.pop_all_e(vbs);
+                let b = (**s.borrow()).clone();
+                *sexp = b; // replace existential
+            }
             Ok(())
         }
         SExp::Constant(_) => Ok(()),
@@ -1017,7 +1024,7 @@ fn choles_rcse(rcse: &Rcse) -> Vec<(Rcse, Sort)> {
 pub fn bav(
     script: &mut Script,
     vng: &mut VarNameGenerator,
-    bava: &mut Vec<(String, SExp, VarBindings)>,
+    bava: &mut Vec<(String, SExp, QVarBindings)>,
     cfg: &Config,
 ) -> io::Result<()> {
     let timer = Timer::new_started(Duration::from_secs(30));
@@ -1041,11 +1048,18 @@ pub fn bav(
 }
 
 type VarBindings = Vec<(SymbolRc, SortRc)>;
+type QVarBindings = Vec<(VarBindings, Q)>;
+
+#[derive(Debug, Clone)]
+pub enum Q {
+    Exists(),
+    ForAll(),
+}
 
 fn bav_c(
     cmd: &mut Command,
     vng: &mut VarNameGenerator,
-    bava: &mut Vec<(String, SExp, VarBindings)>,
+    bava: &mut Vec<(String, SExp, QVarBindings)>,
     qvars: &mut QualedVars,
     timer: Timer,
     cfg: &Config,
@@ -1069,7 +1083,7 @@ fn bav_c(
 
 #[derive(Debug, Clone)]
 struct QualedVars {
-    uqvars: VarBindings,
+    no_skolems: QVarBindings,
     replacer: BTreeMap<SymbolRc, Vec<SymbolRc>>,
     vng: VarNameGenerator,
 }
@@ -1077,7 +1091,7 @@ struct QualedVars {
 impl QualedVars {
     pub fn new_named(s: &str) -> Self {
         QualedVars {
-            uqvars: vec![],
+            no_skolems: vec![],
             replacer: BTreeMap::new(),
             vng: VarNameGenerator::new(s),
         }
@@ -1085,10 +1099,15 @@ impl QualedVars {
 
     pub fn new() -> Self {
         QualedVars {
-            uqvars: vec![],
+            no_skolems: vec![],
             replacer: BTreeMap::new(),
             vng: VarNameGenerator::new("QUAL_REPLACE"),
         }
+    }
+
+    pub fn add_existentials_no_skolem(&mut self, vbs: &VarBindings) {
+        println!("ADDING EXIST NO SKOL {:?}", vbs);
+        self.no_skolems.push((vbs.clone(), Q::Exists()));
     }
 
     pub fn add_existential(&mut self, name: &SymbolRc, sort: &SortRc) {
@@ -1108,12 +1127,8 @@ impl QualedVars {
         vbs.iter().for_each(|(n, s)| self.add_existential(n, s));
     }
 
-    pub fn add_universal(&mut self, name: &SymbolRc, sort: &SortRc) {
-        self.uqvars.push((Rc::clone(name), Rc::clone(sort)));
-    }
-
     pub fn add_universals(&mut self, vbs: &VarBindings) {
-        vbs.iter().for_each(|(n, s)| self.add_universal(n, s));
+        self.no_skolems.push((vbs.clone(), Q::ForAll()));
     }
 
     pub fn replace_if_necessary(&self, name: &mut SymbolRc) {
@@ -1123,8 +1138,8 @@ impl QualedVars {
             .map(|rpmt| *name = Rc::clone(rpmt));
     }
 
-    pub fn pop_n_universal(&mut self, n_to_pop: usize) {
-        self.uqvars.truncate(self.uqvars.len() - n_to_pop);
+    pub fn pop_non_skolem(&mut self) {
+        self.no_skolems.pop();
     }
 
     pub fn pop_e(&mut self, to_pop: &SymbolRc) {
@@ -1140,7 +1155,7 @@ fn bav_se(
     _is_root: bool,
     sexp: &mut SExp,
     vng: &mut VarNameGenerator,
-    bavs: &mut Vec<(String, SExp, VarBindings)>,
+    bavs: &mut Vec<(String, SExp, QVarBindings)>,
     qvars: &mut QualedVars,
     timer: Timer,
     cfg: &Config,
@@ -1152,7 +1167,7 @@ fn bav_se(
     match sexp {
         SExp::BExp(bop, sexps) => {
             let sec = SExp::BExp(Rc::clone(bop), sexps.clone());
-            let pre_uqvars = qvars.uqvars.clone();
+            let pre_uqvars = qvars.no_skolems.clone();
             let before_exploration_num_bavs = bavs.len();
             for sexp in sexps {
                 bav_se(
@@ -1167,6 +1182,7 @@ fn bav_se(
             }
             if bavs.len() <= before_exploration_num_bavs || !cfg.leaf_opt {
                 let name = vng.get_name(Sort::Bool());
+                println!("PUSHING {:?}", pre_uqvars);
                 bavs.push((name, sec, pre_uqvars));
             }
             Ok(())
@@ -1215,10 +1231,27 @@ fn bav_se(
                 timer.clone(),
                 cfg,
             )?;
-            qvars.pop_n_universal(num_vbs);
+            qvars.pop_non_skolem();
             Ok(())
         }
-        SExp::QExists(_, _) => panic!("Existential Quantifiers should be filtered out!"),
+        SExp::QExists(vbs, rest) => {
+            if !true {
+                panic!("Existential Quantifiers should be filtered out!");
+            }
+            let num_vbs = vbs.len();
+            qvars.add_existentials_no_skolem(vbs);
+            bav_se(
+                false,
+                &mut *rest.borrow_mut(),
+                vng,
+                bavs,
+                qvars,
+                timer.clone(),
+                cfg,
+            )?;
+            qvars.pop_non_skolem();
+            Ok(())
+        }
         SExp::Constant(_) => Ok(()),
         SExp::Symbol(s) => {
             qvars.replace_if_necessary(s);
@@ -1362,6 +1395,22 @@ mod tests {
         assert_display_snapshot!(ba_str);
     }
 
+    #[test]
+    fn nested_qual_no_skolem_ba_snap() {
+        let str_script =
+            "(assert (forall ((a Int)) (exists ((b String)) (and (= b \"\") (= a (len b)) ))))";
+        let mut p = script(str_script).unwrap().1;
+
+        let bas = ba_script(
+            &mut p,
+            &mut Metadata::new_empty(),
+            &Config {
+                ..Config::default()
+            },
+        )
+        .unwrap();
+        assert_display_snapshot!(bas[0]);
+    }
     #[test]
     fn forall_ba_snap() {
         let str_script =

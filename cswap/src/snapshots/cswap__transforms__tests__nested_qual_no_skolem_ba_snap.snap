@@ -1,0 +1,13 @@
+---
+source: cswap/src/transforms.rs
+expression: "bas[0]"
+---
+(declare-const BAV1 Bool)
+(declare-const BAV2 Bool)
+(declare-const BAV3 Bool)
+(assert (= BAV1 (forall ((a Int)) (exists ((b String)) (= b "")))))
+(assert (= BAV2 (forall ((a Int)) (exists ((b String)) (= a (len b))))))
+(assert (= BAV3 (forall ((a Int)) (exists ((b String)) (and (= b "") (= a (len b)))))))
+(check-sat)
+(get-model)
+
