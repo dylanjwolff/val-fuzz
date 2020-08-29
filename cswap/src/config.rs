@@ -30,6 +30,7 @@ pub struct Config {
     pub enforce_on_resub: bool,
     pub use_bdom_vs: bool,
     pub max_const_relations_to_monitor: u8,
+    pub dont_skolemize_existential: bool,
     pub skolemize_universal: bool,
     pub leaf_opt: bool,
     pub cp_og: bool,
@@ -64,6 +65,7 @@ impl Config {
             use_bdom_vs: false,
             max_const_relations_to_monitor: 0,
             skolemize_universal: false,
+            dont_skolemize_existential: false,
             leaf_opt: false,
             cp_og: false,
         }

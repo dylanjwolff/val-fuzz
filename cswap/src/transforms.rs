@@ -759,7 +759,7 @@ fn rl_s(
             Ok(())
         }
         SExp::QExists(vbs, s) => {
-            if true {
+            if cfg.dont_skolemize_existential {
                 qvars.add_existentials_no_skolem(vbs);
             } else {
                 qvars.add_existentials(vbs);
@@ -774,7 +774,7 @@ fn rl_s(
                 recur_count,
                 cfg,
             )?;
-            if true {
+            if cfg.dont_skolemize_existential {
                 qvars.pop_non_skolem();
             } else {
                 qvars.pop_all_e(vbs);
@@ -1235,7 +1235,7 @@ fn bav_se(
             Ok(())
         }
         SExp::QExists(vbs, rest) => {
-            if !true {
+            if !cfg.dont_skolemize_existential {
                 panic!("Existential Quantifiers should be filtered out!");
             }
             let num_vbs = vbs.len();
@@ -1405,6 +1405,7 @@ mod tests {
             &mut p,
             &mut Metadata::new_empty(),
             &Config {
+                dont_skolemize_existential: true,
                 ..Config::default()
             },
         )
