@@ -447,17 +447,17 @@ pub fn grab_all_decls(script: &Script) -> Vec<CommandRc> {
 }
 
 pub fn ba_script(script: &mut Script, md: &mut Metadata, cfg: &Config) -> io::Result<Vec<Script>> {
-    rl(script, &cfg)?;
-
-    let mut vng = VarNameGenerator::new("BAV");
-    let mut bavs = vec![];
-    bav(script, &mut vng, &mut bavs, &cfg)?;
-
     let og_vars = script
         .get_all_global_var_bindings()
         .into_iter()
         .map(|(a, b)| (a.to_string(), b))
         .filter(|(name, _sort)| !name.contains("GEN")); // TODO dont do string compares here
+
+    rl(script, &cfg)?;
+
+    let mut vng = VarNameGenerator::new("BAV");
+    let mut bavs = vec![];
+    bav(script, &mut vng, &mut bavs, &cfg)?;
 
     let bavns = vng
         .vars_generated
@@ -1327,7 +1327,16 @@ mod tests {
     fn num_op_ba_script_snap() {
         let str_script = "(declare-fun x () Real)(assert (< (+ 4 3) x))";
         let mut p = script(str_script).unwrap().1;
-        let ba_str = ba_script(&mut p, &mut Metadata::new_empty(), &Config::default()).unwrap()[0]
+        let ba_str = ba_script(
+            &mut p,
+            &mut Metadata::new_empty(),
+            &Config {
+                use_bdom_vs: true,
+                cp_og: true,
+                ..Config::default()
+            },
+        )
+        .unwrap()[0]
             .to_string();
 
         assert_display_snapshot!(ba_str);
@@ -1338,7 +1347,16 @@ mod tests {
         let str_script =
             "(assert (exists ((a Int)) (< a 4)))(assert (exists ((a String)) (= a \"\")))";
         let mut p = script(str_script).unwrap().1;
-        let ba_str = ba_script(&mut p, &mut Metadata::new_empty(), &Config::default()).unwrap()[0]
+        let ba_str = ba_script(
+            &mut p,
+            &mut Metadata::new_empty(),
+            &Config {
+                use_bdom_vs: true,
+                cp_og: true,
+                ..Config::default()
+            },
+        )
+        .unwrap()[0]
             .to_string();
 
         assert_display_snapshot!(ba_str);
@@ -1349,7 +1367,15 @@ mod tests {
         let str_script =
             "(assert (forall ((a Int)) (< a 4)))(assert (exists ((a String)) (= a \"\")))";
         let mut p = script(str_script).unwrap().1;
-        let bas = ba_script(&mut p, &mut Metadata::new_empty(), &Config::default()).unwrap();
+        let bas = ba_script(
+            &mut p,
+            &mut Metadata::new_empty(),
+            &Config {
+                cp_og: true,
+                ..Config::default()
+            },
+        )
+        .unwrap();
         let ba_stra = bas[0].to_string();
         let ba_strb = bas[1].to_string();
         assert_display_snapshot!(ba_stra + "\n\n ~~~~~~~~~~~~~~~~~~~~~~~ \n\n" + &ba_strb);
@@ -1557,7 +1583,10 @@ mod tests {
                     Sort::Fp("11".to_owned(), "53".to_owned()),
                 ),
             ],
-            &Config::default(),
+            &Config {
+                use_bdom_vs: true,
+                ..Config::default()
+            },
         );
 
         assert_display_snapshot!(Script::Commands(r.1));

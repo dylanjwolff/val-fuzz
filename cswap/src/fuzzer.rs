@@ -483,7 +483,16 @@ mod test {
             .1;
         let mut md = Metadata::new_empty();
         replace_constants_with_fresh_vars(&mut script, &mut md).unwrap();
-        let new_script = &ba_script(&mut script, &mut md, &Config::default()).unwrap()[0];
+        let new_script = &ba_script(
+            &mut script,
+            &mut md,
+            &Config {
+                use_bdom_vs: true,
+                max_const_relations_to_monitor: 2,
+                ..Config::default()
+            },
+        )
+        .unwrap()[0];
         assert_display_snapshot!(new_script);
     }
 
@@ -494,7 +503,15 @@ mod test {
             ((_ to_fp 11 53) roundNearestTiesToEven 1.3902774452208657152141313417814671993255615234375 (- 17)))))").unwrap().1;
         let mut md = Metadata::new_empty();
         replace_constants_with_fresh_vars(&mut script, &mut md).unwrap();
-        let new_script = &ba_script(&mut script, &mut md, &Config::default()).unwrap()[0];
+        let new_script = &ba_script(
+            &mut script,
+            &mut md,
+            &Config {
+                use_bdom_vs: true,
+                ..Config::default()
+            },
+        )
+        .unwrap()[0];
         assert_display_snapshot!(new_script);
     }
 
