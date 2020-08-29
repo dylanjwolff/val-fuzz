@@ -1182,7 +1182,6 @@ fn bav_se(
             }
             if bavs.len() <= before_exploration_num_bavs || !cfg.leaf_opt {
                 let name = vng.get_name(Sort::Bool());
-                println!("PUSHING {:?}", pre_uqvars);
                 bavs.push((name, sec, pre_uqvars));
             }
             Ok(())

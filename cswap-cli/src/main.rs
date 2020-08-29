@@ -24,6 +24,7 @@ use cswap::solver::profiles_to_string;
 use cswap::solver::ProfileIndex;
 use std::cmp::max;
 use std::collections::HashSet;
+use std::time::SystemTime;
 
 const KEEP_FILES: &'static str = "keep-files";
 const STACK_SIZE: &'static str = "stack-size";
@@ -166,13 +167,19 @@ fn main() {
         return;
     }
 
+    let start = SystemTime::now();
     if matches.is_present(RBASE) {
-        exec_randomized(dir_name, (max(workers.0, workers.1), workers.2), cfg)
+        exec_randomized(dir_name, (max(workers.0, workers.1), workers.2), cfg);
     } else if matches.is_present(FROM_SKELS) {
-        from_skels(dir_name, (workers.1, workers.2), cfg)
+        from_skels(dir_name, (workers.1, workers.2), cfg);
     } else {
-        exec(dir_name, workers, cfg)
+        exec(dir_name, workers, cfg);
     }
+    let end = SystemTime::now();
+    info!(
+        "Total Elapsed Time:{}",
+        end.duration_since(start).unwrap().as_secs()
+    );
 }
 
 fn parse_workers(workern_str: &str) -> (u8, u8, u8) {
