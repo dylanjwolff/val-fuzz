@@ -1,0 +1,12 @@
+---
+source: cswap/src/fuzzer.rs
+expression: new_script
+---
+(declare-const GEN1 Int)
+(declare-const GEN2 Int)
+(declare-fun z () Real)
+(declare-const BAV1 Bool)
+(assert (= BAV1 (= GEN1 (+ z GEN2))))
+(check-sat)
+(get-model)
+

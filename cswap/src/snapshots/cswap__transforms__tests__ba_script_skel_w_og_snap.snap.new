@@ -1,0 +1,21 @@
+---
+source: cswap/src/transforms.rs
+expression: p
+---
+(declare-const BAV1 Bool)
+(declare-const BAV2 Bool)
+(declare-const BAV3 Bool)
+(declare-const BAV4 Bool)
+(declare-const BAV5 Bool)
+(declare-const BAV6 Bool)
+(declare-const x Int)
+(declare-const y Int)
+(assert (or (and (> x (+ y 3)) (< y 7)) (= y x)))
+(assert (distinct y x))
+(assert (= BAV1 (> x (+ y 3))))
+(assert (= BAV2 (< y 7)))
+(assert (= BAV3 (and (> x (+ y 3)) (< y 7))))
+(assert (= BAV4 (= y x)))
+(assert (= BAV5 (or (and (> x (+ y 3)) (< y 7)) (= y x))))
+(assert (= BAV6 (distinct y x)))
+

@@ -25,7 +25,6 @@ pub mod utils;
 use crate::fuzzer::mutator;
 use crate::fuzzer::solver_fn;
 use crate::fuzzer::StatefulBavAssign;
-use crate::transforms::STATIC_FFLAGS;
 
 use crate::randomized_baseline::rand_fuzz_solve;
 use crate::randomized_baseline::StatefulRandBaseFuzzer;
@@ -163,11 +162,7 @@ fn launch(qs: (InputPPQ, SkeletonQueue), worker_counts: (u8, u8, u8), cfg: Confi
     }
     info!("Saw {:?} across ALL threads", all_stats);
     info!("CSVRUNSTATS:{}", all_stats.to_csv_string());
-    info!(
-        "CSVCONFIG:{}, {}",
-        cfg.to_csv_string(),
-        to_csv(&STATIC_FFLAGS)
-    );
+    info!("CSVCONFIG:{}", cfg.to_csv_string());
     info!("Stage 3 Complete");
 }
 
@@ -304,11 +299,7 @@ pub fn exec_randomized(dirname: &str, worker_count: (u8, u8), cfg: Config) {
     }
     info!("Saw {:?} across ALL threads", all_stats);
     info!("CSVRUNSTATS:{}", all_stats.to_csv_string());
-    info!(
-        "CSVCONFIG:{}, {}",
-        cfg.to_csv_string(),
-        to_csv(&STATIC_FFLAGS)
-    );
+    info!("CSVCONFIG:{}", cfg.to_csv_string());
     info!("Stage 3 Complete");
 }
 

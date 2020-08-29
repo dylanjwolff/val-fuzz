@@ -153,6 +153,7 @@ fn main() {
         profiles,
         monitors_in_final: false,
         enforce_on_resub: false,
+        ..Config::default()
     };
 
     assert!(

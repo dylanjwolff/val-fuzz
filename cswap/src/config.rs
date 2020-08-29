@@ -28,6 +28,11 @@ pub struct Config {
     pub mask_size: usize,
     pub monitors_in_final: bool,
     pub enforce_on_resub: bool,
+    pub use_bdom_vs: bool,
+    pub max_const_relations_to_monitor: u8,
+    pub skolemize_universal: bool,
+    pub leaf_opt: bool,
+    pub cp_og: bool,
 }
 
 #[macro_export]
@@ -56,6 +61,11 @@ impl Config {
             profiles: HashSet::new(),
             monitors_in_final: false,
             enforce_on_resub: false,
+            use_bdom_vs: false,
+            max_const_relations_to_monitor: 0,
+            skolemize_universal: false,
+            leaf_opt: false,
+            cp_og: false,
         }
     }
 

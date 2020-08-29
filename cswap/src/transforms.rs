@@ -222,8 +222,9 @@ fn get_boolean_abstraction(bavs: Vec<(String, SExp, VarBindings)>) -> Vec<Comman
 // Get BOOLEAN domain monitors ... THESE are added to the metadata      Vec<String, Sort>, vng -> Vec<Variables>, Vec<Command>
 fn get_boolean_domain_monitors(
     subexp_monitors: Vec<(String, Sort)>,
+    cfg: &Config,
 ) -> (Vec<(String, Sort)>, Vec<CommandRc>) {
-    if !USE_BDOM_VS {
+    if !cfg.use_bdom_vs {
         return (vec![], vec![]);
     }
     let mut vng = VarNameGenerator::new("BDOM");
@@ -445,24 +446,18 @@ pub fn grab_all_decls(script: &Script) -> Vec<CommandRc> {
     decl_cmds
 }
 
-pub fn ba_script(script: &mut Script, md: &mut Metadata) -> io::Result<Vec<Script>> {
-    rl(script)?;
+pub fn ba_script(script: &mut Script, md: &mut Metadata, cfg: &Config) -> io::Result<Vec<Script>> {
+    rl(script, &cfg)?;
 
     let mut vng = VarNameGenerator::new("BAV");
     let mut bavs = vec![];
-    bav(script, &mut vng, &mut bavs)?;
+    bav(script, &mut vng, &mut bavs, &cfg)?;
 
     let og_vars = script
         .get_all_global_var_bindings()
         .into_iter()
         .map(|(a, b)| (a.to_string(), b))
         .filter(|(name, _sort)| !name.contains("GEN")); // TODO dont do string compares here
-
-    rl(script)?;
-
-    let mut vng = VarNameGenerator::new("BAV");
-    let mut bavs = vec![];
-    bav(script, &mut vng, &mut bavs)?;
 
     let bavns = vng
         .vars_generated
@@ -472,12 +467,15 @@ pub fn ba_script(script: &mut Script, md: &mut Metadata) -> io::Result<Vec<Scrip
         .chain(og_vars)
         .collect();
 
-    let (bdomvs, mut bdomcmds) = get_boolean_domain_monitors(bavns);
+    let (bdomvs, mut bdomcmds) = get_boolean_domain_monitors(bavns, cfg);
 
-    let num_const_to_relate = if USE_RELATIONAL_CONST_MONITORS { 15 } else { 0 };
-    let (subset_constvs) =
-        get_subset_consts(md.constvns.clone(), num_const_to_relate, &Config::default())
-            .unwrap_or(vec![]);
+    let num_const_to_relate = cfg.max_const_relations_to_monitor;
+    let (subset_constvs) = get_subset_consts(
+        md.constvns.clone(),
+        num_const_to_relate as usize,
+        &Config::default(),
+    )
+    .unwrap_or(vec![]);
     let (intervs, mut intercmds) = get_inter_relation_constant_monitors(subset_constvs);
 
     md.bavns.append(&mut bdomvs.clone());
@@ -511,7 +509,7 @@ pub fn ba_script(script: &mut Script, md: &mut Metadata) -> io::Result<Vec<Scrip
     let mut ba_script = Script::Commands(decls);
     add_get_model(&mut ba_script);
 
-    if !CP_OG {
+    if !cfg.cp_og {
         Ok(vec![ba_script])
     } else {
         iscript.insert_all(end_insert_pt(&iscript), &ba);
@@ -531,7 +529,7 @@ pub fn add_get_model(script: &mut Script) {
     });
 }
 
-pub fn rl(script: &mut Script) -> io::Result<()> {
+pub fn rl(script: &mut Script, cfg: &Config) -> io::Result<()> {
     let mut scoped_vars = BTreeMap::new();
     let timer = Timer::new_started(Duration::from_secs(5));
     let mut vng = VarNameGenerator::new("RL_LET");
@@ -547,6 +545,7 @@ pub fn rl(script: &mut Script) -> io::Result<()> {
                     &mut new_vv,
                     &mut qvars,
                     &timer,
+                    cfg,
                 )?;
             }
         }
@@ -567,6 +566,7 @@ fn rl_c(
     new_var_vals: &mut Vec<SExpRc>,
     qvars: &mut QualedVars,
     timer: &Timer,
+    cfg: &Config,
 ) -> io::Result<()> {
     if timer.is_done() {
         return liftio!(Err("Timeout Replacing 'Let' statements"));
@@ -581,6 +581,7 @@ fn rl_c(
             qvars,
             timer,
             0,
+            cfg,
         ),
         _ => Ok(()),
     }?;
@@ -614,6 +615,7 @@ fn rl_s(
     qvars: &mut QualedVars,
     timer: &Timer,
     mut recur_count: u8,
+    cfg: &Config,
 ) -> io::Result<()> {
     if timer.is_done() {
         return liftio!(Err("Timeout Replacing 'Let' statements"));
@@ -642,6 +644,7 @@ fn rl_s(
                     qvars,
                     timer,
                     recur_count,
+                    cfg,
                 )?; // first make sure the val is "let-free"
                 new_vars.push((var, val)); // make note of the mapping to add to the rest
             }
@@ -680,6 +683,7 @@ fn rl_s(
                 qvars,
                 timer,
                 recur_count,
+                cfg,
             )?;
 
             // Pop our variables off of the stack
@@ -723,13 +727,14 @@ fn rl_s(
                     qvars,
                     timer,
                     recur_count,
+                    cfg,
                 )?
             }
             Ok(())
         }
         SExp::QForAll(vbs, s) => {
             let num_vbs = vbs.len();
-            if !UNIVERSAL_AS_EXISTENTIAL {
+            if !cfg.skolemize_universal {
                 qvars.add_universals(vbs);
             } else {
                 qvars.add_existentials(vbs);
@@ -742,9 +747,10 @@ fn rl_s(
                 qvars,
                 timer,
                 recur_count,
+                cfg,
             )?;
 
-            if !UNIVERSAL_AS_EXISTENTIAL {
+            if !cfg.skolemize_universal {
                 qvars.pop_n_universal(num_vbs);
             } else {
                 qvars.pop_all_e(vbs);
@@ -763,6 +769,7 @@ fn rl_s(
                 qvars,
                 timer,
                 recur_count,
+                cfg,
             )?;
             qvars.pop_all_e(vbs);
             let b = (**s.borrow()).clone();
@@ -1011,13 +1018,21 @@ pub fn bav(
     script: &mut Script,
     vng: &mut VarNameGenerator,
     bava: &mut Vec<(String, SExp, VarBindings)>,
+    cfg: &Config,
 ) -> io::Result<()> {
     let timer = Timer::new_started(Duration::from_secs(30));
     let mut qvars = QualedVars::new();
     match script {
         Script::Commands(cmds) => {
             for cmd in cmds.iter_mut() {
-                bav_c(&mut *cmd.borrow_mut(), vng, bava, &mut qvars, timer.clone())?;
+                bav_c(
+                    &mut *cmd.borrow_mut(),
+                    vng,
+                    bava,
+                    &mut qvars,
+                    timer.clone(),
+                    cfg,
+                )?;
             }
         }
     };
@@ -1033,6 +1048,7 @@ fn bav_c(
     bava: &mut Vec<(String, SExp, VarBindings)>,
     qvars: &mut QualedVars,
     timer: Timer,
+    cfg: &Config,
 ) -> io::Result<()> {
     if timer.is_done() {
         return liftio!(Err("Timeout creating Boolean Abstraction"));
@@ -1045,6 +1061,7 @@ fn bav_c(
             bava,
             qvars,
             timer.clone(),
+            cfg,
         ),
         _ => Ok(()),
     }
@@ -1119,19 +1136,6 @@ impl QualedVars {
     }
 }
 
-const USE_BDOM_VS: bool = true;
-const USE_RELATIONAL_CONST_MONITORS: bool = true;
-const UNIVERSAL_AS_EXISTENTIAL: bool = false;
-const LEAF_OPT: bool = true;
-const CP_OG: bool = true;
-pub const STATIC_FFLAGS: [bool; 5] = [
-    USE_BDOM_VS,
-    USE_RELATIONAL_CONST_MONITORS,
-    UNIVERSAL_AS_EXISTENTIAL,
-    LEAF_OPT,
-    CP_OG,
-];
-
 fn bav_se(
     _is_root: bool,
     sexp: &mut SExp,
@@ -1139,6 +1143,7 @@ fn bav_se(
     bavs: &mut Vec<(String, SExp, VarBindings)>,
     qvars: &mut QualedVars,
     timer: Timer,
+    cfg: &Config,
 ) -> io::Result<()> {
     if timer.is_done() {
         return liftio!(Err("Timeout creating Boolean Abstraction"));
@@ -1157,9 +1162,10 @@ fn bav_se(
                     bavs,
                     qvars,
                     timer.clone(),
+                    cfg,
                 )?;
             }
-            if bavs.len() <= before_exploration_num_bavs || !LEAF_OPT {
+            if bavs.len() <= before_exploration_num_bavs || !cfg.leaf_opt {
                 let name = vng.get_name(Sort::Bool());
                 bavs.push((name, sec, pre_uqvars));
             }
@@ -1174,6 +1180,7 @@ fn bav_se(
                     bavs,
                     qvars,
                     timer.clone(),
+                    cfg,
                 )?;
             }
             Ok(())
@@ -1187,13 +1194,14 @@ fn bav_se(
                     bavs,
                     qvars,
                     timer.clone(),
+                    cfg,
                 )?;
             }
             Ok(())
         }
         SExp::Let(_, _) => panic!("Let statments should be filtered out!"),
         SExp::QForAll(vbs, rest) => {
-            if UNIVERSAL_AS_EXISTENTIAL {
+            if cfg.skolemize_universal {
                 panic!("Universal Quantifiers should be filtered out!");
             }
             let num_vbs = vbs.len();
@@ -1205,6 +1213,7 @@ fn bav_se(
                 bavs,
                 qvars,
                 timer.clone(),
+                cfg,
             )?;
             qvars.pop_n_universal(num_vbs);
             Ok(())
@@ -1318,7 +1327,8 @@ mod tests {
     fn num_op_ba_script_snap() {
         let str_script = "(declare-fun x () Real)(assert (< (+ 4 3) x))";
         let mut p = script(str_script).unwrap().1;
-        let ba_str = ba_script(&mut p, &mut Metadata::new_empty()).unwrap()[0].to_string();
+        let ba_str = ba_script(&mut p, &mut Metadata::new_empty(), &Config::default()).unwrap()[0]
+            .to_string();
 
         assert_display_snapshot!(ba_str);
     }
@@ -1328,7 +1338,8 @@ mod tests {
         let str_script =
             "(assert (exists ((a Int)) (< a 4)))(assert (exists ((a String)) (= a \"\")))";
         let mut p = script(str_script).unwrap().1;
-        let ba_str = ba_script(&mut p, &mut Metadata::new_empty()).unwrap()[0].to_string();
+        let ba_str = ba_script(&mut p, &mut Metadata::new_empty(), &Config::default()).unwrap()[0]
+            .to_string();
 
         assert_display_snapshot!(ba_str);
     }
@@ -1338,7 +1349,7 @@ mod tests {
         let str_script =
             "(assert (forall ((a Int)) (< a 4)))(assert (exists ((a String)) (= a \"\")))";
         let mut p = script(str_script).unwrap().1;
-        let bas = ba_script(&mut p, &mut Metadata::new_empty()).unwrap();
+        let bas = ba_script(&mut p, &mut Metadata::new_empty(), &Config::default()).unwrap();
         let ba_stra = bas[0].to_string();
         let ba_strb = bas[1].to_string();
         assert_display_snapshot!(ba_stra + "\n\n ~~~~~~~~~~~~~~~~~~~~~~~ \n\n" + &ba_strb);
@@ -1348,7 +1359,8 @@ mod tests {
     fn ba_script_eqv() {
         let str_script = "(assert (exists ((a Int)) (< a 4)))";
         let mut p = script(str_script).unwrap().1;
-        let ba_str = ba_script(&mut p, &mut Metadata::new_empty()).unwrap()[0].to_string();
+        let ba_str = ba_script(&mut p, &mut Metadata::new_empty(), &Config::default()).unwrap()[0]
+            .to_string();
 
         assert!(ba_str.contains("declare-const QUAL") || ba_str.contains("declare-fun QUAL"));
     }
@@ -1358,7 +1370,7 @@ mod tests {
         let str_script =
             "(declare-const x Int)(declare-const y Int)(assert (or (and (> x (+ y 3)) (< y 7)) (= y x)))(assert (distinct y x))";
         let mut p = script(str_script).unwrap().1;
-        ba_script(&mut p, &mut Metadata::new_empty()).unwrap();
+        ba_script(&mut p, &mut Metadata::new_empty(), &Config::default()).unwrap();
         assert_display_snapshot!(p);
     }
 
@@ -1367,14 +1379,18 @@ mod tests {
         let str_script =
             "(declare-const x Int)(declare-const y Int)(assert (or (and (> x 3) (< y 7)) (= y x)))(assert (distinct y x))";
         let mut p = script(str_script).unwrap().1;
-        assert_display_snapshot!(ba_script(&mut p, &mut Metadata::new_empty()).unwrap()[0]);
+        assert_display_snapshot!(
+            ba_script(&mut p, &mut Metadata::new_empty(), &Config::default()).unwrap()[0]
+        );
     }
 
     #[test]
     fn decl_order_ba_script_snap() {
         let str_script = "(define-sort FP () (_ FloatingPoint 11 53)) (assert  (exists ((x FP)) (fp.isInfinite (fp.sqrt RTN x))))";
         let mut p = script(str_script).unwrap().1;
-        assert_display_snapshot!(ba_script(&mut p, &mut Metadata::new_empty()).unwrap()[0]);
+        assert_display_snapshot!(
+            ba_script(&mut p, &mut Metadata::new_empty(), &Config::default()).unwrap()[0]
+        );
     }
 
     #[test]
@@ -1531,15 +1547,18 @@ mod tests {
 
     #[test]
     fn domain_monitors_snap() {
-        let r = get_boolean_domain_monitors(vec![
-            ("BAV1".to_owned(), Sort::Bool()),
-            ("BAV3".to_owned(), Sort::Dec()),
-            ("BAV4".to_owned(), Sort::Str()),
-            (
-                "BAV5".to_owned(),
-                Sort::Fp("11".to_owned(), "53".to_owned()),
-            ),
-        ]);
+        let r = get_boolean_domain_monitors(
+            vec![
+                ("BAV1".to_owned(), Sort::Bool()),
+                ("BAV3".to_owned(), Sort::Dec()),
+                ("BAV4".to_owned(), Sort::Str()),
+                (
+                    "BAV5".to_owned(),
+                    Sort::Fp("11".to_owned(), "53".to_owned()),
+                ),
+            ],
+            &Config::default(),
+        );
 
         assert_display_snapshot!(Script::Commands(r.1));
     }
@@ -1557,7 +1576,7 @@ mod tests {
         let str_script =
             "(assert (= x (let ((x 4)) (let ((y (+ x 2))(z (unknown_op x))) (= (- x 4) y z)))))";
         let mut p = script(str_script).unwrap().1;
-        rl(&mut p).unwrap();
+        rl(&mut p, &Config::default()).unwrap();
         assert_display_snapshot!(p);
     }
 
@@ -1580,6 +1599,7 @@ mod tests {
             &mut qvars,
             &timer,
             0,
+            &Config::default(),
         )
         .unwrap();
         assert_eq!(sexp, expected);
@@ -1591,7 +1611,7 @@ mod tests {
             .unwrap()
             .1;
 
-        rl(&mut script).unwrap();
+        rl(&mut script, &Config::default()).unwrap();
         assert_display_snapshot!(script);
     }
 }

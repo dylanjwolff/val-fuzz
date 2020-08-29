@@ -456,7 +456,7 @@ pub fn strip_and_transform(
     let chf = cfg.file_provider.cholesfile(&mut md)?;
     fs::write(chf, script.to_string())?;
 
-    let ba_script = ba_script(&mut script, &mut md)?;
+    let ba_script = ba_script(&mut script, &mut md, cfg)?;
     if cfg.monitors_in_final {
         cfg.file_provider.serialize_og_w_m(&script, &mut md)?;
     }
@@ -483,7 +483,7 @@ mod test {
             .1;
         let mut md = Metadata::new_empty();
         replace_constants_with_fresh_vars(&mut script, &mut md).unwrap();
-        let new_script = &ba_script(&mut script, &mut md).unwrap()[0];
+        let new_script = &ba_script(&mut script, &mut md, &Config::default()).unwrap()[0];
         assert_display_snapshot!(new_script);
     }
 
@@ -494,7 +494,7 @@ mod test {
             ((_ to_fp 11 53) roundNearestTiesToEven 1.3902774452208657152141313417814671993255615234375 (- 17)))))").unwrap().1;
         let mut md = Metadata::new_empty();
         replace_constants_with_fresh_vars(&mut script, &mut md).unwrap();
-        let new_script = &ba_script(&mut script, &mut md).unwrap()[0];
+        let new_script = &ba_script(&mut script, &mut md, &Config::default()).unwrap()[0];
         assert_display_snapshot!(new_script);
     }
 
@@ -522,11 +522,7 @@ mod test {
             max_iter: 1,
             rng_seed: 1,
             remove_files: true,
-            stack_size: 1,
-            profiles: HashSet::new(),
-            mask_size: 1,
-            monitors_in_final: false,
-            enforce_on_resub: false,
+            ..Config::default()
         };
 
         let mut sba = StatefulBavAssign {
