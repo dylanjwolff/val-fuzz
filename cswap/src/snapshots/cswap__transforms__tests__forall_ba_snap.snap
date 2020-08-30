@@ -4,20 +4,28 @@ expression: "ba_stra + \"\\n\\n ~~~~~~~~~~~~~~~~~~~~~~~ \\n\\n\" + &ba_strb"
 ---
 (declare-const BAV1 Bool)
 (declare-const BAV2 Bool)
+(declare-const BDOM1 Bool)
+(declare-const BDOM2 Bool)
 (declare-const QUAL_PRE_REPLACE1 String)
 (assert (not (forall ((a Int)) (< a 4))))
 (assert (not (= QUAL_PRE_REPLACE1 "")))
 (assert (= BAV1 (forall ((a Int)) (< a 4))))
 (assert (= BAV2 (= QUAL_PRE_REPLACE1 "")))
+(assert (= BDOM1 BAV1))
+(assert (= BDOM2 BAV2))
 
 
  ~~~~~~~~~~~~~~~~~~~~~~~ 
 
 (declare-const BAV1 Bool)
 (declare-const BAV2 Bool)
+(declare-const BDOM1 Bool)
+(declare-const BDOM2 Bool)
 (declare-const QUAL_PRE_REPLACE1 String)
 (assert (forall ((a Int)) (< a 4)))
 (assert (= QUAL_PRE_REPLACE1 ""))
 (assert (= BAV1 (forall ((a Int)) (< a 4))))
 (assert (= BAV2 (= QUAL_PRE_REPLACE1 "")))
+(assert (= BDOM1 BAV1))
+(assert (= BDOM2 BAV2))
 

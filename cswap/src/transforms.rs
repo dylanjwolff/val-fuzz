@@ -222,9 +222,6 @@ fn get_boolean_domain_monitors(
     subexp_monitors: Vec<(String, Sort)>,
     cfg: &Config,
 ) -> (Vec<(String, Sort)>, Vec<CommandRc>) {
-    if !cfg.use_bdom_vs {
-        return (vec![], vec![]);
-    }
     let mut vng = VarNameGenerator::new("BDOM");
     let mut baveq = subexp_monitors
         .into_iter()
@@ -457,13 +454,17 @@ pub fn ba_script(script: &mut Script, md: &mut Metadata, cfg: &Config) -> io::Re
     let mut bavs = vec![];
     bav(script, &mut vng, &mut bavs, &cfg)?;
 
-    let bavns = vng
+    let bavns_i = vng
         .vars_generated
         .clone()
         .into_iter()
-        .filter(|(name, _sort)| !name.contains("REPL")) // TODO move quantifiers into same step as "let" replacement to avoid this
-        .chain(og_vars)
-        .collect();
+        .filter(|(name, _sort)| !name.contains("REPL")); // TODO move quantifiers into same step as "let" replacement to avoid this
+
+    let bavns = if cfg.use_bdom_vs {
+        bavns_i.chain(og_vars).collect()
+    } else {
+        bavns_i.collect()
+    };
 
     let (bdomvs, mut bdomcmds) = get_boolean_domain_monitors(bavns, cfg);
 
@@ -1360,7 +1361,6 @@ mod tests {
 
         assert_display_snapshot!(s);
     }
-
     #[test]
     fn num_op_ba_script_snap() {
         let str_script = "(declare-fun x () Real)(assert (< (+ 4 3) x))";

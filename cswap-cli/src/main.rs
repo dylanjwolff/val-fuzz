@@ -152,8 +152,6 @@ fn main() {
         remove_files: !matches.is_present(KEEP_FILES),
         mask_size: 1,
         profiles,
-        monitors_in_final: false,
-        enforce_on_resub: false,
         ..Config::default()
     };
 
