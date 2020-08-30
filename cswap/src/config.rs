@@ -17,7 +17,7 @@ use std::collections::HashSet;
 use std::hash::Hash;
 use std::hash::Hasher;
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Serialize)]
 pub struct Config {
     pub file_provider: FileProvider,
     pub remove_files: bool,
@@ -77,21 +77,9 @@ impl Config {
         self.rng_seed.hash(&mut s);
         s.finish()
     }
-
-    pub fn to_csv_string(&self) -> String {
-        format!(
-            "{}, {}, {}, {}, {}, {}",
-            self.max_iter,
-            self.rng_seed,
-            self.stack_size,
-            self.mask_size,
-            self.monitors_in_final,
-            self.enforce_on_resub
-        )
-    }
 }
 
-#[derive(Debug, Eq, PartialEq, Clone)]
+#[derive(Serialize, Debug, Eq, PartialEq, Clone)]
 pub struct FileProvider {
     pub basedir: PathBuf,
     pub skeldir: PathBuf,

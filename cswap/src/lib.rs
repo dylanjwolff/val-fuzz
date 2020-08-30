@@ -5,6 +5,7 @@ extern crate rand;
 extern crate rand_core;
 extern crate rand_xoshiro;
 extern crate serde;
+extern crate serde_json;
 extern crate serde_lexpr;
 extern crate subprocess;
 extern crate tempfile;
@@ -161,16 +162,15 @@ fn launch(qs: (InputPPQ, SkeletonQueue), worker_counts: (u8, u8, u8), cfg: Confi
         trace!("Thread finished stage 3");
     }
     info!("Saw {:?} across ALL threads", all_stats);
-    info!("CSVRUNSTATS:{}", all_stats.to_csv_string());
-    info!("CSVCONFIG:{}", cfg.to_csv_string());
+    info!(
+        "JSONRUNSTATS:{}",
+        serde_json::to_string(&all_stats).expect("RUNSTATS should serialize")
+    );
+    info!(
+        "JSONCONFIG:{}",
+        serde_json::to_string(&cfg).expect("CFG should serialize")
+    );
     info!("Stage 3 Complete");
-}
-
-fn to_csv(bs: &[bool]) -> String {
-    bs.iter()
-        .map(|b| b.to_string())
-        .collect::<Vec<String>>()
-        .join(", ")
 }
 
 pub fn from_skels(dirname: &str, worker_counts: (u8, u8), mut cfg: Config) {
@@ -298,8 +298,14 @@ pub fn exec_randomized(dirname: &str, worker_count: (u8, u8), cfg: Config) {
         trace!("Thread finished");
     }
     info!("Saw {:?} across ALL threads", all_stats);
-    info!("CSVRUNSTATS:{}", all_stats.to_csv_string());
-    info!("CSVCONFIG:{}", cfg.to_csv_string());
+    info!(
+        "JSONRUNSTATS:{}",
+        serde_json::to_string(&all_stats).expect("RUNSTATS should serialize")
+    );
+    info!(
+        "JSONCONFIG:{}",
+        serde_json::to_string(&cfg).expect("CFG should serialize")
+    );
     info!("Stage 3 Complete");
 }
 

@@ -1,5 +1,6 @@
 use crate::ast::*;
 use crate::parser::*;
+use serde::Serialize;
 use std::collections::HashSet;
 use std::fmt;
 use std::io::Write;
@@ -95,7 +96,7 @@ pub fn all_profiles() -> HashSet<ProfileIndex> {
         .collect()
 }
 
-#[derive(Debug, Eq, PartialEq, Hash, Clone)]
+#[derive(Serialize, Debug, Eq, PartialEq, Hash, Clone)]
 pub enum ProfileIndex {
     Z3(usize),
     CVC4(usize),

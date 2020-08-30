@@ -13,6 +13,7 @@ use std::collections::BTreeSet;
 
 use crate::solver::all_non_err_timed_out;
 use crate::solver::RSolve;
+use serde::ser::{Serialize, SerializeStruct, Serializer};
 use std::cmp::min;
 use std::collections::hash_map::DefaultHasher;
 use std::fmt;
@@ -49,23 +50,6 @@ impl RunStats {
             has_unsats: (0, 0),
             all_err: (0, 0),
         }
-    }
-
-    pub fn to_csv_string(&self) -> String {
-        format!(
-            "{}, {}, {}, {}, {}, {}, {}, {}, {}, {}, {}",
-            self.iter_subs.0,
-            self.iter_subs.1,
-            self.unique_subs.len(),
-            self.has_sats.0,
-            self.has_sats.1,
-            self.has_unsats.0,
-            self.has_unsats.1,
-            self.all_non_errs_are_timeouts.0,
-            self.all_non_errs_are_timeouts.1,
-            self.all_err.0,
-            self.all_err.1
-        )
     }
 
     pub fn record_sub(&mut self, sub_str: &str) -> bool {
@@ -123,6 +107,35 @@ impl RunStats {
             .union(&other.unique_subs)
             .cloned()
             .collect();
+    }
+}
+
+impl Serialize for RunStats {
+    fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
+    where
+        S: Serializer,
+    {
+        // 3 is the number of fields in the struct.
+        let mut state = serializer.serialize_struct("RunStats", 7)?;
+
+        state.serialize_field("Iterations", &self.iter_subs.0)?;
+        state.serialize_field("Substitutions", &self.iter_subs.1)?;
+        state.serialize_field("Unique Substitutions", &self.unique_subs.len())?;
+        state.serialize_field("Sat Iterations", &self.has_sats.0)?;
+        state.serialize_field("Sat Substitutions", &self.has_sats.1)?;
+        state.serialize_field("Unsat Iterations", &self.has_unsats.0)?;
+        state.serialize_field("Unsat Substitutions", &self.has_unsats.1)?;
+        state.serialize_field(
+            "All Non-Errors Timeout on Iterations",
+            &self.all_non_errs_are_timeouts.0,
+        )?;
+        state.serialize_field(
+            "All Non-Errors Timeout on Substitutions",
+            &self.all_non_errs_are_timeouts.0,
+        )?;
+        state.serialize_field("All Errors on Iterations", &self.all_err.0)?;
+        state.serialize_field("All Errors on Substitution", &self.all_err.1)?;
+        state.end()
     }
 }
 
