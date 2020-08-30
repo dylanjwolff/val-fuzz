@@ -586,23 +586,29 @@ fn rl_c(
     Ok(())
 }
 
-fn fresh_eq_val_sexp(fresh_name: String, val: &SExpRc, qvars: &QualedVars) -> (SExpRc, SExpRc) {
+fn fresh_eq_val_sexp_inside_quants(
+    fresh_name: String,
+    val: &SExpRc,
+    qvars: &QualedVars,
+) -> (SExpRc, SExpRc) {
     let new_name_sexp = rccell!(SExp::Symbol(rccell!(Symbol::Token(fresh_name))));
 
     let qvbs = qvars.no_skolems.clone();
-    let mut rhs = val.borrow().clone();
+
+    // In contrast to adding the boolean abstraction... here we actually want the unskolemized quantifiers on the outside
+    let mut nested_equiv = SExp::BExp(
+        rccell!(BoolOp::Equals()),
+        vec![Rc::clone(&new_name_sexp), Rc::clone(val)],
+    );
+
     for (vbs, q) in qvbs.into_iter().rev() {
-        rhs = match q {
-            Q::Exists() => SExp::QExists(vbs, rccell!(Box::new(rhs))),
-            Q::ForAll() => SExp::QForAll(vbs, rccell!(Box::new(rhs))),
+        nested_equiv = match q {
+            Q::Exists() => SExp::QExists(vbs, rccell!(Box::new(nested_equiv))),
+            Q::ForAll() => SExp::QForAll(vbs, rccell!(Box::new(nested_equiv))),
         };
     }
 
-    let equiv = SExp::BExp(
-        rccell!(BoolOp::Equals()),
-        vec![Rc::clone(&new_name_sexp), rccell!(rhs)],
-    );
-    (new_name_sexp, rccell!(equiv))
+    (new_name_sexp, rccell!(nested_equiv))
 }
 
 static RECUR_LIMIT: u8 = 10;
@@ -654,7 +660,7 @@ fn rl_s(
                     Some(sort) => {
                         let new_name = vng.get_name(sort.clone());
                         let (new_name_sexp, new_var_val_sexp) =
-                            fresh_eq_val_sexp(new_name, val, qvars);
+                            fresh_eq_val_sexp_inside_quants(new_name, val, qvars);
                         new_var_vals.push(new_var_val_sexp);
                         new_name_sexp
                     }
