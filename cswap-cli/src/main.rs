@@ -22,8 +22,11 @@ use cswap::from_skels;
 use cswap::solver::all_profiles;
 use cswap::solver::profiles_to_string;
 use cswap::solver::ProfileIndex;
+use cswap::utils::MyBackoff;
 use std::cmp::max;
 use std::collections::HashSet;
+use std::thread;
+use std::thread::JoinHandle;
 use std::time::SystemTime;
 
 const KEEP_FILES: &'static str = "keep-files";
@@ -132,21 +135,21 @@ fn main() {
         Some(iterstr) => iterstr.parse::<u32>().unwrap(),
         None => 1,
     };
-    let seed = match matches.value_of(SEED) {
-        Some(seedstr) => seedstr.parse::<u64>().unwrap(),
-        None => 0,
+    let seeds = match matches.value_of(SEED) {
+        Some(seedstr) => seedstr
+            .split(',')
+            .map(|s| s.parse::<u64>().unwrap())
+            .collect(),
+        None => vec![0],
     };
-    info!("Seed is {:?}", seed);
+    info!("Seeds are {:?}", seeds);
     let stack_size = match matches.value_of(STACK_SIZE) {
         Some(stacksstr) => stacksstr.parse::<usize>().unwrap() * 1024 * 1024,
         None => 500 * 1024 * 1024,
     };
     info!("Stack size is {:?}B", stack_size);
 
-    let fp = FileProvider::new(&(seed.to_string() + "-cswap-fuzz-run-out"));
     let cfg = Config {
-        file_provider: fp,
-        rng_seed: seed,
         max_iter: max_iter,
         stack_size: stack_size,
         remove_files: !matches.is_present(KEEP_FILES),
@@ -166,12 +169,38 @@ fn main() {
     }
 
     let start = SystemTime::now();
-    if matches.is_present(RBASE) {
-        exec_randomized(dir_name, (max(workers.0, workers.1), workers.2), cfg);
-    } else if matches.is_present(FROM_SKELS) {
-        from_skels(dir_name, (workers.1, workers.2), cfg);
-    } else {
-        exec(dir_name, workers, cfg);
+
+    let use_random_base = matches.is_present(RBASE);
+    let use_from_skels = matches.is_present(FROM_SKELS);
+    let handles = seeds
+        .iter()
+        .map(|seed| {
+            let dir_name = dir_name.to_owned();
+            let fp = FileProvider::new(&(seed.to_string() + "-cswap-fuzz-run-out"));
+            let cfg = Config {
+                rng_seed: *seed,
+                file_provider: fp,
+                ..cfg.clone()
+            };
+            thread::Builder::new()
+                .stack_size(cfg.stack_size)
+                .spawn(move || {
+                    if use_random_base {
+                        exec_randomized(&dir_name, (max(workers.0, workers.1), workers.2), cfg);
+                    } else if use_from_skels {
+                        from_skels(&dir_name, (workers.1, workers.2), cfg);
+                    } else {
+                        exec(&dir_name, workers, cfg);
+                    }
+                })
+        })
+        .collect::<Vec<std::io::Result<JoinHandle<()>>>>();
+
+    let mut backoff = MyBackoff::new();
+    for h in handles {
+        h.unwrap().join().unwrap();
+        backoff.snooze();
+        info!("Seed finished");
     }
     let end = SystemTime::now();
     info!(
