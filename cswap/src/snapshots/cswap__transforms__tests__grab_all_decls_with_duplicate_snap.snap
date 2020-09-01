@@ -1,0 +1,7 @@
+---
+source: cswap/src/transforms.rs
+expression: "Script::Commands(grab_all_decls(&p))"
+---
+(declare-const x Int)
+(define-funs-rec ((y ((v0 a6)) a4)) (c4$2))
+

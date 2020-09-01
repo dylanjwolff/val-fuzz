@@ -1,6 +1,7 @@
 use std::cell::RefCell;
 use std::fmt;
 use std::fs;
+use std::hash::{Hash, Hasher};
 use std::path::Path;
 use std::rc::Rc;
 
@@ -43,6 +44,12 @@ pub enum Command {
     Generic(String),
 }
 
+impl Hash for Command {
+    fn hash<H: Hasher>(&self, state: &mut H) {
+        self.to_string().hash(state);
+    }
+}
+
 #[derive(Serialize, Deserialize, Debug, Eq, PartialEq, Clone)]
 pub enum Sort {
     UInt(),
@@ -73,6 +80,13 @@ pub enum SExp {
 #[derive(Serialize, PartialEq, PartialOrd, Ord, Deserialize, Debug, Clone, Eq)]
 pub enum Symbol {
     Token(String),
+}
+
+impl Hash for Symbol {
+    fn hash<H: Hasher>(&self, state: &mut H) {
+        let Self::Token(s) = &self;
+        s.hash(state);
+    }
 }
 
 #[derive(Serialize, Deserialize, Debug, Eq, PartialEq, Clone)]

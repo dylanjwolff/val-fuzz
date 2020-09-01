@@ -16,6 +16,7 @@ use crate::solver::RSolve;
 use serde::ser::{Serialize, SerializeStruct, Serializer};
 use std::cmp::min;
 use std::collections::hash_map::DefaultHasher;
+use std::collections::HashSet;
 use std::fmt;
 use std::hash::Hash;
 use std::hash::Hasher;
@@ -23,6 +24,24 @@ use std::sync::Mutex;
 use std::thread;
 use std::time::Duration;
 use std::time::SystemTime;
+
+pub struct HashHashSet {
+    inner: HashSet<u64>,
+}
+
+impl HashHashSet {
+    pub fn new() -> Self {
+        HashHashSet {
+            inner: HashSet::new(),
+        }
+    }
+
+    pub fn insert<T: std::hash::Hash>(&mut self, item: &T) -> bool {
+        let mut s = DefaultHasher::new();
+        item.hash(&mut s);
+        self.inner.insert(s.finish())
+    }
+}
 
 #[derive(Eq, PartialEq, Clone)]
 pub struct RunStats {

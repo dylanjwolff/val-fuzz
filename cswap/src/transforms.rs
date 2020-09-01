@@ -13,6 +13,7 @@ use std::collections::BTreeMap;
 
 use std::io;
 
+use crate::utils::HashHashSet;
 use std::rc::Rc;
 use std::time::Duration;
 
@@ -427,14 +428,36 @@ pub fn replace_constants_with_fresh_vars(script: &mut Script, md: &mut Metadata)
 pub fn grab_all_decls(script: &Script) -> Vec<CommandRc> {
     let Script::Commands(cmds) = script;
     let mut decl_cmds = vec![];
+    let mut s = HashHashSet::new();
     for cmd in cmds {
-        match *cmd.borrow() {
-            Command::DeclFn(_, _, _)
-            | Command::DeclConst(_, _)
-            | Command::GenericDecl(_, _)
-            | Command::DefineFun(_, _, _, _)
-            | Command::DefineFunRec(_, _, _, _)
-            | Command::DefineFunsRec(_, _) => decl_cmds.push(Rc::clone(cmd)),
+        match &*cmd.borrow() {
+            Command::GenericDecl(_, _) => {
+                if s.insert(&*cmd.borrow()) {
+                    decl_cmds.push(Rc::clone(cmd))
+                }
+            }
+            Command::DeclConst(name, _) => {
+                if s.insert(&name) {
+                    decl_cmds.push(Rc::clone(cmd))
+                }
+            }
+            Command::DeclFn(name, _, _)
+            | Command::DefineFun(name, _, _, _)
+            | Command::DefineFunRec(name, _, _, _) => {
+                if s.insert(&name) {
+                    decl_cmds.push(Rc::clone(cmd))
+                }
+            }
+            Command::DefineFunsRec(defs, rest) => {
+                let new_defs: Vec<(Symbol, Vec<Sort>, Sort)> = defs
+                    .iter()
+                    .cloned()
+                    .filter(|(name, _, _)| s.insert(name))
+                    .collect();
+                if new_defs.len() > 0 {
+                    decl_cmds.push(rccell!(Command::DefineFunsRec(new_defs, rest.clone())))
+                }
+            }
             _ => (),
         }
     }
@@ -1475,6 +1498,13 @@ mod tests {
         assert_display_snapshot!(
             ba_script(&mut p, &mut Metadata::new_empty(), &Config::default()).unwrap()[0]
         );
+    }
+
+    #[test]
+    fn grab_all_decls_with_duplicate_snap() {
+        let str_script = "(declare-const x Int)(declare-const x Int)(declare-fun x Int)(define-funs-rec ((x ((v0 a6))a4)(y ((v0 a6))a4))(c4$2))";
+        let p = script(str_script).unwrap().1;
+        assert_display_snapshot!(Script::Commands(grab_all_decls(&p)));
     }
 
     #[test]
