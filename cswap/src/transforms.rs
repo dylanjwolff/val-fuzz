@@ -442,13 +442,15 @@ pub fn grab_all_decls(script: &Script) -> Vec<CommandRc> {
 }
 
 pub fn ba_script(script: &mut Script, md: &mut Metadata, cfg: &Config) -> io::Result<Vec<Script>> {
+    let mut decls = grab_all_decls(script);
+
     let og_vars = script
         .get_all_global_var_bindings()
         .into_iter()
         .map(|(a, b)| (a.to_string(), b))
         .filter(|(name, _sort)| !name.contains("GEN")); // TODO dont do string compares here
 
-    rl(script, &cfg)?;
+    let mut qual_inits = rl(script, &cfg)?;
 
     let mut vng = VarNameGenerator::new("BAV");
     let mut bavs = vec![];
@@ -480,14 +482,13 @@ pub fn ba_script(script: &mut Script, md: &mut Metadata, cfg: &Config) -> io::Re
     md.bavns.append(&mut bdomvs.clone());
     md.bavns.append(&mut intervs.clone());
 
-    let mut decls = grab_all_decls(script);
-
     let mut bdom_inits = init_vars(script, bdomvs.clone());
     let mut inter_inits = init_vars(script, intervs.clone());
 
     let mut vs = init_vars(script, vng.vars_generated);
 
     decls.append(&mut vs);
+    decls.append(&mut qual_inits);
     decls.append(&mut bdom_inits);
     decls.append(&mut inter_inits);
 
@@ -528,7 +529,9 @@ pub fn add_get_model(script: &mut Script) {
     });
 }
 
-pub fn rl(script: &mut Script, cfg: &Config) -> io::Result<()> {
+type Commands = Vec<Rc<RefCell<Command>>>;
+
+pub fn rl(script: &mut Script, cfg: &Config) -> io::Result<Commands> {
     let mut scoped_vars = BTreeMap::new();
     let timer = Timer::new_started(Duration::from_secs(5));
     let mut vng = VarNameGenerator::new("RL_LET");
@@ -551,11 +554,11 @@ pub fn rl(script: &mut Script, cfg: &Config) -> io::Result<()> {
     };
 
     vng.merge_generated(qvars.vng);
-    init_vars(script, vng.vars_generated);
+    let inits = init_vars(script, vng.vars_generated);
     let cmds = many_assert(&mut new_vv.into_iter().map(|v| v.borrow().clone()));
 
     script.insert_all(end_insert_pt(script), &cmds);
-    Ok(())
+    Ok(inits)
 }
 
 fn rl_c(
