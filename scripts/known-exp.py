@@ -7,13 +7,24 @@ import json
 from pandas.api.types import CategoricalDtype
 from tqdm import tqdm
 
+flags = {}
+flags["RBASE"] = "-r"
+flags["MULTIEF5"] = "--multi-enforce 5"
+flags["EFFINAL"] = "--enforce-final"
+flags["CPOG"] = "--copy-original"
+flags["SKOLU"] = "--skolemize-universal"
+flags["NOSKOLE"] = "--no-skolemize-existential"
+flags["RELC15"] = "--const-relations 15"
+flags["ADOMAIN"] = "--abstract-domain-vars"
+flags["LEAFOPT"] = "--leaf-opt"
 
-configs = {
-        "ALL1": 1,
-}
-reps = "0,1"
+configs = flags
+reps = range(0,30)
+streps = ",".join([str(r) for r in reps])
+maxiter = 50
 
-for config_tag, maxiter in tqdm(configs.items()):
+for config_tag, options in tqdm(configs.items()):
+
 
     base_cvc4 = "0675545"
     base_z3 = "a35d00e"
@@ -28,7 +39,7 @@ for config_tag, maxiter in tqdm(configs.items()):
     reprod = {}
     reprods = {}
 
-    for zsh in tqdm([solv_hashes[0], solv_hashes[8]]):
+    for zsh in tqdm(solv_hashes):
         cmdstr = "python3 ./smtvm.py " + zsh[0] + " install " + zsh[1]
         o = sp.getoutput(cmdstr)
 
@@ -42,7 +53,7 @@ for config_tag, maxiter in tqdm(configs.items()):
             sys.exit("didn't recognize solver version")
 
 
-        cmdstr = "cswap-cli -v -s " + reps + " -i " + str(maxiter) + " ~/known/repro/" + zsh[0] + "-" + zsh[1]
+        cmdstr = "cswap-cli -v -w 1,1,1 " + options + " -s " + streps + " -i " + str(maxiter) + " ~/known/repro/" + zsh[0] + "-" + zsh[1]
         (s, o) = sp.getstatusoutput(cmdstr)
 
         iter_runstats_strs = [l.split("JSONRUNSTATS:")[-1] for l in o.split("\n") if "JSONRUNSTATS:" in l]
@@ -62,7 +73,7 @@ for config_tag, maxiter in tqdm(configs.items()):
             del cfg["file_provider"]
             cfg["profiles"] = len(cfg["profiles"])
 
-        for rep in [0,1]:
+        for rep in reps:
             if not rep in reprods.keys():
                 reprods[rep] = {}
             cmdstr = "ls " + str(rep) + "-cswap-fuzz-run-out/bugs"
@@ -78,7 +89,7 @@ for config_tag, maxiter in tqdm(configs.items()):
                     reprods[rep][solver_sfs] = "NOREPRO"
 
                 for bf in bug_files:
-                    cmdstr = "cat 0-cswap-fuzz-run-out/bugs/" + bf
+                    cmdstr = "cat " + str(rep) + "-cswap-fuzz-run-out/bugs/" + bf
                     bf_cts = sp.getoutput(cmdstr).lower()
 
                     if sfs in bf:
