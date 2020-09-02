@@ -10,23 +10,10 @@ from tqdm import tqdm
 
 configs = {
         "ALL1": 1,
-        "ALL5": 5,
-        "ALL10": 10,
-        "ALL15": 15,
-        "ALL20": 20,
-        "ALL25": 25,
-        "ALL30": 30,
-        "ALL40": 40,
-        "ALL55": 55,
-        "ALL70": 70,
-        "ALL90": 90,
-        "ALL130": 130,
-        "ALL160": 160,
-        "ALL200": 200,
 }
+reps = "0,1"
 
 for config_tag, maxiter in tqdm(configs.items()):
-    repetitions = 1
 
     base_cvc4 = "0675545"
     base_z3 = "a35d00e"
@@ -36,41 +23,51 @@ for config_tag, maxiter in tqdm(configs.items()):
 
     cum_repros = []
     cumreps = []
-    for rep in tqdm(range(repetitions)):
-        cum_runstats_dicts = []
-        total_elapsed = 0
-        cumdf =  pd.DataFrame()
-        reprod = {}
-        for zsh in tqdm(solv_hashes):
-            cmdstr = "python3 ./smtvm.py " + zsh[0] + " install " + zsh[1]
+    cum_runstats_dicts = []
+    total_elapsed  = []
+    cumdf =  pd.DataFrame()
+    reprod = {}
+    reprods = {}
+
+    for zsh in tqdm([solv_hashes[0], solv_hashes[8]]):
+        cmdstr = "python3 ./smtvm.py " + zsh[0] + " install " + zsh[1]
+        o = sp.getoutput(cmdstr)
+
+        if zsh[0].strip() == "z3":
+            cmdstr = "python3 ./smtvm.py cvc4 install " + base_cvc4
             o = sp.getoutput(cmdstr)
-
-            if zsh[0].strip() == "z3":
-                cmdstr = "python3 ./smtvm.py cvc4 install " + base_cvc4
-                o = sp.getoutput(cmdstr)
-            elif zsh[0].strip() == "cvc4":
-                cmdstr = "python3 ./smtvm.py z3 install " + base_z3
-                o = sp.getoutput(cmdstr)
-            else:
-                sys.exit("didn't recognize solver version")
+        elif zsh[0].strip() == "cvc4":
+            cmdstr = "python3 ./smtvm.py z3 install " + base_z3
+            o = sp.getoutput(cmdstr)
+        else:
+            sys.exit("didn't recognize solver version")
 
 
-            cmdstr = "cswap-cli -v -s " + str(rep) + " -i " + str(maxiter) + " ~/known/repro/" + zsh[0] + "-" + zsh[1]
-            (s, o) = sp.getstatusoutput(cmdstr)
-            elapsed = int([l for l in o.split("\n") if "Elapsed Time" in l][0].split(':')[-1].strip())
-            total_elapsed = elapsed + total_elapsed
+        cmdstr = "cswap-cli -v -s " + reps + " -i " + str(maxiter) + " ~/known/repro/" + zsh[0] + "-" + zsh[1]
+        (s, o) = sp.getstatusoutput(cmdstr)
+        elapsed_times = [int(l.split(':')[-1].strip()) for l in o.split("\n") if "Elapsed Time" in l]
 
-            runstats_str = [l for l in o.split("\n") if "JSONRUNSTATS:" in l][0].split("JSONRUNSTATS:")[-1]
-            runstats = json.loads(runstats_str)
-            cum_runstats_dicts.append(runstats)
+        iter_runstats_strs = [l.split("JSONRUNSTATS:")[-1] for l in o.split("\n") if "JSONRUNSTATS:" in l]
 
-            cfg_str = [l for l in o.split("\n") if "JSONCONFIG:" in l][0].split("JSONCONFIG:")[-1]
-            cfg = json.loads(cfg_str)
+        iter_runstats = [json.loads(rss) for rss in iter_runstats_strs]
+        df = pd.DataFrame(iter_runstats)
+        df["subset_of_samples"] = str(zsh[0]) + str(zsh[1])
+        df["seed"] = df.index
+        if cumdf.empty:
+            cumdf = df
+        else:
+            cumdf = cumdf.append(df, ignore_index=True)
+
+        cfg_strs = [l.split("JSONCONFIG:")[-1] for l in o.split("\n") if "JSONCONFIG:" in l]
+        cfgs = [json.loads(cfs) for cfs in cfg_strs]
+        for cfg in cfgs:
             del cfg["file_provider"]
             cfg["profiles"] = len(cfg["profiles"])
-            dfcfg = pd.DataFrame.from_dict(cfg, orient="index")
 
-            cmdstr = "ls 0-cswap-fuzz-run-out/bugs"
+        for rep in [0,1]:
+            if not rep in reprods.keys():
+                reprods[rep] = {}
+            cmdstr = "ls " + str(rep) + "-cswap-fuzz-run-out/bugs"
             bug_files = sp.getoutput(cmdstr).split("\n")
 
             cmdstr = "ls ~/known/repro/" + zsh[0] + "-" + zsh[1]
@@ -80,7 +77,7 @@ for config_tag, maxiter in tqdm(configs.items()):
             for sfs in seed_file_stems:
                 solver_sfs = str(zsh[0]) + "-" + sfs
                 if solver_sfs not in reprod.keys():
-                    reprod[solver_sfs] = "NOREPRO"
+                    reprods[rep][solver_sfs] = "NOREPRO"
 
                 for bf in bug_files:
                     cmdstr = "cat 0-cswap-fuzz-run-out/bugs/" + bf
@@ -88,36 +85,27 @@ for config_tag, maxiter in tqdm(configs.items()):
 
                     if sfs in bf:
                         if "soundness" in bf_cts:
-                            reprod[solver_sfs] = "SOUND" 
-                        elif reprod[solver_sfs] != "SOUND":
-                            reprod[solver_sfs] = "BUG" 
+                            reprods[rep][solver_sfs] = "SOUND" 
+                        elif reprods[rep][solver_sfs] != "SOUND":
+                            reprods[rep][solver_sfs] = "BUG" 
             cmdstr = "rm -r " + str(rep) + "-cswap-fuzz-run-out"
-            o = sp.getstatusoutput(cmdstr)
+            sp.getoutput(cmdstr)
 
+    reprocats = CategoricalDtype(categories=["BUG", "SOUND", "NOREPRO"])
+    reprodf = pd.DataFrame.from_dict(reprods, orient="index", dtype=reprocats)
+    reprodf.index.names = ["seed"]
 
+    per_seed_stats = cumdf.groupby("seed").sum()
 
+    bugs = [row.value_counts()["BUG"] + row.value_counts()["SOUND"] for (seed, row) in reprodf.transpose().items()]
+    sounds = [row.value_counts()["SOUND"] for (seed, row) in reprodf.transpose().items()]
+    per_seed_stats["bugs_found"] = bugs
+    per_seed_stats["soundness_bugs_found"] = sounds 
 
-
-        reprocats = CategoricalDtype(categories=["BUG", "SOUND", "NOREPRO"])
-        reprodf = pd.DataFrame.from_dict(reprod, orient="index", dtype=reprocats)
-        cum_repros.append(reprodf[0])
-
-        cumdf = pd.DataFrame(cum_runstats_dicts)
-
-        iter_df = cumdf.sum()
-        iter_df["Bugs"] = reprodf[0].value_counts()["BUG"] + reprodf[0].value_counts()["SOUND"]
-        iter_df["Soundness Bugs"] = reprodf[0].value_counts()["SOUND"]
-        iter_df["Elapsed Time"] = total_elapsed
-
-        cumreps.append(iter_df)
-
-    cumreps_repros_df = pd.DataFrame(cum_repros).reset_index(drop=True)
-    cumrepsdf = pd.DataFrame(cumreps)
-
-    cumrepsdf.to_csv(config_tag + ".csv")
+    per_seed_stats.to_csv(config_tag + ".csv")
     res = pd.DataFrame()
-    res["Means"] = cumrepsdf.mean()
-    res["Std"] = cumrepsdf.std()
+    res["Means"] = per_seed_stats.mean()
+    res["Std"] = per_seed_stats.std()
+    print(config_tag)
     print(res)
-    # print(cumrepsdf.std())
 
