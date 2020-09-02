@@ -62,12 +62,14 @@ use std::thread::JoinHandle;
 
 use walkdir::WalkDir;
 
+use std::time::SystemTime;
 type InputPPQ = Arc<SegQueue<Result<PathBuf, PoisonPill>>>;
 type SkeletonQueue = Arc<SegQueue<(PathBuf, PathBuf)>>;
 type BavAssingedQ = Arc<ArrayQueue<(Vec<(String, bool)>, (PathBuf, PathBuf))>>;
 type StageCompleteA = Arc<StageComplete>;
 
 fn launch(qs: (InputPPQ, SkeletonQueue), worker_counts: (u8, u8, u8), cfg: Config) {
+    let start = SystemTime::now();
     let criteria_a = max((worker_counts.1 as usize) * cfg.max_iter as usize, 1);
     let criteria_b = max((worker_counts.2 as usize) * 10 as usize, 1);
     let baq_cap = min(criteria_a, criteria_b);
@@ -161,6 +163,9 @@ fn launch(qs: (InputPPQ, SkeletonQueue), worker_counts: (u8, u8, u8), cfg: Confi
         backoff.snooze();
         trace!("Thread finished stage 3");
     }
+
+    let end = SystemTime::now();
+    all_stats.elapsed_time = end.duration_since(start).unwrap();
     info!("Saw {:?} across ALL threads", all_stats);
     info!(
         "JSONRUNSTATS:{}",
@@ -243,6 +248,8 @@ pub fn exec_randomized(dirname: &str, worker_count: (u8, u8), cfg: Config) {
     }
     q.push(Err(PoisonPill {}));
 
+    let start = SystemTime::now();
+
     let aq = Arc::new(q);
     let stage0 = match worker_count.0 {
         0 => Arc::new(StageComplete::finished()),
@@ -297,6 +304,8 @@ pub fn exec_randomized(dirname: &str, worker_count: (u8, u8), cfg: Config) {
         backoff.snooze();
         trace!("Thread finished");
     }
+    let end = SystemTime::now();
+    all_stats.elapsed_time = end.duration_since(start).unwrap();
     info!("Saw {:?} across ALL threads", all_stats);
     info!(
         "JSONRUNSTATS:{}",

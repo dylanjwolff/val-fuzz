@@ -24,7 +24,6 @@ for config_tag, maxiter in tqdm(configs.items()):
     cum_repros = []
     cumreps = []
     cum_runstats_dicts = []
-    total_elapsed  = []
     cumdf =  pd.DataFrame()
     reprod = {}
     reprods = {}
@@ -45,7 +44,6 @@ for config_tag, maxiter in tqdm(configs.items()):
 
         cmdstr = "cswap-cli -v -s " + reps + " -i " + str(maxiter) + " ~/known/repro/" + zsh[0] + "-" + zsh[1]
         (s, o) = sp.getstatusoutput(cmdstr)
-        elapsed_times = [int(l.split(':')[-1].strip()) for l in o.split("\n") if "Elapsed Time" in l]
 
         iter_runstats_strs = [l.split("JSONRUNSTATS:")[-1] for l in o.split("\n") if "JSONRUNSTATS:" in l]
 

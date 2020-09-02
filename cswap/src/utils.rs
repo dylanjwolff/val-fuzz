@@ -45,6 +45,7 @@ impl HashHashSet {
 
 #[derive(Eq, PartialEq, Clone)]
 pub struct RunStats {
+    pub elapsed_time: Duration,
     iter_subs: (u64, u64),
     all_non_errs_are_timeouts: (u64, u64),
     unique_subs: BTreeSet<u64>,
@@ -62,6 +63,7 @@ impl fmt::Debug for RunStats {
 impl RunStats {
     pub fn new() -> Self {
         RunStats {
+            elapsed_time: Duration::from_secs(0),
             iter_subs: (0, 0),
             all_non_errs_are_timeouts: (0, 0),
             unique_subs: BTreeSet::new(),
@@ -137,6 +139,7 @@ impl Serialize for RunStats {
         // 3 is the number of fields in the struct.
         let mut state = serializer.serialize_struct("RunStats", 7)?;
 
+        state.serialize_field("Elapsed Time (s)", &self.elapsed_time.as_secs())?;
         state.serialize_field("Iterations", &self.iter_subs.0)?;
         state.serialize_field("Substitutions", &self.iter_subs.1)?;
         state.serialize_field("Unique Substitutions", &self.unique_subs.len())?;
