@@ -41,6 +41,14 @@ const LIST_PROFILES: &'static str = "list-profiles";
 const NO_MULTITHREAD: &'static str = "no-multithreading";
 const VERBOSITY: &'static str = "verbosity";
 const RBASE: &'static str = "randomized-baseline";
+const MULTIEF: &'static str = "multi-enforce";
+const EFFINAL: &'static str = "enforce-final";
+const CPOG: &'static str = "copy-original";
+const SKOLU: &'static str = "skolemize-universal";
+const NOSKOLE: &'static str = "no-skolemize-existential";
+const RELC: &'static str = "const-relations";
+const ADOMAIN: &'static str = "abstract-domain-vars";
+const LEAFOPT: &'static str = "leaf-opt";
 
 fn main() {
     let matches: ArgMatches = App::new("Value Constant Mutation Fuzzer for SMTlib2 Solvers")
@@ -60,6 +68,46 @@ fn main() {
             Arg::with_name(FROM_SKELS)
                 .short("f")
                 .help("Use skeleton files from pre-processing or previous run"),
+        )
+        .arg(
+            Arg::with_name(MULTIEF)
+                .long(MULTIEF)
+                .help("Enforce 'n' constraints on the meta-formula")
+                .takes_value(true),
+        )
+        .arg(
+            Arg::with_name(EFFINAL)
+                .long(EFFINAL)
+                .help("Enforce constraints on the final call to solvers"),
+        )
+        .arg(Arg::with_name(CPOG).long(CPOG).help(
+            "Copy the original formula and its negation to create two meta-formulas per seed",
+        ))
+        .arg(
+            Arg::with_name(SKOLU)
+                .help("Skolemize universal quantifiers")
+                .long(SKOLU),
+        )
+        .arg(
+            Arg::with_name(NOSKOLE)
+                .help("Don't skolemize existential quantifiers")
+                .long(NOSKOLE),
+        )
+        .arg(
+            Arg::with_name(RELC)
+                .long(RELC)
+                .help("Use 'n' constants to create relational constraints (e.g. c1 == c2)")
+                .takes_value(true),
+        )
+        .arg(
+            Arg::with_name(LEAFOPT)
+                .long(LEAFOPT)
+                .help("Ignore non-leaf sub-expressions for creating the meta-formula"),
+        )
+        .arg(
+            Arg::with_name(ADOMAIN)
+                .long(ADOMAIN)
+                .help("Use abstract domain constraints for variables (e.g. x == 0)"),
         )
         .arg(
             Arg::with_name(RBASE)
@@ -149,11 +197,29 @@ fn main() {
     };
     info!("Stack size is {:?}B", stack_size);
 
+    let enforce_mask_size = match matches.value_of(MULTIEF) {
+        Some(s) => s.parse::<usize>().unwrap(),
+        None => 1,
+    };
+
+    let rel_cs = match matches.value_of(RELC) {
+        Some(s) => s.parse::<u8>().unwrap(),
+        None => 0,
+    };
+
     let cfg = Config {
         max_iter: max_iter,
         stack_size: stack_size,
         remove_files: !matches.is_present(KEEP_FILES),
-        mask_size: 1,
+        mask_size: enforce_mask_size,
+        max_const_relations_to_monitor: rel_cs,
+        dont_skolemize_existential: matches.is_present(NOSKOLE),
+        monitors_in_final: matches.is_present(EFFINAL),
+        use_bdom_vs: matches.is_present(ADOMAIN),
+        skolemize_universal: matches.is_present(SKOLU),
+        leaf_opt: matches.is_present(LEAFOPT),
+        cp_og: matches.is_present(CPOG),
+        enforce_on_resub: matches.is_present(EFFINAL),
         profiles,
         ..Config::default()
     };
