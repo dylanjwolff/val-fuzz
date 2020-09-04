@@ -153,7 +153,7 @@ impl Serialize for RunStats {
         )?;
         state.serialize_field(
             "All Non-Errors Timeout on Substitutions",
-            &self.all_non_errs_are_timeouts.0,
+            &self.all_non_errs_are_timeouts.1,
         )?;
         state.serialize_field("All Errors on Iterations", &self.all_err.0)?;
         state.serialize_field("All Errors on Substitution", &self.all_err.1)?;
