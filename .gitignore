@@ -6,3 +6,4 @@ tags.temp
 bin
 .solvers
 z3.log
+venv

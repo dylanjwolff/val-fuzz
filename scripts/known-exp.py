@@ -8,12 +8,14 @@ from pandas.api.types import CategoricalDtype
 from tqdm import tqdm
 
 flags = {}
-flags["RBASE"] = "-r"
+# flags["SPLITSKOL"] = ""
+# flags["REVSPLITSKOL"] = "--skolemize-universal --no-skolemize-existential"
+# flags["NOSKOLE"] = "--no-skolemize-existential"
+# flags["SKOLU"] = "--skolemize-universal"
+# flags["RBASE_SINGLE"] = "-r"
 flags["MULTIEF5"] = "--multi-enforce 5"
 flags["EFFINAL"] = "--enforce-final"
 flags["CPOG"] = "--copy-original"
-flags["SKOLU"] = "--skolemize-universal"
-flags["NOSKOLE"] = "--no-skolemize-existential"
 flags["RELC15"] = "--const-relations 15"
 flags["ADOMAIN"] = "--abstract-domain-vars"
 flags["LEAFOPT"] = "--leaf-opt"
@@ -53,7 +55,7 @@ for config_tag, options in tqdm(configs.items()):
             sys.exit("didn't recognize solver version")
 
 
-        cmdstr = "cswap-cli -v -w 1,1,1 " + options + " -s " + streps + " -i " + str(maxiter) + " ~/known/repro/" + zsh[0] + "-" + zsh[1]
+        cmdstr = "cswap-cli -v -w 1,1,1 --skolemize-universal " + options + " -s " + streps + " -i " + str(maxiter) + " ~/known/repro/" + zsh[0] + "-" + zsh[1]
         (s, o) = sp.getstatusoutput(cmdstr)
 
         iter_runstats_strs = [l.split("JSONRUNSTATS:")[-1] for l in o.split("\n") if "JSONRUNSTATS:" in l]
@@ -110,8 +112,9 @@ for config_tag, options in tqdm(configs.items()):
     sounds = [row.value_counts()["SOUND"] for (seed, row) in reprodf.transpose().items()]
     per_seed_stats["bugs_found"] = bugs
     per_seed_stats["soundness_bugs_found"] = sounds 
-
+    per_seed_stats = per_seed_stats.join(reprodf)
     per_seed_stats.to_csv(config_tag + ".csv")
+
     res = pd.DataFrame()
     res["Means"] = per_seed_stats.mean()
     res["Std"] = per_seed_stats.std()

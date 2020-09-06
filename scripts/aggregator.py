@@ -2,8 +2,10 @@
 import subprocess as sp
 import os
 import sys
+import numpy as np
 import pandas as pd
 from pandas.api.types import CategoricalDtype
+from scipy.stats import ttest_ind_from_stats
 
 
 def bug_filter():
@@ -39,18 +41,49 @@ sounds = [row.value_counts()["SOUND"] for (seed, row) in crt.drop(sound_filter()
 
 cumdf["bugs_adj"] = bugs
 cumdf["sounds_adj"] = sounds
-print(cumdf)
+# print(cumdf)
 
 
-cumdf["Bug Efficiency Adj"] = cumdf["bugs_adj"] / (cumdf["Iterations"] + cumdf["Substitutions"])
-cumdf["Bug Efficiency"] = cumdf["bugs_found"] / (cumdf["Iterations"] + cumdf["Substitutions"])
-cumdf["Soundness Bug Efficiency Adj"] = cumdf["sounds_adj"] / (cumdf["Iterations"] + cumdf["Substitutions"])
-cumdf["Soundness Bug Efficiency"] = cumdf["soundness_bugs_found"] / (cumdf["Iterations"] + cumdf["Substitutions"])
-cumdf["Bug Time Efficiency"] = cumdf["bugs_adj"] / cumdf["Elapsed Time (s)"]
-cumdf["Soundness Bug Time Efficiency"] = cumdf["sounds_adj"] / cumdf["Elapsed Time (s)"]
+cumdf["BugEfficiencyAdj"] = cumdf["bugs_adj"] / (cumdf["Iterations"] + cumdf["Substitutions"])
+cumdf["BugEfficiency"] = cumdf["bugs_found"] / (cumdf["Iterations"] + cumdf["Substitutions"])
+cumdf["SoundnessBugEfficiencyAdj"] = cumdf["sounds_adj"] / (cumdf["Iterations"] + cumdf["Substitutions"])
+cumdf["SoundnessBugEfficiency"] = cumdf["soundness_bugs_found"] / (cumdf["Iterations"] + cumdf["Substitutions"])
 
 means = cumdf.groupby("config tag").mean()
-print(means.loc[: , ["sounds_adj", "soundness_bugs_found", "bugs_adj", "bugs_found", "Soundness Bug Efficiency", "Bug Efficiency Adj", "Bug Efficiency", "Soundness Bug Time Efficiency", "Bug Time Efficiency"]])
+# print(means.loc[: , ["sounds_adj", "soundness_bugs_found", "bugs_adj", "bugs_found", "SoundnessBugEfficiency", "BugEfficiencyAdj", "BugEfficiency"]])
 
 stds = cumdf.groupby("config tag").std()
-print(stds.loc[: , ["soundness_bugs_found","bugs_found", "Soundness Bug Efficiency", "Bug Efficiency", "Soundness Bug Time Efficiency", "Bug Time Efficiency"]])
+# print(stds.loc[: , ["sounds_adj", "soundness_bugs_found","bugs_found", "SoundnessBugEfficiency", "BugEfficiency"]])
+
+final = means.join(stds, rsuffix="Std")[["sounds_adj", "bugs_adj", "SoundnessBugEfficiencyAdj", "BugEfficiencyAdj"]]
+
+col = "sounds_adj"
+basem = means[col]["SKOLU"]
+bases = stds[col]["SKOLU"]
+tt = ttest_ind_from_stats(mean1=basem, std1=bases, nobs1=30, mean2=means[col], std2=stds[col], nobs2=30, equal_var=False)
+final[col + "PVal"] = np.round(tt[1], 4)
+
+col = "bugs_adj"
+basem = means[col]["SKOLU"]
+bases = stds[col]["SKOLU"]
+tt = ttest_ind_from_stats(mean1=basem, std1=bases, nobs1=30, mean2=means[col], std2=stds[col], nobs2=30, equal_var=False)
+final[col + "PVal"] = np.round(tt[1], 4)
+
+
+col = "SoundnessBugEfficiencyAdj"
+basem = means[col]["SKOLU"]
+bases = stds[col]["SKOLU"]
+tt = ttest_ind_from_stats(mean1=basem, std1=bases, nobs1=30, mean2=means[col], std2=stds[col], nobs2=30, equal_var=False)
+final[col + "PVal"] = np.round(tt[1], 4)
+
+col = "BugEfficiencyAdj"
+basem = means[col]["SKOLU"]
+bases = stds[col]["SKOLU"]
+tt = ttest_ind_from_stats(mean1=basem, std1=bases, nobs1=30, mean2=means[col], std2=stds[col], nobs2=30, equal_var=False)
+final[col + "PVal"] = np.round(tt[1], 4)
+
+
+
+
+print(final)
+
