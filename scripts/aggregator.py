@@ -98,8 +98,14 @@ fig=plt.figure()
 ax=fig.add_subplot(111, label="1")
 ax2=fig.add_subplot(111, label="2", frame_on=False)
 
-ax.errorbar(relmeans.index, relmeans["soundness_bugs_found"], color="C0", yerr=relstds["soundness_bugs_found"], capsize=3, capthick=1.5, ls='--', marker='o', elinewidth=0.00001)
-ax2.errorbar(relmeans.index, relmeans["SoundnessBugEfficiencyAdj"], color="C1", yerr=relstds["SoundnessBugEfficiencyAdj"], capsize=3, capthick=1.5, ls='--', marker='*', elinewidth=0.00001)
+y1 = relmeans["soundness_bugs_found"]
+y1e = relstds["soundness_bugs_found"]
+y2 = relmeans["SoundnessBugEfficiencyAdj"]
+y2e = relstds["SoundnessBugEfficiencyAdj"]
+ax.plot(relmeans.index, y1, color="C0",ls='--', marker='o')
+ax2.plot(relmeans.index, y2, color="C1",ls='--', marker='*')
+ax.fill_between(relmeans.index, y1 - y1e, y1 + y1e, alpha=0.2)
+ax2.fill_between(relmeans.index, y2 - y2e, y2 + y2e, alpha=0.2, color="C1")
 ax2.yaxis.tick_right()
 
 ax.set_ylabel("Soundness Bugs Found", color="C0")
@@ -126,8 +132,14 @@ fig=plt.figure()
 ax=fig.add_subplot(111, label="1")
 ax2=fig.add_subplot(111, label="2", frame_on=False)
 
-ax.errorbar(multimeans.index, multimeans["soundness_bugs_found"], color="C0", yerr=multistds["soundness_bugs_found"], capsize=2.5, capthick=1, ls='--', marker='o')
-ax2.errorbar(multimeans.index, multimeans["SoundnessBugEfficiencyAdj"], color="C1", yerr=multistds["SoundnessBugEfficiencyAdj"], capsize=2.5, capthick=1, ls='--', marker='*')
+y1 = multimeans["soundness_bugs_found"]
+y1e = multistds["soundness_bugs_found"]
+y2 = multimeans["SoundnessBugEfficiencyAdj"]
+y2e = multistds["SoundnessBugEfficiencyAdj"]
+ax.plot(multimeans.index, y1, color="C0",ls='--', marker='o')
+ax2.plot(multimeans.index, y2, color="C1",ls='--', marker='*')
+ax.fill_between(multimeans.index, y1 - y1e, y1 + y1e, alpha=0.2)
+ax2.fill_between(multimeans.index, y2 - y2e, y2 + y2e, alpha=0.2, color="C1")
 ax2.yaxis.tick_right()
 
 ax.set_ylabel("Soundness Bugs Found", color="C0")
