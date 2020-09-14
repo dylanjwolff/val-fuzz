@@ -7,7 +7,7 @@ import pandas as pd
 import matplotlib
 from pandas.api.types import CategoricalDtype
 from scipy.stats import ttest_ind_from_stats
-
+import matplotlib.pyplot as plt
 
 def bug_filter():
     rbs = pd.read_csv("RBASE_SINGLE.csv")
@@ -45,10 +45,10 @@ cumdf["sounds_adj"] = sounds
 # print(cumdf)
 
 
-cumdf["BugEfficiencyAdj"] = cumdf["bugs_adj"] / (cumdf["Iterations"] + cumdf["Substitutions"])
-cumdf["BugEfficiency"] = cumdf["bugs_found"] / (cumdf["Iterations"] + cumdf["Substitutions"])
-cumdf["SoundnessBugEfficiencyAdj"] = cumdf["sounds_adj"] / (cumdf["Iterations"] + cumdf["Substitutions"])
-cumdf["SoundnessBugEfficiency"] = cumdf["soundness_bugs_found"] / (cumdf["Iterations"] + cumdf["Substitutions"])
+cumdf["BugEfficiencyAdj"] = 1000 * cumdf["bugs_adj"] / (cumdf["Iterations"] + cumdf["Substitutions"])
+cumdf["BugEfficiency"] = 1000 * cumdf["bugs_found"] / (cumdf["Iterations"] + cumdf["Substitutions"])
+cumdf["SoundnessBugEfficiencyAdj"] = 1000 * cumdf["sounds_adj"] / (cumdf["Iterations"] + cumdf["Substitutions"])
+cumdf["SoundnessBugEfficiency"] = 1000 * cumdf["soundness_bugs_found"] / (cumdf["Iterations"] + cumdf["Substitutions"])
 
 means = cumdf.groupby("config tag").mean()
 # print(means.loc[: , ["sounds_adj", "soundness_bugs_found", "bugs_adj", "bugs_found", "SoundnessBugEfficiency", "BugEfficiencyAdj", "BugEfficiency"]])
@@ -87,5 +87,18 @@ final[col + "PVal"] = np.round(tt[1], 4)
 
 final.to_csv("aggereg_ceesssvee")
 
-print(final)
-cumdf.boxplot()
+plotdf = cumdf[cumdf["config tag"].map(lambda i: i in ["RBASE", "SOUND", "SKOLU", "LINEAR"])]
+
+plotdf.boxplot(by="config tag", column=["SoundnessBugEfficiencyAdj"], grid=False)
+plt.ylabel("Bugs per Call To Solver")
+plt.title("Soundness Bug Detection Efficiency")
+plt.suptitle("")
+# plt.show()
+plt.savefig('plt1.png', bbox_inches='tight')
+
+plotdf.boxplot(by="config tag", column=["soundness_bugs_found"], grid=False)
+plt.ylabel("Bugs")
+plt.title("Soundness Bugs Detected")
+plt.suptitle("")
+# plt.show()
+plt.savefig('plt2.png', bbox_inches='tight')
