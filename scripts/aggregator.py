@@ -87,18 +87,78 @@ final[col + "PVal"] = np.round(tt[1], 4)
 
 final.to_csv("aggereg_ceesssvee")
 
+
+
+relcdf= cumdf[cumdf["config tag"].map(lambda i: "RELC" in i)]
+relcdf["xnum"] = relcdf["config tag"].map(lambda s: int(s.split("RELC")[-1]))
+relmeans = relcdf.groupby("xnum").mean()
+relstds = relcdf.groupby("xnum").std()
+
+fig=plt.figure()
+ax=fig.add_subplot(111, label="1")
+ax2=fig.add_subplot(111, label="2", frame_on=False)
+
+ax.errorbar(relmeans.index, relmeans["soundness_bugs_found"], color="C0", yerr=relstds["soundness_bugs_found"], capsize=3, capthick=1.5, ls='--', marker='o', elinewidth=0.00001)
+ax2.errorbar(relmeans.index, relmeans["SoundnessBugEfficiencyAdj"], color="C1", yerr=relstds["SoundnessBugEfficiencyAdj"], capsize=3, capthick=1.5, ls='--', marker='*', elinewidth=0.00001)
+ax2.yaxis.tick_right()
+
+ax.set_ylabel("Soundness Bugs Found", color="C0")
+ax2.set_ylabel("Soundness Bugs Found Per 1000 Solver Invocations", color="C1")
+ax2.yaxis.set_label_position('right') 
+ax.tick_params(axis='y', colors="C0")
+ax2.tick_params(axis='y', colors="C1")
+ax2.set_xticks(range(0,16))
+ax.set_xticks(range(0,16))
+plt.xticks(range(0,16))
+plt.xlabel("Values used for Relative Constant Relations")
+plt.show()
+
+# ----------
+
+multicdf= cumdf[cumdf["config tag"].map(lambda i: "MULTIEF" in i)]
+multicdf["xnum"] = multicdf["config tag"].map(lambda s: int(s.split("MULTIEF")[-1]))
+multimeans = multicdf.groupby("xnum").mean()
+multistds = multicdf.groupby("xnum").std()
+
+print("multimeans")
+print(multimeans)
+fig=plt.figure()
+ax=fig.add_subplot(111, label="1")
+ax2=fig.add_subplot(111, label="2", frame_on=False)
+
+ax.errorbar(multimeans.index, multimeans["soundness_bugs_found"], color="C0", yerr=multistds["soundness_bugs_found"], capsize=2.5, capthick=1, ls='--', marker='o')
+ax2.errorbar(multimeans.index, multimeans["SoundnessBugEfficiencyAdj"], color="C1", yerr=multistds["SoundnessBugEfficiencyAdj"], capsize=2.5, capthick=1, ls='--', marker='*')
+ax2.yaxis.tick_right()
+
+ax.set_ylabel("Soundness Bugs Found", color="C0")
+ax2.set_ylabel("Soundness Bugs Found Per 1000 Solver Invocations", color="C1")
+ax2.yaxis.set_label_position('right') 
+ax.tick_params(axis='y', colors="C0")
+ax2.tick_params(axis='y', colors="C1")
+ax2.set_xticks(range(0,9))
+ax.set_xticks(range(0,9))
+plt.xticks(range(0,9))
+plt.xlabel("Number of Constraints Enforced")
+plt.show()
+
+
+
+
 plotdf = cumdf[cumdf["config tag"].map(lambda i: i in ["RBASE", "SOUND", "SKOLU", "LINEAR"])]
 
 plotdf.boxplot(by="config tag", column=["SoundnessBugEfficiencyAdj"], grid=False)
 plt.ylabel("Bugs per Call To Solver")
-plt.title("Soundness Bug Detection Efficiency")
+plt.title("")
 plt.suptitle("")
 # plt.show()
 plt.savefig('plt1.png', bbox_inches='tight')
 
 plotdf.boxplot(by="config tag", column=["soundness_bugs_found"], grid=False)
 plt.ylabel("Bugs")
-plt.title("Soundness Bugs Detected")
+plt.title("")
 plt.suptitle("")
 # plt.show()
 plt.savefig('plt2.png', bbox_inches='tight')
+
+
+
