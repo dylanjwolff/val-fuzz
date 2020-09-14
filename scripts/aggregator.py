@@ -4,6 +4,7 @@ import os
 import sys
 import numpy as np
 import pandas as pd
+import matplotlib
 from pandas.api.types import CategoricalDtype
 from scipy.stats import ttest_ind_from_stats
 
@@ -55,7 +56,7 @@ means = cumdf.groupby("config tag").mean()
 stds = cumdf.groupby("config tag").std()
 # print(stds.loc[: , ["sounds_adj", "soundness_bugs_found","bugs_found", "SoundnessBugEfficiency", "BugEfficiency"]])
 
-final = means.join(stds, rsuffix="Std")[["sounds_adj", "bugs_adj", "SoundnessBugEfficiencyAdj", "BugEfficiencyAdj"]]
+final = means.join(stds, rsuffix="Std")[["soundness_bugs_found", "soundness_bugs_foundStd", "bugs_found", "bugs_foundStd", "SoundnessBugEfficiencyAdj", "SoundnessBugEfficiencyAdjStd", "BugEfficiencyAdj", "BugEfficiencyAdjStd"]]
 
 col = "sounds_adj"
 basem = means[col]["SKOLU"]
@@ -84,6 +85,7 @@ final[col + "PVal"] = np.round(tt[1], 4)
 
 
 
+final.to_csv("aggereg_ceesssvee")
 
 print(final)
-
+cumdf.boxplot()
