@@ -89,8 +89,8 @@ final.to_csv("aggereg_ceesssvee")
 
 
 
-relcdf= cumdf[cumdf["config tag"].map(lambda i: "RELC" in i)]
-relcdf["xnum"] = relcdf["config tag"].map(lambda s: int(s.split("RELC")[-1]))
+relcdf= cumdf[cumdf["config tag"].map(lambda i: "RELC" in i or i in "SKOLU")]
+relcdf["xnum"] = relcdf["config tag"].map(lambda s: int(s.split("RELC")[-1]) if ("RELC" in s) else 1)
 relmeans = relcdf.groupby("xnum").mean()
 relstds = relcdf.groupby("xnum").std()
 
@@ -117,12 +117,13 @@ ax2.set_xticks(range(0,16))
 ax.set_xticks(range(0,16))
 plt.xticks(range(0,16))
 plt.xlabel("Values used for Relative Constant Relations")
-plt.show()
+# plt.show()
+plt.savefig('pltrel.png', bbox_inches='tight')
 
 # ----------
 
-multicdf= cumdf[cumdf["config tag"].map(lambda i: "MULTIEF" in i)]
-multicdf["xnum"] = multicdf["config tag"].map(lambda s: int(s.split("MULTIEF")[-1]))
+multicdf= cumdf[cumdf["config tag"].map(lambda i: "MULTIEF" in i or i in "SKOLU")]
+multicdf["xnum"] = multicdf["config tag"].map(lambda s: int(s.split("MULTIEF")[-1]) if ("MULTIEF" in s) else 1)
 multimeans = multicdf.groupby("xnum").mean()
 multistds = multicdf.groupby("xnum").std()
 
@@ -151,7 +152,8 @@ ax2.set_xticks(range(0,9))
 ax.set_xticks(range(0,9))
 plt.xticks(range(0,9))
 plt.xlabel("Number of Constraints Enforced")
-plt.show()
+# plt.show()
+plt.savefig('pltmulti.png', bbox_inches='tight')
 
 
 
