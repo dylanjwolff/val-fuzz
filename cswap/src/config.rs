@@ -125,6 +125,20 @@ impl FileProvider {
         FileProvider::new_existing(dirname, false)
     }
 
+    pub fn new_unique(dirname: &str) -> FileProvider {
+        let td = Builder::new()
+            .prefix("")
+            .rand_bytes(32)
+            .suffix(&("_".to_string() + dirname))
+            .tempdir_in(Path::new("."))
+            .expect("Tempdir should be able to be created")
+            .into_path();
+        FileProvider::new_existing(
+            td.to_str().expect("Path to dir should be valid string"),
+            true,
+        )
+    }
+
     pub fn og_w_monitors<'a>(&self, md: &'a mut Metadata) -> io::Result<PathBuf> {
         let tfile = Builder::new()
             .prefix("ogwms_")

@@ -259,7 +259,7 @@ fn main() {
         .iter()
         .map(|seed| {
             let dir_name = dir_name.to_owned();
-            let fp = FileProvider::new(&(seed.to_string() + "-cswap-fuzz-run-out"));
+            let fp = FileProvider::new_unique(&(seed.to_string() + "-cswap-fuzz-run-out"));
             let cfg = Config {
                 rng_seed: *seed,
                 file_provider: fp,
