@@ -10,6 +10,7 @@ use cswap::parser::script;
 use cswap::solver::profiles_solve;
 use cswap::solver::profiles_to_string;
 use cswap::solver::solve;
+use std::time::Duration;
 
 use cswap::solver::ProfileIndex;
 
@@ -24,6 +25,7 @@ const CREDUCE_SCRIPT: &'static str = "creduce-script";
 const PROFILES: &'static str = "profiles";
 const FORMAT: &'static str = "format";
 const LIST_PROFILES: &'static str = "list-profiles";
+const TIMEOUT: &'static str = "timeout";
 
 fn main() {
     let ecode = {
@@ -53,6 +55,13 @@ fn main() {
                     .takes_value(true),
             )
             .arg(
+                Arg::with_name(TIMEOUT)
+                    .short("t")
+                    .long(TIMEOUT)
+                    .help("Sets the timeout for the solvers in seconds")
+                    .takes_value(true),
+            )
+            .arg(
                 Arg::with_name(FORMAT)
                     .short("f")
                     .help("Format the SMTLIB2 file to stdout. Removes all comments"),
@@ -77,9 +86,16 @@ fn main() {
             _ => (),
         };
 
+        let timeout = match matches.value_of(TIMEOUT) {
+            Some(to) => Duration::from_secs(
+                to.parse::<u8>().expect("Expected small number for timeout") as u64,
+            ),
+            None => Duration::from_secs(6),
+        };
+
         let results = match matches.value_of(PROFILES) {
-            Some(pstr) => profiles_solve(infile_name, &parse_profiles(pstr)),
-            None => solve(infile_name),
+            Some(pstr) => profiles_solve(infile_name, &parse_profiles(pstr), timeout),
+            None => solve(infile_name, timeout),
         };
 
         if log_level > 1 {

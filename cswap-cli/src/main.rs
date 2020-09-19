@@ -10,6 +10,7 @@ use log::LevelFilter;
 use log4rs::append::console::ConsoleAppender;
 use log4rs::config::Config as L4rsConfig;
 use log4rs::config::{Appender, Logger, Root};
+use std::time::Duration;
 
 use clap::App;
 use clap::Arg;
@@ -29,6 +30,7 @@ use std::thread;
 use std::thread::JoinHandle;
 use std::time::SystemTime;
 
+const TIMEOUT: &'static str = "timeout";
 const KEEP_FILES: &'static str = "keep-files";
 const STACK_SIZE: &'static str = "stack-size";
 const DIR: &'static str = "Seed/Skeleton Directory";
@@ -68,6 +70,13 @@ fn main() {
             Arg::with_name(FROM_SKELS)
                 .short("f")
                 .help("Use skeleton files from pre-processing or previous run"),
+        )
+        .arg(
+            Arg::with_name(TIMEOUT)
+                .long(TIMEOUT)
+                .help("Sets the default timeout for calls to the solver")
+                .short("t")
+                .takes_value(true),
         )
         .arg(
             Arg::with_name(MULTIEF)
@@ -207,6 +216,13 @@ fn main() {
         None => 0,
     };
 
+    let timeout = match matches.value_of(TIMEOUT) {
+        Some(s) => {
+            Duration::from_secs(s.parse::<u8>().expect("Timeout should be small number") as u64)
+        }
+        None => Duration::from_secs(6),
+    };
+
     let cfg = Config {
         max_iter: max_iter,
         stack_size: stack_size,
@@ -220,6 +236,7 @@ fn main() {
         leaf_opt: matches.is_present(LEAFOPT),
         cp_og: matches.is_present(CPOG),
         enforce_on_resub: matches.is_present(EFFINAL),
+        timeout,
         profiles,
         ..Config::default()
     };

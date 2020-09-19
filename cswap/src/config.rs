@@ -3,6 +3,7 @@ use std::fs;
 use std::io;
 use std::path::Path;
 use std::path::PathBuf;
+use std::time::Duration;
 
 use crate::ast::Sort;
 
@@ -34,6 +35,7 @@ pub struct Config {
     pub skolemize_universal: bool,
     pub leaf_opt: bool,
     pub cp_og: bool,
+    pub timeout: Duration,
 }
 
 #[macro_export]
@@ -68,6 +70,7 @@ impl Config {
             dont_skolemize_existential: false,
             leaf_opt: false,
             cp_og: false,
+            timeout: Duration::from_secs(6),
         }
     }
 

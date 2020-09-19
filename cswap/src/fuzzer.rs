@@ -309,6 +309,7 @@ pub fn solver_fn(
         filepaths.0.to_str().unwrap_or("defaultname"),
         &SIMPLE_PROFILE,
         seed,
+        cfg.timeout,
     );
 
     let ct = to_ctr.entry(md.seed_file.clone()).or_insert(0);
@@ -385,7 +386,11 @@ fn resub_model(
             .file_provider
             .serialize_resub_str(script_str, &filepaths.0, &md)?;
 
-        let results = profiles_solve(resubbed_f.to_str().unwrap_or("defaultname"), &cfg.profiles);
+        let results = profiles_solve(
+            resubbed_f.to_str().unwrap_or("defaultname"),
+            &cfg.profiles,
+            cfg.timeout,
+        );
         stats.record_stats_for_sub_results(&results);
 
         log_check_enforce(&results, enforcemt);

@@ -108,7 +108,11 @@ pub fn rand_fuzz_solve(
         )));
     }
 
-    let results = profiles_solve(iter_f.to_str().unwrap_or("defaultname"), &cfg.profiles);
+    let results = profiles_solve(
+        iter_f.to_str().unwrap_or("defaultname"),
+        &cfg.profiles,
+        cfg.timeout,
+    );
     stats.record_stats_for_sub_results(&results);
 
     let ct = to_ctr.entry(md.seed_file.clone()).or_insert(0);

@@ -102,21 +102,25 @@ pub enum ProfileIndex {
     CVC4(usize),
 }
 
-pub fn profiles_solve(filename: &str, pis: &HashSet<ProfileIndex>) -> Vec<RSolve> {
+pub fn profiles_solve(
+    filename: &str,
+    pis: &HashSet<ProfileIndex>,
+    timeout: Duration,
+) -> Vec<RSolve> {
     let filepath = Path::new(filename);
 
     let mr_cvc4 = CVC4_PROFILES
         .iter()
         .zip(0..CVC4_PROFILES.len() - 1)
         .filter(|(_, i)| pis.contains(&ProfileIndex::CVC4(*i)))
-        .map(|(p, _)| p)
+        .map(|(p, _)| p.clone().timeout(timeout))
         .map(|profile| profile.run_on(&filepath));
 
     let mr_z3 = Z3_PROFILES
         .iter()
         .zip(0..Z3_PROFILES.len() - 1)
         .filter(|(_, i)| pis.contains(&ProfileIndex::Z3(*i)))
-        .map(|(p, _)| p)
+        .map(|(p, _)| p.clone().timeout(timeout))
         .map(|profile| profile.run_on(&filepath));
 
     mr_cvc4.chain(mr_z3).collect()
@@ -126,6 +130,7 @@ pub fn randomized_profiles_solve(
     filename: &str,
     pis: &HashSet<ProfileIndex>,
     seed: u64,
+    timeout: Duration,
 ) -> Vec<RSolve> {
     let filepath = Path::new(filename);
 
@@ -133,7 +138,7 @@ pub fn randomized_profiles_solve(
         .iter()
         .zip(0..CVC4_PROFILES.len() - 1)
         .filter(|(_, i)| pis.contains(&ProfileIndex::CVC4(*i)))
-        .map(|(p, _)| p.randomize(seed))
+        .map(|(p, _)| p.randomize(seed).timeout(timeout))
         .map(|profile| profile.run_on(&filepath))
         .peekable();
 
@@ -141,7 +146,7 @@ pub fn randomized_profiles_solve(
         .iter()
         .zip(0..Z3_PROFILES.len() - 1)
         .filter(|(_, i)| pis.contains(&ProfileIndex::Z3(*i)))
-        .map(|(p, _)| p.randomize(seed))
+        .map(|(p, _)| p.randomize(seed).timeout(timeout))
         .map(|profile| profile.run_on(&filepath))
         .peekable();
 
@@ -681,14 +686,17 @@ impl RSolve {
     }
 }
 
-pub fn solve(filename: &str) -> Vec<RSolve> {
+pub fn solve(filename: &str, timeout: Duration) -> Vec<RSolve> {
     let filepath = Path::new(filename);
 
     let mr_cvc4 = CVC4_PROFILES
         .iter()
-        .map(|profile| profile.run_on(&filepath));
+        .cloned()
+        .map(|profile| profile.clone().timeout(timeout).run_on(&filepath));
 
-    let mr_z3 = Z3_PROFILES.iter().map(|profile| profile.run_on(&filepath));
+    let mr_z3 = Z3_PROFILES
+        .iter()
+        .map(|profile| profile.clone().timeout(timeout).run_on(&filepath));
 
     mr_cvc4.chain(mr_z3).collect()
 }
@@ -834,7 +842,11 @@ mod tests {
         vec![1, 5].into_iter().for_each(|i| {
             pis.insert(ProfileIndex::new(i));
         });
-        assert_debug_snapshot!(profiles_solve("test/strings20.smt2", &pis));
+        assert_debug_snapshot!(profiles_solve(
+            "test/strings20.smt2",
+            &pis,
+            Duration::from_secs(6)
+        ));
     }
 
     #[test]
