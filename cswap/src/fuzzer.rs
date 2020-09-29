@@ -1,5 +1,6 @@
 use crate::ast::CommandRc;
 use crate::ast::Script;
+use crate::ast::Sort;
 use crate::config::Config;
 use crate::config::FileProvider;
 use crate::config::Metadata;
@@ -14,9 +15,12 @@ use crate::transforms::rv;
 use crate::utils::dyn_fmt;
 use crate::utils::to_strs;
 use crate::utils::DFormatParseError;
+use crate::utils::HashHashSet;
 use crate::utils::RunStats;
+use std::collections::HashMap;
 
 use crate::utils::RandUniqPermGen;
+use std::hash::Hash;
 
 use std::collections::BTreeMap;
 use std::fs::OpenOptions;
@@ -394,6 +398,7 @@ fn resub_model(
         stats.record_stats_for_sub_results(&results);
 
         log_check_enforce(&results, enforcemt);
+        log_check_coverage(&results, &md.bavns, md.seed_file.clone());
 
         if !report_any_bugs(&resubbed_f, &results, &cfg.file_provider) {
             if cfg.remove_files {
@@ -402,6 +407,44 @@ fn resub_model(
         }
     }
     Ok(())
+}
+
+type VarName = String;
+type VarValStr = String;
+type SolverConfigStr = String;
+type SeedFileNameStr = String;
+/// Exit on first success, only report if no successes and at least one failure
+fn log_check_coverage(
+    results: &Vec<RSolve>,
+    coverage_vars: &Vec<(String, Sort)>,
+    seed_file: SeedFileNameStr,
+    all_file_coverages: &mut HashMap<String, HashMap<String, HashHashSet>>,
+) {
+    let (cnames, _evals): (Vec<_>, Vec<_>) = coverage_vars.iter().cloned().unzip();
+
+    let mut coverages = all_file_coverages
+        .entry(seed_file)
+        .or_insert(HashMap::new());
+
+    let strress = results.iter().for_each(|result| {
+        let rvarstrs = result
+            .extract_const_var_vals(&cnames)
+            .into_iter()
+            .map(|(sym, sexp)| (sym.to_string(), sexp.to_string()));
+
+        let filtered = rvarstrs
+            .filter(|(name, _strval)| cnames.contains(name))
+            .collect::<BTreeMap<VarName, VarValStr>>();
+
+        let solver = result.solver.to_string();
+
+        coverages
+            .entry(solver)
+            .or_insert(HashHashSet::new())
+            .insert(&filtered);
+    });
+
+    println!("COVERAGES: {:?}", all_file_coverages);
 }
 
 /// Exit on first success, only report if no successes and at least one failure

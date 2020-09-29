@@ -16,6 +16,7 @@ use crate::solver::RSolve;
 use serde::ser::{Serialize, SerializeStruct, Serializer};
 use std::cmp::min;
 use std::collections::hash_map::DefaultHasher;
+use std::collections::HashMap;
 use std::collections::HashSet;
 use std::fmt;
 use std::hash::Hash;
@@ -40,6 +41,18 @@ impl HashHashSet {
         let mut s = DefaultHasher::new();
         item.hash(&mut s);
         self.inner.insert(s.finish())
+    }
+}
+
+impl fmt::Debug for HashHashSet {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        write!(f, "Set of Size {}", self.inner.len())
+    }
+}
+
+impl fmt::Display for HashHashSet {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        write!(f, "Set of Size {}", self.inner.len())
     }
 }
 
