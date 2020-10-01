@@ -134,29 +134,24 @@ impl BSECoverages {
         let mut all_file_coverages = &mut self.inner;
         let (cnames, _evals): (Vec<_>, Vec<_>) = coverage_vars.iter().cloned().unzip();
 
-        let mut coverages = all_file_coverages
-            .entry(seed_file)
-            .or_insert(HashMap::new());
-
         let strress = results
             .iter()
             .filter(|r| r.has_sat() && !r.has_unrecoverable_error())
             .for_each(|result| {
-                println!("RES: {:?}", result);
                 let rvarstrs = result
                     .extract_const_var_vals(&cnames)
                     .into_iter()
                     .map(|(sym, sexp)| (sym.to_string(), sexp.to_string()));
-                println!("RVARSTRS: {:?}", rvarstrs);
 
                 let filtered = rvarstrs
                     .filter(|(name, _strval)| cnames.contains(name))
                     .collect::<BTreeMap<VarName, VarValStr>>();
-                println!("COV FILT: {:?}", filtered);
+
                 let solver = result.solver.to_string();
+                let mut coverages = all_file_coverages.entry(solver).or_insert(HashMap::new());
 
                 coverages
-                    .entry(solver)
+                    .entry(seed_file.clone())
                     .or_insert(HashHashSet::new())
                     .insert(&filtered);
             });

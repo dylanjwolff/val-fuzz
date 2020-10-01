@@ -30,6 +30,7 @@ use std::thread;
 use std::thread::JoinHandle;
 use std::time::SystemTime;
 
+const MFINAL: &'static str = "monitors-in-final";
 const TIMEOUT: &'static str = "timeout";
 const KEEP_FILES: &'static str = "keep-files";
 const STACK_SIZE: &'static str = "stack-size";
@@ -89,6 +90,9 @@ fn main() {
                 .long(EFFINAL)
                 .help("Enforce constraints on the final call to solvers"),
         )
+        .arg(Arg::with_name(MFINAL).long(MFINAL).help(
+            "Include monitor variables in final formula for e.g. boolean sub-exp coverage metrics",
+        ))
         .arg(Arg::with_name(CPOG).long(CPOG).help(
             "Copy the original formula and its negation to create two meta-formulas per seed",
         ))
@@ -230,7 +234,7 @@ fn main() {
         mask_size: enforce_mask_size,
         max_const_relations_to_monitor: rel_cs,
         dont_skolemize_existential: matches.is_present(NOSKOLE),
-        monitors_in_final: matches.is_present(EFFINAL),
+        monitors_in_final: matches.is_present(EFFINAL) || matches.is_present(MFINAL),
         use_bdom_vs: matches.is_present(ADOMAIN),
         skolemize_universal: matches.is_present(SKOLU),
         leaf_opt: matches.is_present(LEAFOPT),
