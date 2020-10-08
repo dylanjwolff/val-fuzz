@@ -469,19 +469,26 @@ fn find_var_refs_sexp(vars: &BTreeMap<Symbol, Sort>, rcse: Rcse) -> Vec<(Rcse, S
 
 pub fn replace_constants_with_fresh_vars(script: &mut Script, md: &mut Metadata) -> io::Result<()> {
     let max_consts = 10;
-    let min_consts = 5;
+    let min_consts = 0;
 
     use rand::{seq::IteratorRandom, thread_rng}; // 0.6.1
 
     let mut rng = thread_rng();
-    let choles = choles(script);
+    let mut choles = choles(script);
 
     let og_vars = script.get_all_global_var_bindings();
     let var_refs = find_var_refs(&og_vars, &script);
 
     if choles.len() < min_consts {
         let concretizations = min_consts - choles.len();
-        let sample = var_refs.iter().choose_multiple(&mut rng, concretizations);
+        let sample: Vec<(Rcse, Sort)> = var_refs
+            .into_iter()
+            .choose_multiple(&mut rng, concretizations);
+        choles.extend(sample);
+    }
+
+    if choles.len() > max_consts {
+        choles = choles.into_iter().choose_multiple(&mut rng, max_consts);
     }
 
     if choles.len() == 0 {
