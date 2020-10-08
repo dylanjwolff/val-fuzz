@@ -51,6 +51,7 @@ const SKOLU: &'static str = "skolemize-universal";
 const NOSKOLE: &'static str = "no-skolemize-existential";
 const RELC: &'static str = "const-relations";
 const ADOMAIN: &'static str = "abstract-domain-vars";
+const ADOMAINE: &'static str = "abstract-domain-sub-expressions";
 const LEAFOPT: &'static str = "leaf-opt";
 const MINCONSTS: &'static str = "min-consts";
 const MAXCONSTS: &'static str = "max-consts";
@@ -134,6 +135,11 @@ fn main() {
             Arg::with_name(ADOMAIN)
                 .long(ADOMAIN)
                 .help("Use abstract domain constraints for variables (e.g. x == 0)"),
+        )
+        .arg(
+            Arg::with_name(ADOMAINE)
+                .long(ADOMAINE)
+                .help("Use abstract domain constraints for sub-expressions (e.g. (+ x 3) == 0)"),
         )
         .arg(
             Arg::with_name(RBASE)
@@ -258,6 +264,11 @@ fn main() {
         None => Duration::from_secs(6),
     };
 
+    assert!(
+        !matches.is_present(ADOMAINE) || matches.is_present(SKOLU),
+        "Expr Adomains can't have universal quantifiers"
+    );
+
     let cfg = Config {
         max_iter: max_iter,
         stack_size: stack_size,
@@ -267,6 +278,7 @@ fn main() {
         dont_skolemize_existential: matches.is_present(NOSKOLE),
         monitors_in_final: matches.is_present(EFFINAL) || matches.is_present(MFINAL),
         use_bdom_vs: matches.is_present(ADOMAIN),
+        adomain_exprs: matches.is_present(ADOMAINE),
         skolemize_universal: matches.is_present(SKOLU),
         leaf_opt: matches.is_present(LEAFOPT),
         cp_og: matches.is_present(CPOG),

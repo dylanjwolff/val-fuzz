@@ -1319,7 +1319,7 @@ fn bav_se(
                     cfg,
                 )?;
             }
-            if (bavs.len() <= before_exploration_num_bavs || !cfg.leaf_opt) && false {
+            if (bavs.len() <= before_exploration_num_bavs || !cfg.leaf_opt) && cfg.adomain_exprs {
                 let name = vng.get_name(Sort::Str());
                 bavs.push((name, sec, pre_uqvars));
             }
@@ -1340,7 +1340,7 @@ fn bav_se(
                     cfg,
                 )?;
             }
-            if (bavs.len() <= before_exploration_num_bavs || !cfg.leaf_opt) && false {
+            if (bavs.len() <= before_exploration_num_bavs || !cfg.leaf_opt) && cfg.adomain_exprs {
                 let name = vng.get_name(Sort::Dec());
                 bavs.push((name, sec, pre_uqvars));
             }
@@ -1361,7 +1361,7 @@ fn bav_se(
                     cfg,
                 )?;
             }
-            if (bavs.len() <= before_exploration_num_bavs || !cfg.leaf_opt) && false {
+            if (bavs.len() <= before_exploration_num_bavs || !cfg.leaf_opt) && cfg.adomain_exprs {
                 if let Some((e, m)) = fpsort {
                     let name = vng.get_name(Sort::Fp(e.clone(), m.clone()));
                     bavs.push((name, sec, pre_uqvars));
@@ -1559,6 +1559,24 @@ mod tests {
         let og_vars = p.get_all_global_var_bindings();
         let vrs = find_var_refs(&og_vars, &p);
         assert_debug_snapshot!(vrs);
+    }
+
+    #[test]
+    fn bav_w_expr_adom_snap() {
+        let str_script = "(declare-fun x () Real)(assert (< (+ 4 3) x))";
+        let mut p = script(str_script).unwrap().1;
+        let ba_str = ba_script(
+            &mut p,
+            &mut Metadata::new_empty(),
+            &Config {
+                adomain_exprs: true,
+                ..Config::default()
+            },
+        )
+        .unwrap()[0]
+            .to_string();
+
+        assert_display_snapshot!(ba_str);
     }
 
     #[test]
