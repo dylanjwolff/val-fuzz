@@ -411,8 +411,78 @@ pub fn get_bav_assign_fmt_str(bavns: &Vec<(String, Sort)>) -> Vec<CommandRc> {
     many_assert(&mut baveq)
 }
 
+fn find_var_refs(vars: &Vec<(Symbol, Sort)>, script: &Script) -> Vec<(Rcse, Sort)> {
+    let Script::Commands(cmds) = script;
+    let mut var_refs = Vec::new();
+    let m: BTreeMap<Symbol, Sort> = vars.iter().cloned().collect();
+    for cmd in cmds {
+        match &mut *cmd.borrow_mut() {
+            Command::Assert(s) | Command::CheckSatAssuming(s) => {
+                var_refs.extend(find_var_refs_sexp(&m, Rcse::NotBox(Rc::clone(s))))
+            }
+            _ => (),
+        }
+    }
+    var_refs
+}
+
+fn find_var_refs_sexp(vars: &BTreeMap<Symbol, Sort>, rcse: Rcse) -> Vec<(Rcse, Sort)> {
+    let current = rcse.clone();
+    let mut var_refs = Vec::new();
+    let inner = |sexp: &SExp| match sexp {
+        SExp::Symbol(s) => {
+            if vars.contains_key(&*s.borrow()) {
+                let sort = vars.get(&*s.borrow()).unwrap().clone();
+                var_refs.push((current, sort));
+            }
+            var_refs
+        }
+        SExp::Let(v, rest) => {
+            for (_, e) in v {
+                var_refs.extend(find_var_refs_sexp(vars, Rcse::NotBox(Rc::clone(e))))
+            }
+            var_refs.extend(find_var_refs_sexp(vars, Rcse::Box(Rc::clone(rest))));
+            var_refs
+        }
+        SExp::Compound(v)
+        | SExp::BExp(_, v)
+        | SExp::FPExp(_, _, v)
+        | SExp::NExp(_, v)
+        | SExp::StrExp(_, v) => {
+            for e in v {
+                var_refs.extend(find_var_refs_sexp(vars, Rcse::NotBox(Rc::clone(e))));
+            }
+            var_refs
+        }
+        SExp::QForAll(_, s) | SExp::QExists(_, s) => {
+            find_var_refs_sexp(vars, Rcse::Box(Rc::clone(s)))
+        }
+
+        SExp::Constant(_) => var_refs,
+    };
+
+    match rcse {
+        Rcse::NotBox(s) => inner(&*s.borrow()),
+        Rcse::Box(bs) => inner(&**bs.borrow()),
+    }
+}
+
 pub fn replace_constants_with_fresh_vars(script: &mut Script, md: &mut Metadata) -> io::Result<()> {
+    let max_consts = 10;
+    let min_consts = 5;
+
+    use rand::{seq::IteratorRandom, thread_rng}; // 0.6.1
+
+    let mut rng = thread_rng();
     let choles = choles(script);
+
+    let og_vars = script.get_all_global_var_bindings();
+    let var_refs = find_var_refs(&og_vars, &script);
+
+    if choles.len() < min_consts {
+        let concretizations = min_consts - choles.len();
+        let sample = var_refs.iter().choose_multiple(&mut rng, concretizations);
+    }
 
     if choles.len() == 0 {
         return liftio!(Err("No Constants to Replace!"));
@@ -1387,6 +1457,16 @@ mod tests {
 
         assert_display_snapshot!(s);
     }
+    #[test]
+    fn find_var_refs_snap() {
+        let str_script =
+            "(declare-fun y () Bool)(declare-fun x () Real)(assert (or y (< (+ x 3) x)))";
+        let mut p = script(str_script).unwrap().1;
+        let og_vars = p.get_all_global_var_bindings();
+        let vrs = find_var_refs(&og_vars, &p);
+        assert_debug_snapshot!(vrs);
+    }
+
     #[test]
     fn num_op_ba_script_snap() {
         let str_script = "(declare-fun x () Real)(assert (< (+ 4 3) x))";

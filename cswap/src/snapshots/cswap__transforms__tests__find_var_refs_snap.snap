@@ -1,0 +1,48 @@
+---
+source: cswap/src/transforms.rs
+expression: vrs
+---
+[
+    (
+        NotBox(
+            RefCell {
+                value: Symbol(
+                    RefCell {
+                        value: Token(
+                            "y",
+                        ),
+                    },
+                ),
+            },
+        ),
+        Bool,
+    ),
+    (
+        NotBox(
+            RefCell {
+                value: Symbol(
+                    RefCell {
+                        value: Token(
+                            "x",
+                        ),
+                    },
+                ),
+            },
+        ),
+        Dec,
+    ),
+    (
+        NotBox(
+            RefCell {
+                value: Symbol(
+                    RefCell {
+                        value: Token(
+                            "x",
+                        ),
+                    },
+                ),
+            },
+        ),
+        Dec,
+    ),
+]

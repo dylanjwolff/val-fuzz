@@ -71,6 +71,7 @@ Notes from going through cvc4/z3 issues:
 
 @TODO 21st September
 [] Concretize or Variablize 
+[] ADomains on Expressions and Vars
 [] Forall OG Vars   
 [] Actually monitor Coverage
     [] Unsat Core
