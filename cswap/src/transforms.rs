@@ -1304,7 +1304,10 @@ fn bav_se(
             }
             Ok(())
         }
-        SExp::StrExp(_, sexps) | SExp::NExp(_, sexps) | SExp::FPExp(_, _, sexps) => {
+        SExp::StrExp(strop, sexps) => {
+            let sec = SExp::StrExp(strop.clone(), sexps.clone());
+            let pre_uqvars = qvars.no_skolems.clone();
+            let before_exploration_num_bavs = bavs.len();
             for sexp in sexps {
                 bav_se(
                     false,
@@ -1315,6 +1318,54 @@ fn bav_se(
                     timer.clone(),
                     cfg,
                 )?;
+            }
+            if (bavs.len() <= before_exploration_num_bavs || !cfg.leaf_opt) && false {
+                let name = vng.get_name(Sort::Str());
+                bavs.push((name, sec, pre_uqvars));
+            }
+            Ok(())
+        }
+        SExp::NExp(numop, sexps) => {
+            let sec = SExp::NExp(numop.clone(), sexps.clone());
+            let pre_uqvars = qvars.no_skolems.clone();
+            let before_exploration_num_bavs = bavs.len();
+            for sexp in sexps {
+                bav_se(
+                    false,
+                    &mut *sexp.borrow_mut(),
+                    vng,
+                    bavs,
+                    qvars,
+                    timer.clone(),
+                    cfg,
+                )?;
+            }
+            if (bavs.len() <= before_exploration_num_bavs || !cfg.leaf_opt) && false {
+                let name = vng.get_name(Sort::Dec());
+                bavs.push((name, sec, pre_uqvars));
+            }
+            Ok(())
+        }
+        SExp::FPExp(fpop, fpsort, sexps) => {
+            let sec = SExp::FPExp(fpop.clone(), fpsort.clone(), sexps.clone());
+            let pre_uqvars = qvars.no_skolems.clone();
+            let before_exploration_num_bavs = bavs.len();
+            for sexp in sexps {
+                bav_se(
+                    false,
+                    &mut *sexp.borrow_mut(),
+                    vng,
+                    bavs,
+                    qvars,
+                    timer.clone(),
+                    cfg,
+                )?;
+            }
+            if (bavs.len() <= before_exploration_num_bavs || !cfg.leaf_opt) && false {
+                if let Some((e, m)) = fpsort {
+                    let name = vng.get_name(Sort::Fp(e.clone(), m.clone()));
+                    bavs.push((name, sec, pre_uqvars));
+                }
             }
             Ok(())
         }
