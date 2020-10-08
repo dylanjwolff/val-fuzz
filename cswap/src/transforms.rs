@@ -8,6 +8,8 @@ use crate::utils::RandUniqPermGen;
 use crate::Metadata;
 use crate::Timer;
 use log::warn;
+use rand_xoshiro::rand_core::SeedableRng;
+use rand_xoshiro::Xoshiro256Plus;
 use std::cell::RefCell;
 use std::collections::BTreeMap;
 
@@ -467,29 +469,35 @@ fn find_var_refs_sexp(vars: &BTreeMap<Symbol, Sort>, rcse: Rcse) -> Vec<(Rcse, S
     }
 }
 
-pub fn replace_constants_with_fresh_vars(script: &mut Script, md: &mut Metadata) -> io::Result<()> {
-    let max_consts = 10;
-    let min_consts = 0;
-
+pub fn replace_constants_with_fresh_vars(
+    script: &mut Script,
+    md: &mut Metadata,
+    cfg: &Config,
+) -> io::Result<()> {
     use rand::{seq::IteratorRandom, thread_rng}; // 0.6.1
 
-    let mut rng = thread_rng();
+    let mut rng = Xoshiro256Plus::seed_from_u64(cfg.get_specific_seed(&md.seed_file));
     let mut choles = choles(script);
 
     let og_vars = script.get_all_global_var_bindings();
     let var_refs = find_var_refs(&og_vars, &script);
 
-    if choles.len() < min_consts {
-        let concretizations = min_consts - choles.len();
+    if choles.len() < cfg.min_consts {
+        let concretizations = cfg.min_consts - choles.len();
         let sample: Vec<(Rcse, Sort)> = var_refs
             .into_iter()
             .choose_multiple(&mut rng, concretizations);
         choles.extend(sample);
     }
 
-    if choles.len() > max_consts {
-        choles = choles.into_iter().choose_multiple(&mut rng, max_consts);
-    }
+    match cfg.max_consts {
+        Some(max_consts) => {
+            if choles.len() > max_consts {
+                choles = choles.into_iter().choose_multiple(&mut rng, max_consts);
+            }
+        }
+        None => (),
+    };
 
     if choles.len() == 0 {
         return liftio!(Err("No Constants to Replace!"));
@@ -1464,6 +1472,34 @@ mod tests {
 
         assert_display_snapshot!(s);
     }
+    #[test]
+    fn concretize_snap() {
+        let str_script =
+            "(declare-fun y () Bool)(declare-fun x () Real)(assert (or y (< (+ x 3) x)))";
+        let mut p = script(str_script).unwrap().1;
+        let cfg = Config {
+            min_consts: 2,
+            ..Config::default()
+        };
+        let mut md = Metadata::new_empty();
+        replace_constants_with_fresh_vars(&mut p, &mut md, &cfg).unwrap();
+        assert_display_snapshot!(p);
+    }
+
+    #[test]
+    fn max_consts_snap() {
+        let str_script =
+            "(declare-fun y () Bool)(declare-fun x () Real)(assert (or y (< (+ x 3) 7.0)))";
+        let mut p = script(str_script).unwrap().1;
+        let cfg = Config {
+            max_consts: Some(1),
+            ..Config::default()
+        };
+        let mut md = Metadata::new_empty();
+        replace_constants_with_fresh_vars(&mut p, &mut md, &cfg).unwrap();
+        assert_display_snapshot!(p);
+    }
+
     #[test]
     fn find_var_refs_snap() {
         let str_script =

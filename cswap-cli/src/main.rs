@@ -52,6 +52,8 @@ const NOSKOLE: &'static str = "no-skolemize-existential";
 const RELC: &'static str = "const-relations";
 const ADOMAIN: &'static str = "abstract-domain-vars";
 const LEAFOPT: &'static str = "leaf-opt";
+const MINCONSTS: &'static str = "min-consts";
+const MAXCONSTS: &'static str = "max-consts";
 
 fn main() {
     let matches: ArgMatches = App::new("Value Constant Mutation Fuzzer for SMTlib2 Solvers")
@@ -83,6 +85,17 @@ fn main() {
             Arg::with_name(MULTIEF)
                 .long(MULTIEF)
                 .help("Enforce 'n' constraints on the meta-formula")
+                .takes_value(true),
+        )
+        .arg(
+            Arg::with_name(MINCONSTS)
+                .long(MINCONSTS)
+                .help("Attempts to ensure each formula has at least 'n' constant values by concretizing variables to be constants")
+                .takes_value(true),
+        ).arg(
+            Arg::with_name(MAXCONSTS)
+                .long(MAXCONSTS)
+                .help("Ensures that each formula uses only up to 'n' constants for value mutations")
                 .takes_value(true),
         )
         .arg(
@@ -215,6 +228,24 @@ fn main() {
         None => 1,
     };
 
+    let min_consts = match matches.value_of(MINCONSTS) {
+        Some(s) => s.parse::<usize>().unwrap(),
+        None => 0,
+    };
+
+    let max_consts = match matches.value_of(MAXCONSTS) {
+        Some(s) => {
+            let mc = s.parse::<usize>().unwrap();
+            assert!(
+                mc >= min_consts,
+                "Max Constants must be greater than the minimum number of constants"
+            );
+            Some(mc)
+        }
+
+        None => None,
+    };
+
     let rel_cs = match matches.value_of(RELC) {
         Some(s) => s.parse::<u8>().unwrap(),
         None => 0,
@@ -240,6 +271,8 @@ fn main() {
         leaf_opt: matches.is_present(LEAFOPT),
         cp_og: matches.is_present(CPOG),
         enforce_on_resub: matches.is_present(EFFINAL),
+        max_consts,
+        min_consts,
         timeout,
         profiles,
         ..Config::default()

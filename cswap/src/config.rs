@@ -35,6 +35,8 @@ pub struct Config {
     pub skolemize_universal: bool,
     pub leaf_opt: bool,
     pub cp_og: bool,
+    pub min_consts: usize,
+    pub max_consts: Option<usize>,
     pub timeout: Duration,
 }
 
@@ -70,6 +72,8 @@ impl Config {
             dont_skolemize_existential: false,
             leaf_opt: false,
             cp_og: false,
+            min_consts: 0,
+            max_consts: None,
             timeout: Duration::from_secs(6),
         }
     }
