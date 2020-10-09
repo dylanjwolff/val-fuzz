@@ -30,10 +30,17 @@ flags = {}
 # flags["LEAFLINEAR"] = "--leaf-opt --copy-original --abstract-domain-vars"
 # flags["RELC3"] = "--const-relations 3"
 # flags["RELC4"] = "--const-relations 4"
-flags["EXP"] = "--const-relations 3 --multi-enforce 7"
-flags["LEAFEXP"] = "--leaf-opt --const-relations 3 --multi-enforce 7"
-flags["SOUND"] = "--abstract-domain-vars --const-relations 3 --multi-enforce 7"
-flags["LEAFSOUND"] = "--leaf-opt --abstract-domain-vars --const-relations 3 --multi-enforce 7"
+# flags["EXP"] = "--const-relations 3 --multi-enforce 7"
+# flags["LEAFEXP"] = "--leaf-opt --const-relations 3 --multi-enforce 7"
+# flags["SOUND"] = "--abstract-domain-vars --const-relations 3 --multi-enforce 7"
+# flags["LEAFSOUND"] = "--leaf-opt --abstract-domain-vars --const-relations 3 --multi-enforce 7"
+#flags["UQUALOG"] = "--uqual-og-vars"
+flags["ADOMAINE"] = "--abstract-domain-sub-expressions"
+#flags["MINCONSTS1"] = "--min-consts 1"
+#flags["MINCONSTS3"] = "--min-consts 3"
+#flags["MINCONSTS5"] = "--min-consts 5"
+#flags["MAXCONSTS5"] = "--max-consts 5"
+#flags["MAXCONSTS10"] = "--max-consts 10"
 
 configs = flags
 reps = range(0,30)
@@ -114,7 +121,7 @@ for config_tag, options in tqdm(configs.items()):
                             reprods[rep][solver_sfs] = "SOUND" 
                         elif reprods[rep][solver_sfs] != "SOUND":
                             reprods[rep][solver_sfs] = "BUG" 
-            cmdstr = "rm -r " + str(rep) + "-cswap-fuzz-run-out"
+            cmdstr = "rm -r *" + str(rep) + "-cswap-fuzz-run-out"
             sp.getoutput(cmdstr)
 
     reprocats = CategoricalDtype(categories=["BUG", "SOUND", "NOREPRO"])

@@ -275,7 +275,7 @@ fn main() {
     );
 
     assert!(
-        !matches.is_present(ADOMAINE) || matches.is_present(UQUALOGVARS),
+        !(matches.is_present(ADOMAINE) && matches.is_present(UQUALOGVARS)),
         "Expr Adomains can't have universal quantifiers (from --uqual-og-vars)"
     );
 
