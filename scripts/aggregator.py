@@ -12,12 +12,16 @@ from scipy.stats import ttest_ind_from_stats
 def bug_filter():
     rbs = pd.read_csv("RBASE_SINGLE.csv")
     all_bugs = (rbs == "BUG").all()
-    return list(all_bugs[all_bugs == True].index)
+    l = list(all_bugs[all_bugs == True].index)
+    print(str(len(l)) + " bugs are trivial")
+    return l
 
 def sound_filter():
     rbs = pd.read_csv("RBASE_SINGLE.csv")
     all_bugs = (rbs == "SOUND").all()
-    return list(all_bugs[all_bugs == True].index)
+    l = list(all_bugs[all_bugs == True].index)
+    print(str(len(l)) + " soundness bugs are trivial")
+    return l
 
 
 cmdstr = "ls *.csv"

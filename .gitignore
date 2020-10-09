@@ -7,3 +7,6 @@ bin
 .solvers
 z3.log
 venv
+**/*.csv
+**/*.txt
+scripts/results
