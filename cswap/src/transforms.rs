@@ -552,11 +552,11 @@ pub fn grab_all_decls(script: &Script) -> Vec<CommandRc> {
 pub fn ba_script(script: &mut Script, md: &mut Metadata, cfg: &Config) -> io::Result<Vec<Script>> {
     let mut decls = grab_all_decls(script);
 
-    let og_vars = script
+    let og_vars: Vec<(Symbol, Sort)> = script
         .get_all_global_var_bindings()
         .into_iter()
-        .map(|(a, b)| (a.to_string(), b))
-        .filter(|(name, _sort)| !name.contains("GEN")); // TODO dont do string compares here
+        .filter(|(sym, sort)| !sym.to_string().contains("GEN"))
+        .collect(); // TODO dont do string compares here
 
     let mut qual_inits = rl(script, &cfg)?;
 
@@ -571,7 +571,14 @@ pub fn ba_script(script: &mut Script, md: &mut Metadata, cfg: &Config) -> io::Re
         .filter(|(name, _sort)| !name.contains("REPL")); // TODO move quantifiers into same step as "let" replacement to avoid this
 
     let bavns = if cfg.use_bdom_vs {
-        bavns_i.chain(og_vars).collect()
+        bavns_i
+            .chain(
+                og_vars
+                    .clone()
+                    .into_iter()
+                    .map(|(sym, sort)| (sym.to_string(), sort)),
+            )
+            .collect()
     } else {
         bavns_i.collect()
     };
@@ -599,6 +606,19 @@ pub fn ba_script(script: &mut Script, md: &mut Metadata, cfg: &Config) -> io::Re
     decls.append(&mut qual_inits);
     decls.append(&mut bdom_inits);
     decls.append(&mut inter_inits);
+
+    if false {
+        let add_og_as_qual = (
+            og_vars
+                .into_iter()
+                .map(|(sym, sort)| (rccell!(sym), rccell!(sort)))
+                .collect(),
+            Q::ForAll(),
+        );
+        for bav in bavs.iter_mut() {
+            bav.2.push(add_og_as_qual.clone());
+        }
+    }
 
     let mut ba = get_boolean_abstraction(bavs);
     let mut iscript = script.invert();
