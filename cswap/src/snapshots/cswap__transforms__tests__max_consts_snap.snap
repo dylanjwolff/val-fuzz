@@ -1,0 +1,9 @@
+---
+source: cswap/src/transforms.rs
+expression: p
+---
+(declare-const GEN1 Int)
+(declare-fun y () Bool)
+(declare-fun x () Real)
+(assert (or y (< (+ x GEN1) 7.0)))
+

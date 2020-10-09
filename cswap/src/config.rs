@@ -3,6 +3,7 @@ use std::fs;
 use std::io;
 use std::path::Path;
 use std::path::PathBuf;
+use std::time::Duration;
 
 use crate::ast::Sort;
 
@@ -29,11 +30,16 @@ pub struct Config {
     pub monitors_in_final: bool,
     pub enforce_on_resub: bool,
     pub use_bdom_vs: bool,
+    pub uqual_og_vars: bool,
+    pub adomain_exprs: bool,
     pub max_const_relations_to_monitor: u8,
     pub dont_skolemize_existential: bool,
     pub skolemize_universal: bool,
     pub leaf_opt: bool,
     pub cp_og: bool,
+    pub min_consts: usize,
+    pub max_consts: Option<usize>,
+    pub timeout: Duration,
 }
 
 #[macro_export]
@@ -63,11 +69,16 @@ impl Config {
             monitors_in_final: false,
             enforce_on_resub: false,
             use_bdom_vs: false,
+            uqual_og_vars: false,
+            adomain_exprs: false,
             max_const_relations_to_monitor: 0,
             skolemize_universal: false,
             dont_skolemize_existential: false,
             leaf_opt: false,
             cp_og: false,
+            min_consts: 0,
+            max_consts: None,
+            timeout: Duration::from_secs(6),
         }
     }
 
@@ -120,6 +131,20 @@ impl FileProvider {
 
     pub fn new(dirname: &str) -> FileProvider {
         FileProvider::new_existing(dirname, false)
+    }
+
+    pub fn new_unique(dirname: &str) -> FileProvider {
+        let td = Builder::new()
+            .prefix("")
+            .rand_bytes(32)
+            .suffix(&("_".to_string() + dirname))
+            .tempdir_in(Path::new("."))
+            .expect("Tempdir should be able to be created")
+            .into_path();
+        FileProvider::new_existing(
+            td.to_str().expect("Path to dir should be valid string"),
+            true,
+        )
     }
 
     pub fn og_w_monitors<'a>(&self, md: &'a mut Metadata) -> io::Result<PathBuf> {

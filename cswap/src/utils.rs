@@ -7,15 +7,17 @@ use rand::Rng;
 use rand_xoshiro::rand_core::SeedableRng;
 use rand_xoshiro::Xoshiro256Plus;
 
+use crate::ast::Sort;
 use std::cmp::Ord;
 use std::collections::BTreeMap;
 use std::collections::BTreeSet;
 
 use crate::solver::all_non_err_timed_out;
 use crate::solver::RSolve;
-use serde::ser::{Serialize, SerializeStruct, Serializer};
+use serde::ser::{Serialize, SerializeMap, SerializeStruct, Serializer};
 use std::cmp::min;
 use std::collections::hash_map::DefaultHasher;
+use std::collections::HashMap;
 use std::collections::HashSet;
 use std::fmt;
 use std::hash::Hash;
@@ -25,6 +27,7 @@ use std::thread;
 use std::time::Duration;
 use std::time::SystemTime;
 
+#[derive(Clone, Eq, PartialEq)]
 pub struct HashHashSet {
     inner: HashSet<u64>,
 }
@@ -41,6 +44,26 @@ impl HashHashSet {
         item.hash(&mut s);
         self.inner.insert(s.finish())
     }
+
+    pub fn len(&self) -> usize {
+        self.inner.len()
+    }
+
+    pub fn merge(&mut self, other: Self) {
+        self.inner.extend(other.inner);
+    }
+}
+
+impl fmt::Debug for HashHashSet {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        write!(f, "Set of Size {}", self.inner.len())
+    }
+}
+
+impl fmt::Display for HashHashSet {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        write!(f, "Set of Size {}", self.inner.len())
+    }
 }
 
 #[derive(Eq, PartialEq, Clone)]
@@ -52,11 +75,115 @@ pub struct RunStats {
     has_sats: (u64, u64),
     has_unsats: (u64, u64),
     all_err: (u64, u64),
+    pub coverage: BSECoverages,
 }
 
 impl fmt::Debug for RunStats {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         write!(f, "RunStats: {{ iter_subs: {:?}, unique_subs: {:?}, has_sats: {:?}, has_unsats: {:?}, all_non_errs_are_timeouts: {:?}, all_err: {:?} }}", self.iter_subs, self.unique_subs.len(), self.has_sats, self.has_unsats,self.all_non_errs_are_timeouts, self.all_err)
+    }
+}
+
+#[derive(Clone, Eq, PartialEq)]
+pub struct BSECoverages {
+    inner: HashMap<String, HashMap<String, HashHashSet>>,
+}
+
+type VarName = String;
+type VarValStr = String;
+type SolverConfigStr = String;
+type SeedFileNameStr = String;
+
+impl BSECoverages {
+    fn new() -> Self {
+        BSECoverages {
+            inner: HashMap::new(),
+        }
+    }
+
+    fn extend(&mut self, other: &Self) {
+        for (k, v) in other.inner.iter() {
+            if self.inner.contains_key(k) {
+                for (ik, iv) in other.inner.get(k).unwrap() {
+                    if self.inner.get(k).unwrap().contains_key(ik) {
+                        self.inner
+                            .get_mut(k)
+                            .unwrap()
+                            .get_mut(ik)
+                            .unwrap()
+                            .merge(iv.clone())
+                    } else {
+                        self.inner
+                            .get_mut(k)
+                            .unwrap()
+                            .insert(ik.clone(), iv.clone());
+                    }
+                }
+            } else {
+                self.inner.insert(k.clone(), v.clone());
+            }
+        }
+    }
+
+    pub fn log_check_coverage(
+        &mut self,
+        results: &Vec<RSolve>,
+        coverage_vars: &Vec<(String, Sort)>,
+        seed_file: SeedFileNameStr,
+    ) {
+        let mut all_file_coverages = &mut self.inner;
+        let (cnames, _evals): (Vec<_>, Vec<_>) = coverage_vars.iter().cloned().unzip();
+
+        let strress = results
+            .iter()
+            .filter(|r| r.has_sat() && !r.has_unrecoverable_error())
+            .for_each(|result| {
+                let rvarstrs = result
+                    .extract_const_var_vals(&cnames)
+                    .into_iter()
+                    .map(|(sym, sexp)| (sym.to_string(), sexp.to_string()));
+
+                let filtered = rvarstrs
+                    .filter(|(name, _strval)| cnames.contains(name))
+                    .collect::<BTreeMap<VarName, VarValStr>>();
+
+                let solver = result.solver.to_string();
+                let mut coverages = all_file_coverages.entry(solver).or_insert(HashMap::new());
+
+                coverages
+                    .entry(seed_file.clone())
+                    .or_insert(HashHashSet::new())
+                    .insert(&filtered);
+            });
+    }
+}
+
+impl fmt::Debug for BSECoverages {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(f, "{{",)?;
+        for (solver, file_covers) in self.inner.iter() {
+            let scov = file_covers
+                .iter()
+                .fold(0, |acc, (_f, fcov)| fcov.len() + acc);
+            write!(f, "{}: {},", solver, scov)?;
+        }
+        write!(f, "}}",)
+    }
+}
+
+impl Serialize for BSECoverages {
+    fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
+    where
+        S: Serializer,
+    {
+        let mut map = serializer.serialize_map(None)?;
+        for (solver, file_covers) in self.inner.iter() {
+            let scov = file_covers
+                .iter()
+                .fold(0, |acc, (_f, fcov)| fcov.len() + acc);
+            map.serialize_entry(&solver, &scov)?;
+        }
+        map.end()
     }
 }
 
@@ -70,6 +197,7 @@ impl RunStats {
             has_sats: (0, 0),
             has_unsats: (0, 0),
             all_err: (0, 0),
+            coverage: BSECoverages::new(),
         }
     }
 
@@ -128,6 +256,7 @@ impl RunStats {
             .union(&other.unique_subs)
             .cloned()
             .collect();
+        self.coverage.extend(&other.coverage);
     }
 }
 
@@ -157,6 +286,7 @@ impl Serialize for RunStats {
         )?;
         state.serialize_field("All Errors on Iterations", &self.all_err.0)?;
         state.serialize_field("All Errors on Substitution", &self.all_err.1)?;
+        state.serialize_field("Coverages", &self.coverage)?;
         state.end()
     }
 }

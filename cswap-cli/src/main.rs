@@ -10,6 +10,7 @@ use log::LevelFilter;
 use log4rs::append::console::ConsoleAppender;
 use log4rs::config::Config as L4rsConfig;
 use log4rs::config::{Appender, Logger, Root};
+use std::time::Duration;
 
 use clap::App;
 use clap::Arg;
@@ -29,6 +30,9 @@ use std::thread;
 use std::thread::JoinHandle;
 use std::time::SystemTime;
 
+const UQUALOGVARS: &'static str = "uqual-og-vars";
+const MFINAL: &'static str = "monitors-in-final";
+const TIMEOUT: &'static str = "timeout";
 const KEEP_FILES: &'static str = "keep-files";
 const STACK_SIZE: &'static str = "stack-size";
 const DIR: &'static str = "Seed/Skeleton Directory";
@@ -48,7 +52,10 @@ const SKOLU: &'static str = "skolemize-universal";
 const NOSKOLE: &'static str = "no-skolemize-existential";
 const RELC: &'static str = "const-relations";
 const ADOMAIN: &'static str = "abstract-domain-vars";
+const ADOMAINE: &'static str = "abstract-domain-sub-expressions";
 const LEAFOPT: &'static str = "leaf-opt";
+const MINCONSTS: &'static str = "min-consts";
+const MAXCONSTS: &'static str = "max-consts";
 
 fn main() {
     let matches: ArgMatches = App::new("Value Constant Mutation Fuzzer for SMTlib2 Solvers")
@@ -70,16 +77,41 @@ fn main() {
                 .help("Use skeleton files from pre-processing or previous run"),
         )
         .arg(
+            Arg::with_name(TIMEOUT)
+                .long(TIMEOUT)
+                .help("Sets the default timeout for calls to the solver")
+                .short("t")
+                .takes_value(true),
+        )
+        .arg(
             Arg::with_name(MULTIEF)
                 .long(MULTIEF)
                 .help("Enforce 'n' constraints on the meta-formula")
                 .takes_value(true),
         )
         .arg(
+            Arg::with_name(MINCONSTS)
+                .long(MINCONSTS)
+                .help("Attempts to ensure each formula has at least 'n' constant values by concretizing variables to be constants")
+                .takes_value(true),
+        ).arg(
+            Arg::with_name(MAXCONSTS)
+                .long(MAXCONSTS)
+                .help("Ensures that each formula uses only up to 'n' constants for value mutations")
+                .takes_value(true),
+        )
+        .arg(
+            Arg::with_name(UQUALOGVARS)
+                .long(UQUALOGVARS)
+                .help("Universally quantify original variables from the formula in the 'skeleton'"),
+        ).arg(
             Arg::with_name(EFFINAL)
                 .long(EFFINAL)
                 .help("Enforce constraints on the final call to solvers"),
         )
+        .arg(Arg::with_name(MFINAL).long(MFINAL).help(
+            "Include monitor variables in final formula for e.g. boolean sub-exp coverage metrics",
+        ))
         .arg(Arg::with_name(CPOG).long(CPOG).help(
             "Copy the original formula and its negation to create two meta-formulas per seed",
         ))
@@ -108,6 +140,11 @@ fn main() {
             Arg::with_name(ADOMAIN)
                 .long(ADOMAIN)
                 .help("Use abstract domain constraints for variables (e.g. x == 0)"),
+        )
+        .arg(
+            Arg::with_name(ADOMAINE)
+                .long(ADOMAINE)
+                .help("Use abstract domain constraints for sub-expressions (e.g. (+ x 3) == 0)"),
         )
         .arg(
             Arg::with_name(RBASE)
@@ -202,10 +239,50 @@ fn main() {
         None => 1,
     };
 
+    let min_consts = match matches.value_of(MINCONSTS) {
+        Some(s) => s.parse::<usize>().unwrap(),
+        None => 0,
+    };
+
+    let max_consts = match matches.value_of(MAXCONSTS) {
+        Some(s) => {
+            let mc = s.parse::<usize>().unwrap();
+            assert!(
+                mc >= min_consts,
+                "Max Constants must be greater than the minimum number of constants"
+            );
+            Some(mc)
+        }
+
+        None => None,
+    };
+
     let rel_cs = match matches.value_of(RELC) {
         Some(s) => s.parse::<u8>().unwrap(),
         None => 0,
     };
+
+    let timeout = match matches.value_of(TIMEOUT) {
+        Some(s) => {
+            Duration::from_secs(s.parse::<u8>().expect("Timeout should be small number") as u64)
+        }
+        None => Duration::from_secs(6),
+    };
+
+    assert!(
+        !matches.is_present(ADOMAINE) || matches.is_present(SKOLU),
+        "Expr Adomains can't have universal quantifiers (need --skolemize-universals)"
+    );
+
+    assert!(
+        !matches.is_present(ADOMAINE) || matches.is_present(UQUALOGVARS),
+        "Expr Adomains can't have universal quantifiers (from --uqual-og-vars)"
+    );
+
+    assert!(
+        !(matches.is_present(UQUALOGVARS) && matches.is_present(ADOMAIN)),
+        "OG Var Domains doesn't make sense with universally quantified OG Vars"
+    );
 
     let cfg = Config {
         max_iter: max_iter,
@@ -214,12 +291,17 @@ fn main() {
         mask_size: enforce_mask_size,
         max_const_relations_to_monitor: rel_cs,
         dont_skolemize_existential: matches.is_present(NOSKOLE),
-        monitors_in_final: matches.is_present(EFFINAL),
+        monitors_in_final: matches.is_present(EFFINAL) || matches.is_present(MFINAL),
         use_bdom_vs: matches.is_present(ADOMAIN),
+        adomain_exprs: matches.is_present(ADOMAINE),
         skolemize_universal: matches.is_present(SKOLU),
         leaf_opt: matches.is_present(LEAFOPT),
         cp_og: matches.is_present(CPOG),
         enforce_on_resub: matches.is_present(EFFINAL),
+        uqual_og_vars: matches.is_present(UQUALOGVARS),
+        max_consts,
+        min_consts,
+        timeout,
         profiles,
         ..Config::default()
     };
@@ -242,7 +324,7 @@ fn main() {
         .iter()
         .map(|seed| {
             let dir_name = dir_name.to_owned();
-            let fp = FileProvider::new(&(seed.to_string() + "-cswap-fuzz-run-out"));
+            let fp = FileProvider::new_unique(&(seed.to_string() + "-cswap-fuzz-run-out"));
             let cfg = Config {
                 rng_seed: *seed,
                 file_provider: fp,

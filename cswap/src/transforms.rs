@@ -8,6 +8,8 @@ use crate::utils::RandUniqPermGen;
 use crate::Metadata;
 use crate::Timer;
 use log::warn;
+use rand_xoshiro::rand_core::SeedableRng;
+use rand_xoshiro::Xoshiro256Plus;
 use std::cell::RefCell;
 use std::collections::BTreeMap;
 
@@ -411,8 +413,91 @@ pub fn get_bav_assign_fmt_str(bavns: &Vec<(String, Sort)>) -> Vec<CommandRc> {
     many_assert(&mut baveq)
 }
 
-pub fn replace_constants_with_fresh_vars(script: &mut Script, md: &mut Metadata) -> io::Result<()> {
-    let choles = choles(script);
+fn find_var_refs(vars: &Vec<(Symbol, Sort)>, script: &Script) -> Vec<(Rcse, Sort)> {
+    let Script::Commands(cmds) = script;
+    let mut var_refs = Vec::new();
+    let m: BTreeMap<Symbol, Sort> = vars.iter().cloned().collect();
+    for cmd in cmds {
+        match &mut *cmd.borrow_mut() {
+            Command::Assert(s) | Command::CheckSatAssuming(s) => {
+                var_refs.extend(find_var_refs_sexp(&m, Rcse::NotBox(Rc::clone(s))))
+            }
+            _ => (),
+        }
+    }
+    var_refs
+}
+
+fn find_var_refs_sexp(vars: &BTreeMap<Symbol, Sort>, rcse: Rcse) -> Vec<(Rcse, Sort)> {
+    let current = rcse.clone();
+    let mut var_refs = Vec::new();
+    let inner = |sexp: &SExp| match sexp {
+        SExp::Symbol(s) => {
+            if vars.contains_key(&*s.borrow()) {
+                let sort = vars.get(&*s.borrow()).unwrap().clone();
+                var_refs.push((current, sort));
+            }
+            var_refs
+        }
+        SExp::Let(v, rest) => {
+            for (_, e) in v {
+                var_refs.extend(find_var_refs_sexp(vars, Rcse::NotBox(Rc::clone(e))))
+            }
+            var_refs.extend(find_var_refs_sexp(vars, Rcse::Box(Rc::clone(rest))));
+            var_refs
+        }
+        SExp::Compound(v)
+        | SExp::BExp(_, v)
+        | SExp::FPExp(_, _, v)
+        | SExp::NExp(_, v)
+        | SExp::StrExp(_, v) => {
+            for e in v {
+                var_refs.extend(find_var_refs_sexp(vars, Rcse::NotBox(Rc::clone(e))));
+            }
+            var_refs
+        }
+        SExp::QForAll(_, s) | SExp::QExists(_, s) => {
+            find_var_refs_sexp(vars, Rcse::Box(Rc::clone(s)))
+        }
+
+        SExp::Constant(_) => var_refs,
+    };
+
+    match rcse {
+        Rcse::NotBox(s) => inner(&*s.borrow()),
+        Rcse::Box(bs) => inner(&**bs.borrow()),
+    }
+}
+
+pub fn replace_constants_with_fresh_vars(
+    script: &mut Script,
+    md: &mut Metadata,
+    cfg: &Config,
+) -> io::Result<()> {
+    use rand::{seq::IteratorRandom, thread_rng}; // 0.6.1
+
+    let mut rng = Xoshiro256Plus::seed_from_u64(cfg.get_specific_seed(&md.seed_file));
+    let mut choles = choles(script);
+
+    let og_vars = script.get_all_global_var_bindings();
+    let var_refs = find_var_refs(&og_vars, &script);
+
+    if choles.len() < cfg.min_consts {
+        let concretizations = cfg.min_consts - choles.len();
+        let sample: Vec<(Rcse, Sort)> = var_refs
+            .into_iter()
+            .choose_multiple(&mut rng, concretizations);
+        choles.extend(sample);
+    }
+
+    match cfg.max_consts {
+        Some(max_consts) => {
+            if choles.len() > max_consts {
+                choles = choles.into_iter().choose_multiple(&mut rng, max_consts);
+            }
+        }
+        None => (),
+    };
 
     if choles.len() == 0 {
         return liftio!(Err("No Constants to Replace!"));
@@ -467,11 +552,11 @@ pub fn grab_all_decls(script: &Script) -> Vec<CommandRc> {
 pub fn ba_script(script: &mut Script, md: &mut Metadata, cfg: &Config) -> io::Result<Vec<Script>> {
     let mut decls = grab_all_decls(script);
 
-    let og_vars = script
+    let og_vars: Vec<(Symbol, Sort)> = script
         .get_all_global_var_bindings()
         .into_iter()
-        .map(|(a, b)| (a.to_string(), b))
-        .filter(|(name, _sort)| !name.contains("GEN")); // TODO dont do string compares here
+        .filter(|(sym, sort)| !sym.to_string().contains("GEN"))
+        .collect(); // TODO dont do string compares here
 
     let mut qual_inits = rl(script, &cfg)?;
 
@@ -486,7 +571,14 @@ pub fn ba_script(script: &mut Script, md: &mut Metadata, cfg: &Config) -> io::Re
         .filter(|(name, _sort)| !name.contains("REPL")); // TODO move quantifiers into same step as "let" replacement to avoid this
 
     let bavns = if cfg.use_bdom_vs {
-        bavns_i.chain(og_vars).collect()
+        bavns_i
+            .chain(
+                og_vars
+                    .clone()
+                    .into_iter()
+                    .map(|(sym, sort)| (sym.to_string(), sort)),
+            )
+            .collect()
     } else {
         bavns_i.collect()
     };
@@ -514,6 +606,19 @@ pub fn ba_script(script: &mut Script, md: &mut Metadata, cfg: &Config) -> io::Re
     decls.append(&mut qual_inits);
     decls.append(&mut bdom_inits);
     decls.append(&mut inter_inits);
+
+    if cfg.uqual_og_vars {
+        let add_og_as_qual = (
+            og_vars
+                .into_iter()
+                .map(|(sym, sort)| (rccell!(sym), rccell!(sort)))
+                .collect(),
+            Q::ForAll(),
+        );
+        for bav in bavs.iter_mut() {
+            bav.2.push(add_og_as_qual.clone());
+        }
+    }
 
     let mut ba = get_boolean_abstraction(bavs);
     let mut iscript = script.invert();
@@ -1219,7 +1324,10 @@ fn bav_se(
             }
             Ok(())
         }
-        SExp::StrExp(_, sexps) | SExp::NExp(_, sexps) | SExp::FPExp(_, _, sexps) => {
+        SExp::StrExp(strop, sexps) => {
+            let sec = SExp::StrExp(strop.clone(), sexps.clone());
+            let pre_uqvars = qvars.no_skolems.clone();
+            let before_exploration_num_bavs = bavs.len();
             for sexp in sexps {
                 bav_se(
                     false,
@@ -1230,6 +1338,54 @@ fn bav_se(
                     timer.clone(),
                     cfg,
                 )?;
+            }
+            if (bavs.len() <= before_exploration_num_bavs || !cfg.leaf_opt) && cfg.adomain_exprs {
+                let name = vng.get_name(Sort::Str());
+                bavs.push((name, sec, pre_uqvars));
+            }
+            Ok(())
+        }
+        SExp::NExp(numop, sexps) => {
+            let sec = SExp::NExp(numop.clone(), sexps.clone());
+            let pre_uqvars = qvars.no_skolems.clone();
+            let before_exploration_num_bavs = bavs.len();
+            for sexp in sexps {
+                bav_se(
+                    false,
+                    &mut *sexp.borrow_mut(),
+                    vng,
+                    bavs,
+                    qvars,
+                    timer.clone(),
+                    cfg,
+                )?;
+            }
+            if (bavs.len() <= before_exploration_num_bavs || !cfg.leaf_opt) && cfg.adomain_exprs {
+                let name = vng.get_name(Sort::Dec());
+                bavs.push((name, sec, pre_uqvars));
+            }
+            Ok(())
+        }
+        SExp::FPExp(fpop, fpsort, sexps) => {
+            let sec = SExp::FPExp(fpop.clone(), fpsort.clone(), sexps.clone());
+            let pre_uqvars = qvars.no_skolems.clone();
+            let before_exploration_num_bavs = bavs.len();
+            for sexp in sexps {
+                bav_se(
+                    false,
+                    &mut *sexp.borrow_mut(),
+                    vng,
+                    bavs,
+                    qvars,
+                    timer.clone(),
+                    cfg,
+                )?;
+            }
+            if (bavs.len() <= before_exploration_num_bavs || !cfg.leaf_opt) && cfg.adomain_exprs {
+                if let Some((e, m)) = fpsort {
+                    let name = vng.get_name(Sort::Fp(e.clone(), m.clone()));
+                    bavs.push((name, sec, pre_uqvars));
+                }
             }
             Ok(())
         }
@@ -1387,6 +1543,80 @@ mod tests {
 
         assert_display_snapshot!(s);
     }
+    #[test]
+    fn concretize_snap() {
+        let str_script =
+            "(declare-fun y () Bool)(declare-fun x () Real)(assert (or y (< (+ x 3) x)))";
+        let mut p = script(str_script).unwrap().1;
+        let cfg = Config {
+            min_consts: 2,
+            ..Config::default()
+        };
+        let mut md = Metadata::new_empty();
+        replace_constants_with_fresh_vars(&mut p, &mut md, &cfg).unwrap();
+        assert_display_snapshot!(p);
+    }
+
+    #[test]
+    fn max_consts_snap() {
+        let str_script =
+            "(declare-fun y () Bool)(declare-fun x () Real)(assert (or y (< (+ x 3) 7.0)))";
+        let mut p = script(str_script).unwrap().1;
+        let cfg = Config {
+            max_consts: Some(1),
+            ..Config::default()
+        };
+        let mut md = Metadata::new_empty();
+        replace_constants_with_fresh_vars(&mut p, &mut md, &cfg).unwrap();
+        assert_display_snapshot!(p);
+    }
+
+    #[test]
+    fn find_var_refs_snap() {
+        let str_script =
+            "(declare-fun y () Bool)(declare-fun x () Real)(assert (or y (< (+ x 3) x)))";
+        let mut p = script(str_script).unwrap().1;
+        let og_vars = p.get_all_global_var_bindings();
+        let vrs = find_var_refs(&og_vars, &p);
+        assert_debug_snapshot!(vrs);
+    }
+
+    #[test]
+    fn bav_w_expr_adom_snap() {
+        let str_script = "(declare-fun x () Real)(assert (< (+ 4 3) x))";
+        let mut p = script(str_script).unwrap().1;
+        let ba_str = ba_script(
+            &mut p,
+            &mut Metadata::new_empty(),
+            &Config {
+                adomain_exprs: true,
+                ..Config::default()
+            },
+        )
+        .unwrap()[0]
+            .to_string();
+
+        assert_display_snapshot!(ba_str);
+    }
+
+    #[test]
+    fn bav_w_uqual_og() {
+        let str_script = "(declare-fun x () Real)(assert (< (+ 4 3) x))";
+        let mut p = script(str_script).unwrap().1;
+        let ba_str = ba_script(
+            &mut p,
+            &mut Metadata::new_empty(),
+            &Config {
+                uqual_og_vars: true,
+                ..Config::default()
+            },
+        )
+        .unwrap()[0]
+            .to_string();
+
+        assert_display_snapshot!(ba_str);
+    }
+
     #[test]
     fn num_op_ba_script_snap() {
         let str_script = "(declare-fun x () Real)(assert (< (+ 4 3) x))";

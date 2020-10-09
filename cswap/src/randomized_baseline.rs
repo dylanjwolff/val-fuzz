@@ -12,6 +12,7 @@ use crate::parser::script_from_f;
 use crate::solver::all_non_err_timed_out;
 use crate::solver::check_valid_solve;
 use crate::solver::profiles_solve;
+use crate::transforms::ba_script;
 use crate::utils::RunStats;
 
 use crate::fuzzer::report_any_bugs;
@@ -84,10 +85,17 @@ impl<'a> StatefulRandBaseFuzzer<'a> {
             return Ok(None);
         }
 
-        self.cfg
-            .file_provider
-            .serialize_iterfile_str(&script_str, self.current_iter, &mut self.md)
-            .map(|r| Some((r, self.md_file.clone())))
+        if self.cfg.monitors_in_final {
+            ba_script(&mut self.script, &mut self.md, &self.cfg)?;
+        }
+
+        let subf = self.cfg.file_provider.serialize_iterfile(
+            &self.script,
+            self.current_iter,
+            &mut self.md,
+        )?;
+
+        Ok(Some((subf, self.md_file.clone())))
     }
 }
 
@@ -108,8 +116,15 @@ pub fn rand_fuzz_solve(
         )));
     }
 
-    let results = profiles_solve(iter_f.to_str().unwrap_or("defaultname"), &cfg.profiles);
+    let results = profiles_solve(
+        iter_f.to_str().unwrap_or("defaultname"),
+        &cfg.profiles,
+        cfg.timeout,
+    );
     stats.record_stats_for_sub_results(&results);
+    stats
+        .coverage
+        .log_check_coverage(&results, &md.bavns, md.seed_file.clone());
 
     let ct = to_ctr.entry(md.seed_file.clone()).or_insert(0);
     if all_non_err_timed_out(&results) {

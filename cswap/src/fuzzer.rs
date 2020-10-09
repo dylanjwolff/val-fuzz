@@ -1,5 +1,6 @@
 use crate::ast::CommandRc;
 use crate::ast::Script;
+use crate::ast::Sort;
 use crate::config::Config;
 use crate::config::FileProvider;
 use crate::config::Metadata;
@@ -14,9 +15,12 @@ use crate::transforms::rv;
 use crate::utils::dyn_fmt;
 use crate::utils::to_strs;
 use crate::utils::DFormatParseError;
+use crate::utils::HashHashSet;
 use crate::utils::RunStats;
+use std::collections::HashMap;
 
 use crate::utils::RandUniqPermGen;
+use std::hash::Hash;
 
 use std::collections::BTreeMap;
 use std::fs::OpenOptions;
@@ -309,6 +313,7 @@ pub fn solver_fn(
         filepaths.0.to_str().unwrap_or("defaultname"),
         &SIMPLE_PROFILE,
         seed,
+        cfg.timeout,
     );
 
     let ct = to_ctr.entry(md.seed_file.clone()).or_insert(0);
@@ -385,10 +390,17 @@ fn resub_model(
             .file_provider
             .serialize_resub_str(script_str, &filepaths.0, &md)?;
 
-        let results = profiles_solve(resubbed_f.to_str().unwrap_or("defaultname"), &cfg.profiles);
+        let results = profiles_solve(
+            resubbed_f.to_str().unwrap_or("defaultname"),
+            &cfg.profiles,
+            cfg.timeout,
+        );
         stats.record_stats_for_sub_results(&results);
 
         log_check_enforce(&results, enforcemt);
+        stats
+            .coverage
+            .log_check_coverage(&results, &md.bavns, md.seed_file.clone());
 
         if !report_any_bugs(&resubbed_f, &results, &cfg.file_provider) {
             if cfg.remove_files {
@@ -452,7 +464,7 @@ pub fn strip_and_transform(
 
     let mut md = Metadata::new(source_file);
 
-    replace_constants_with_fresh_vars(&mut script, &mut md)?;
+    replace_constants_with_fresh_vars(&mut script, &mut md, cfg)?;
     let chf = cfg.file_provider.cholesfile(&mut md)?;
     fs::write(chf, script.to_string())?;
 
@@ -482,7 +494,8 @@ mod test {
             .unwrap()
             .1;
         let mut md = Metadata::new_empty();
-        replace_constants_with_fresh_vars(&mut script, &mut md).unwrap();
+        let cfg = Config::default();
+        replace_constants_with_fresh_vars(&mut script, &mut md, &cfg).unwrap();
         let new_script = &ba_script(
             &mut script,
             &mut md,
@@ -502,7 +515,8 @@ mod test {
             ((_ to_fp 11 53) roundNearestTiesToEven 0.5792861143265499723753464422770775854587554931640625 (- 1022))
             ((_ to_fp 11 53) roundNearestTiesToEven 1.3902774452208657152141313417814671993255615234375 (- 17)))))").unwrap().1;
         let mut md = Metadata::new_empty();
-        replace_constants_with_fresh_vars(&mut script, &mut md).unwrap();
+        let cfg = Config::default();
+        replace_constants_with_fresh_vars(&mut script, &mut md, &cfg).unwrap();
         let new_script = &ba_script(
             &mut script,
             &mut md,

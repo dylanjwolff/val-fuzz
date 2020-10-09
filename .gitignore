@@ -5,6 +5,8 @@ tags.lock
 tags.temp
 bin
 .solvers
+*.csv
+*.png
 z3.log
 venv
 **/*.csv
