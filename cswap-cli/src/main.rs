@@ -30,6 +30,7 @@ use std::thread;
 use std::thread::JoinHandle;
 use std::time::SystemTime;
 
+const UQUALOGVARS: &'static str = "uqual-og-vars";
 const MFINAL: &'static str = "monitors-in-final";
 const TIMEOUT: &'static str = "timeout";
 const KEEP_FILES: &'static str = "keep-files";
@@ -100,6 +101,10 @@ fn main() {
                 .takes_value(true),
         )
         .arg(
+            Arg::with_name(UQUALOGVARS)
+                .long(UQUALOGVARS)
+                .help("Universally quantify original variables from the formula in the 'skeleton'"),
+        ).arg(
             Arg::with_name(EFFINAL)
                 .long(EFFINAL)
                 .help("Enforce constraints on the final call to solvers"),
@@ -266,7 +271,17 @@ fn main() {
 
     assert!(
         !matches.is_present(ADOMAINE) || matches.is_present(SKOLU),
-        "Expr Adomains can't have universal quantifiers"
+        "Expr Adomains can't have universal quantifiers (need --skolemize-universals)"
+    );
+
+    assert!(
+        !matches.is_present(ADOMAINE) || matches.is_present(UQUALOGVARS),
+        "Expr Adomains can't have universal quantifiers (from --uqual-og-vars)"
+    );
+
+    assert!(
+        !(matches.is_present(UQUALOGVARS) && matches.is_present(ADOMAIN)),
+        "OG Var Domains doesn't make sense with universally quantified OG Vars"
     );
 
     let cfg = Config {
@@ -283,6 +298,7 @@ fn main() {
         leaf_opt: matches.is_present(LEAFOPT),
         cp_og: matches.is_present(CPOG),
         enforce_on_resub: matches.is_present(EFFINAL),
+        uqual_og_vars: matches.is_present(UQUALOGVARS),
         max_consts,
         min_consts,
         timeout,

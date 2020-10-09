@@ -607,7 +607,7 @@ pub fn ba_script(script: &mut Script, md: &mut Metadata, cfg: &Config) -> io::Re
     decls.append(&mut bdom_inits);
     decls.append(&mut inter_inits);
 
-    if false {
+    if cfg.uqual_og_vars {
         let add_og_as_qual = (
             og_vars
                 .into_iter()
@@ -1590,6 +1590,24 @@ mod tests {
             &mut Metadata::new_empty(),
             &Config {
                 adomain_exprs: true,
+                ..Config::default()
+            },
+        )
+        .unwrap()[0]
+            .to_string();
+
+        assert_display_snapshot!(ba_str);
+    }
+
+    #[test]
+    fn bav_w_uqual_og() {
+        let str_script = "(declare-fun x () Real)(assert (< (+ 4 3) x))";
+        let mut p = script(str_script).unwrap().1;
+        let ba_str = ba_script(
+            &mut p,
+            &mut Metadata::new_empty(),
+            &Config {
+                uqual_og_vars: true,
                 ..Config::default()
             },
         )
