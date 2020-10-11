@@ -34,13 +34,13 @@ flags = {}
 # flags["LEAFEXP"] = "--leaf-opt --const-relations 3 --multi-enforce 7"
 # flags["SOUND"] = "--abstract-domain-vars --const-relations 3 --multi-enforce 7"
 # flags["LEAFSOUND"] = "--leaf-opt --abstract-domain-vars --const-relations 3 --multi-enforce 7"
-#flags["UQUALOG"] = "--uqual-og-vars"
+flags["UQUALOG"] = "--uqual-og-vars"
 flags["ADOMAINE"] = "--abstract-domain-sub-expressions"
-#flags["MINCONSTS1"] = "--min-consts 1"
-#flags["MINCONSTS3"] = "--min-consts 3"
-#flags["MINCONSTS5"] = "--min-consts 5"
-#flags["MAXCONSTS5"] = "--max-consts 5"
-#flags["MAXCONSTS10"] = "--max-consts 10"
+flags["MINCONSTS1"] = "--min-consts 1"
+flags["MINCONSTS3"] = "--min-consts 3"
+flags["MINCONSTS5"] = "--min-consts 5"
+flags["MAXCONSTS5"] = "--max-consts 5"
+flags["MAXCONSTS10"] = "--max-consts 10"
 
 configs = flags
 reps = range(0,30)
@@ -100,7 +100,7 @@ for config_tag, options in tqdm(configs.items()):
         for rep in reps:
             if not rep in reprods.keys():
                 reprods[rep] = {}
-            cmdstr = "ls " + str(rep) + "-cswap-fuzz-run-out/bugs"
+            cmdstr = "ls *_" + str(rep) + "-cswap-fuzz-run-out/bugs"
             bug_files = sp.getoutput(cmdstr).split("\n")
 
             cmdstr = "ls ~/known/repro/" + zsh[0] + "-" + zsh[1]
@@ -113,7 +113,7 @@ for config_tag, options in tqdm(configs.items()):
                     reprods[rep][solver_sfs] = "NOREPRO"
 
                 for bf in bug_files:
-                    cmdstr = "cat " + str(rep) + "-cswap-fuzz-run-out/bugs/" + bf
+                    cmdstr = "cat *_" + str(rep) + "-cswap-fuzz-run-out/bugs/" + bf
                     bf_cts = sp.getoutput(cmdstr).lower()
 
                     if sfs in bf:
@@ -121,7 +121,7 @@ for config_tag, options in tqdm(configs.items()):
                             reprods[rep][solver_sfs] = "SOUND" 
                         elif reprods[rep][solver_sfs] != "SOUND":
                             reprods[rep][solver_sfs] = "BUG" 
-            cmdstr = "rm -r *" + str(rep) + "-cswap-fuzz-run-out"
+            cmdstr = "rm -r *_" + str(rep) + "-cswap-fuzz-run-out"
             sp.getoutput(cmdstr)
 
     reprocats = CategoricalDtype(categories=["BUG", "SOUND", "NOREPRO"])

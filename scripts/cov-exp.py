@@ -43,16 +43,22 @@ flags["RBASE"] = "-r"
 #flags["MAXCONSTS10"] = "--max-consts 10"
 
 configs = flags
-reps = range(0,2)
+reps = range(0,15)
 streps = ",".join([str(r) for r in reps])
-iters = [10]
+iters = [5, 10, 15, 25, 35, 50, 100]
 filesdir = "~/known/repro"
 profile = 1
 
+base_cvc4 = "0675545"
+base_z3 = "a35d00e"
+cmdstr = "python3 ./smtvm.py cvc4 install " + base_cvc4
+o = sp.getoutput(cmdstr)
+cmdstr = "python3 ./smtvm.py z3 install " + base_z3
+o = sp.getoutput(cmdstr)
+ 
+
 for config_tag, options in tqdm(configs.items()):
 
-    base_cvc4 = "0675545"
-    base_z3 = "a35d00e"
 
     cum_repros = []
     cumreps = []
@@ -61,7 +67,7 @@ for config_tag, options in tqdm(configs.items()):
     reprod = {}
     reprods = {}
 
-    for i in iters:
+    for i in tqdm(iters):
         cmdstr = "cswap-cli -v -w 1,1,1 --timeout 1 " + options + " -p " + str(profile) + " -s " + streps + " -i " + str(i) + " --monitors-in-final " + filesdir
         (s, o) = sp.getstatusoutput(cmdstr)
 
@@ -97,7 +103,7 @@ for config_tag, options in tqdm(configs.items()):
         print(cfgs)
 
         for rep in reps:
-            cmdstr = "rm -r *" + str(rep) + "-cswap-fuzz-run-out"
+            cmdstr = "rm -r *_" + str(rep) + "-cswap-fuzz-run-out"
             sp.getoutput(cmdstr)
 
     cumdf["Cov Per Sat"] = cumdf["coverage"]/cumdf["Sat Substitutions"]
@@ -105,6 +111,6 @@ for config_tag, options in tqdm(configs.items()):
     print(cumdf.groupby("iters").mean().T)
     print(cumdf.groupby("iters").std().T)
 
-    cumdf.to_csv(config_tag + ".csv")
+    cumdf.to_csv(config_tag + "_COV.ceesv")
 
 
