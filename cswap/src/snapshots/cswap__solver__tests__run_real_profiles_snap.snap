@@ -1,17 +1,17 @@
 ---
 source: cswap/src/solver.rs
-expression: "profiles_solve(\"test/strings20.smt2\", &pis)"
+expression: "profiles_solve(\"test/strings20.smt2\", &pis, Duration::from_secs(6))"
 ---
 [
     RSolve {
         was_timeout: false,
         was_segv: false,
-        stdout: "sat\n(model\n(define-fun s () String \"\\\"\")\n)\n",
+        stdout: "sat\n(\n(define-fun s () String \"\\\"\")\n)\n",
         stderr: "",
         lines: [
             Sat,
             Generic(
-                "(model",
+                "(",
             ),
             Generic(
                 "(define-fun s () String \"\\\"\")",
