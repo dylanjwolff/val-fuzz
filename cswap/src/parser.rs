@@ -594,11 +594,20 @@ fn naked_define_funcs_rec(s: &str) -> IResult<&str, Command> {
 }
 
 pub fn model(s: &str) -> IResult<&str, Vec<(Symbol, Vec<(SymbolRc, SortRc)>, Sort, SExp)>> {
-    let model_result = ws!(brack!(preceded(
+    // Fn doesn't implement Clone for some reason TODO
+    //
+    let model_results = many0(ws!(brack!(preceded(
         ws!(tag("define-fun")),
         ws!(naked_fn_definition)
-    )));
-    brack!(preceded(ws!(tag("model")), many0(model_result)))(s)
+    ))));
+    let model_results_ = many0(ws!(brack!(preceded(
+        ws!(tag("define-fun")),
+        ws!(naked_fn_definition)
+    ))));
+    brack!(alt((
+        preceded(ws!(tag("model")), model_results),
+        model_results_
+    )))(s)
 }
 
 pub fn z3_oerror(s: &str) -> IResult<&str, &str> {
@@ -863,6 +872,14 @@ mod tests {
             (define-fun S () (Set Int) (as emptyset (Set Int)))
             (define-fun T () (Set Int) (singleton 0))
             )";
+        assert_debug_snapshot!(model(response));
+    }
+
+    // let response = "sat
+
+    #[test]
+    fn cvc4_model2_as_output_snap() {
+        let response = "((define-fun s () String \"j\"))";
         assert_debug_snapshot!(model(response));
     }
 

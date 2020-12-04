@@ -1,0 +1,25 @@
+---
+source: cswap/src/parser.rs
+expression: model(response)
+---
+Ok(
+    (
+        "",
+        [
+            (
+                Token(
+                    "s",
+                ),
+                [],
+                Str,
+                Constant(
+                    RefCell {
+                        value: Str(
+                            "j",
+                        ),
+                    },
+                ),
+            ),
+        ],
+    ),
+)
