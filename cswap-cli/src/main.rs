@@ -30,6 +30,7 @@ use std::thread;
 use std::thread::JoinHandle;
 use std::time::SystemTime;
 
+const SKIP_SOLVE: &'static str = "skip-solve";
 const UQUALOGVARS: &'static str = "uqual-og-vars";
 const MFINAL: &'static str = "monitors-in-final";
 const TIMEOUT: &'static str = "timeout";
@@ -132,6 +133,10 @@ fn main() {
                 .takes_value(true),
         )
         .arg(
+            Arg::with_name(SKIP_SOLVE)
+                .long(SKIP_SOLVE)
+                .help("Do not perform differential solving operations on generated test cases to look for bugs"),
+        ).arg(
             Arg::with_name(LEAFOPT)
                 .long(LEAFOPT)
                 .help("Ignore non-leaf sub-expressions for creating the meta-formula"),
@@ -296,6 +301,7 @@ fn main() {
         adomain_exprs: matches.is_present(ADOMAINE),
         skolemize_universal: matches.is_present(SKOLU),
         leaf_opt: matches.is_present(LEAFOPT),
+        skip_solve: matches.is_present(SKIP_SOLVE),
         cp_og: matches.is_present(CPOG),
         enforce_on_resub: matches.is_present(EFFINAL),
         uqual_og_vars: matches.is_present(UQUALOGVARS),

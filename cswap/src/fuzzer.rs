@@ -390,21 +390,23 @@ fn resub_model(
             .file_provider
             .serialize_resub_str(script_str, &filepaths.0, &md)?;
 
-        let results = profiles_solve(
-            resubbed_f.to_str().unwrap_or("defaultname"),
-            &cfg.profiles,
-            cfg.timeout,
-        );
-        stats.record_stats_for_sub_results(&results);
+        if !cfg.skip_solve {
+            let results = profiles_solve(
+                resubbed_f.to_str().unwrap_or("defaultname"),
+                &cfg.profiles,
+                cfg.timeout,
+            );
+            stats.record_stats_for_sub_results(&results);
 
-        log_check_enforce(&results, enforcemt);
-        stats
-            .coverage
-            .log_check_coverage(&results, &md.bavns, md.seed_file.clone());
+            log_check_enforce(&results, enforcemt);
+            stats
+                .coverage
+                .log_check_coverage(&results, &md.bavns, md.seed_file.clone());
 
-        if !report_any_bugs(&resubbed_f, &results, &cfg.file_provider) {
-            if cfg.remove_files {
-                fs::remove_file(&resubbed_f).unwrap_or(());
+            if !report_any_bugs(&resubbed_f, &results, &cfg.file_provider) {
+                if cfg.remove_files {
+                    fs::remove_file(&resubbed_f).unwrap_or(());
+                }
             }
         }
     }
