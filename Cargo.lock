@@ -345,6 +345,7 @@ dependencies = [
  "cswap",
  "log",
  "log4rs",
+ "rand",
 ]
 
 [[package]]

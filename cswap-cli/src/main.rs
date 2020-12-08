@@ -4,6 +4,7 @@ extern crate clap;
 extern crate cswap;
 extern crate log;
 extern crate log4rs;
+extern crate rand;
 
 use log::info;
 use log::LevelFilter;
@@ -24,6 +25,7 @@ use cswap::solver::all_profiles;
 use cswap::solver::profiles_to_string;
 use cswap::solver::ProfileIndex;
 use cswap::utils::MyBackoff;
+use rand::Rng;
 use std::cmp::max;
 use std::collections::HashSet;
 use std::thread;
@@ -180,7 +182,7 @@ fn main() {
         .arg(
             Arg::with_name(SEED)
                 .short("s")
-                .help("Seed for randomization. Runs are repeatable with the same seed")
+                .help("Seed for randomization. Runs are repeatable with the same seed. Seeds are randomized by default without this flag.")
                 .takes_value(true),
         )
         .arg(
@@ -238,8 +240,8 @@ fn main() {
         Some(seedstr) => seedstr
             .split(',')
             .map(|s| s.parse::<u64>().unwrap())
-            .collect(),
-        None => vec![0],
+            .collect::<Vec<u64>>(),
+        None => vec![rand::thread_rng().gen()],
     };
     info!("Seeds are {:?}", seeds);
     let stack_size = match matches.value_of(STACK_SIZE) {
