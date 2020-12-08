@@ -57,6 +57,7 @@ const ADOMAINE: &'static str = "abstract-domain-sub-expressions";
 const LEAFOPT: &'static str = "leaf-opt";
 const MINCONSTS: &'static str = "min-consts";
 const MAXCONSTS: &'static str = "max-consts";
+const OUTDIR: &'static str = "out-dir";
 
 fn main() {
     let matches: ArgMatches = App::new("Value Constant Mutation Fuzzer for SMTlib2 Solvers")
@@ -91,11 +92,19 @@ fn main() {
                 .takes_value(true),
         )
         .arg(
+            Arg::with_name(OUTDIR)
+                .long(OUTDIR)
+                .short("o")
+                .help("Specifies the output directory for the fuzzer. A randomized directory name will be used by default. Naming collisons will cause a panic.")
+                .takes_value(true),
+        )
+        .arg(
             Arg::with_name(MINCONSTS)
                 .long(MINCONSTS)
                 .help("Attempts to ensure each formula has at least 'n' constant values by concretizing variables to be constants")
                 .takes_value(true),
-        ).arg(
+        )
+        .arg(
             Arg::with_name(MAXCONSTS)
                 .long(MAXCONSTS)
                 .help("Ensures that each formula uses only up to 'n' constants for value mutations")
@@ -289,6 +298,11 @@ fn main() {
         "OG Var Domains doesn't make sense with universally quantified OG Vars"
     );
 
+    assert!(
+        !(matches.is_present(OUTDIR) && seeds.len() > 1),
+        "Can't have single output folder with multiple seeds."
+    );
+
     let cfg = Config {
         max_iter: max_iter,
         stack_size: stack_size,
@@ -329,8 +343,11 @@ fn main() {
     let handles = seeds
         .iter()
         .map(|seed| {
+            let fp = match matches.value_of(OUTDIR) {
+                Some(outdir) => FileProvider::new(outdir),
+                None => FileProvider::new_unique(&(seed.to_string() + "-cswap-fuzz-run-out")),
+            };
             let dir_name = dir_name.to_owned();
-            let fp = FileProvider::new_unique(&(seed.to_string() + "-cswap-fuzz-run-out"));
             let cfg = Config {
                 rng_seed: *seed,
                 file_provider: fp,
