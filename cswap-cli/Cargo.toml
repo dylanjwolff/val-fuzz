@@ -11,4 +11,5 @@ clap = "2.33.0"
 cswap = { path = "../cswap" }
 log = "0.4.8"
 log4rs = "0.12.0"
+rand = "0.7.3"
 
