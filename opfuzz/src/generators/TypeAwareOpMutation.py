@@ -3,6 +3,8 @@ import random
 from src.generators.Generator import Generator
 from src.parsing.parse import *
 
+import subprocess as sp
+
 
 class TypeAwareOpMutation(Generator):
     def __init__(self, seeds, args):
@@ -78,4 +80,22 @@ class TypeAwareOpMutation(Generator):
                     break
         mutated_fn = "%s/%s.smt2" % (self.args.scratchfolder, self.args.name)
         with open(mutated_fn,"w") as f: f.write(self.formula.__str__())
+
+
+        # Call ValFuzz on the operator mutated file
+        f = mutated_fn
+        od = "%s/%s" % (self.args.scratchfolder, "valfuzz-od")
+
+        out = sp.getoutput("cswap-cli -i 1 --skip-solve --skolemize-universal --min-consts 3 --multi-enforce 7 -w 1,1,2 --abstract-domain-vars -o %s %s" % (od, f))
+
+        # move the file down to the top level of the scratchfolder
+        of_names = os.listdir("%s/scratch" % (od))
+        out = [sp.getoutput("mv %s/scratch/%s %s" % (od, of, self.args.scratchfolder) for ofn in of_names]
+
+        # remove the valfuzz scratch folder to avoid name collisions in future calls
+        out = sp.getoutput("rm -r %s" % od)
+
+        ofs = ["%s/%s" % (self.args.scratchfolder, ofn) for ofn in of_names]
+
+        # this function should return a list as valfuzz will return 0 to 2 files per iteration depending on smt solver results
         return mutated_fn
