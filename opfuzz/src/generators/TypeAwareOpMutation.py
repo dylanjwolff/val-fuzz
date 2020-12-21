@@ -4,6 +4,7 @@ from src.generators.Generator import Generator
 from src.parsing.parse import *
 
 import subprocess as sp
+import os
 
 
 class TypeAwareOpMutation(Generator):
@@ -90,12 +91,17 @@ class TypeAwareOpMutation(Generator):
 
         # move the file down to the top level of the scratchfolder
         of_names = os.listdir("%s/scratch" % (od))
-        out = [sp.getoutput("mv %s/scratch/%s %s" % (od, of, self.args.scratchfolder) for ofn in of_names]
+
+        out = [sp.getoutput("cp %s/scratch/%s %s" % (od, ofn, self.args.scratchfolder)) for ofn in of_names]
 
         # remove the valfuzz scratch folder to avoid name collisions in future calls
         out = sp.getoutput("rm -r %s" % od)
 
+        of_names = os.listdir("%s" % (self.args.scratchfolder))
+        print("ValFuzz:" + str(of_names))
+
+
         ofs = ["%s/%s" % (self.args.scratchfolder, ofn) for ofn in of_names]
 
         # this function should return a list as valfuzz will return 0 to 2 files per iteration depending on smt solver results
-        return mutated_fn
+        return ofs

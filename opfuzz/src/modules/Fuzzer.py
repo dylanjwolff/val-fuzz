@@ -51,11 +51,18 @@ class Fuzzer:
                 fusion_seeds = [seed1, seed2]
                 self.generator = SemanticFusion(fusion_seeds, self.args)
             else: assert(False)
-            
+
+            stop = False
             for _ in range(self.args.iterations):
+                if stop: break
+
                 self.statistic.printbar()
-                if not self.validate(self.generator.generate()): break
-                self.statistic.mutants += 1
+                mutants = self.generator.generate()
+                for mutant in mutants:
+                    if not self.validate(mutant):
+                        stop = True
+                        break
+                    self.statistic.mutants += 1
 
     def validate(self, fn):
 
