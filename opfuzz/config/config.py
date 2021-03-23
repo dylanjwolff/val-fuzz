@@ -33,4 +33,5 @@ ignore_msgs = [
     "Symbol 'str.to-re' not declared as a variable",
     "Symbol 'str.to.re' not declared as a variable",
     "Unimplemented code encountered",
+    "not yet support",
 ]

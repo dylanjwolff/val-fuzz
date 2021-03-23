@@ -85,7 +85,7 @@ class TypeAwareOpMutation(Generator):
 
         # Call ValFuzz on the operator mutated file
         f = mutated_fn
-        od = "%s/%s" % (self.args.scratchfolder, "valfuzz-od")
+        od = "%s/%s-%s" % (self.args.scratchfolder, "valfuzz-od", self.args.name)
 
         out = sp.getoutput("cswap-cli -i 1 --skip-solve --skolemize-universal --min-consts 3 --multi-enforce 7 -w 1,1,2 --abstract-domain-vars -o %s %s" % (od, f))
 
@@ -97,10 +97,8 @@ class TypeAwareOpMutation(Generator):
         # remove the valfuzz scratch folder to avoid name collisions in future calls
         out = sp.getoutput("rm -r %s" % od)
 
-        of_names = os.listdir("%s" % (self.args.scratchfolder))
-        print("ValFuzz:" + str(of_names))
-
-
+        op_fname = f.split('/')[-1];
+        of_names.append(op_fname)
         ofs = ["%s/%s" % (self.args.scratchfolder, ofn) for ofn in of_names]
 
         # this function should return a list as valfuzz will return 0 to 2 files per iteration depending on smt solver results
