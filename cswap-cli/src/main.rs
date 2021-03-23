@@ -368,6 +368,7 @@ fn main() {
                 })
         })
         .collect::<Vec<std::io::Result<JoinHandle<()>>>>();
+    cfg.file_provider.cleanup_all(); // a bit hacky, but this cleans up the temporary directory created by Config::default()
 
     let mut backoff = MyBackoff::new();
     for h in handles {

@@ -54,7 +54,6 @@ impl VarNameGenerator {
 fn get_subset_consts(
     consts: Vec<(String, Sort)>,
     num: usize,
-    cfg: &Config,
 ) -> Option<Vec<(String, Sort)>> {
     let mut permgen = RandUniqPermGen::new_masked_with_retries(0, consts.len(), 1000, num);
     // seed, numbits, iter, mask size
@@ -589,7 +588,6 @@ pub fn ba_script(script: &mut Script, md: &mut Metadata, cfg: &Config) -> io::Re
     let (subset_constvs) = get_subset_consts(
         md.constvns.clone(),
         num_const_to_relate as usize,
-        &Config::default(),
     )
     .unwrap_or(vec![]);
     let (intervs, mut intercmds) = get_inter_relation_constant_monitors(subset_constvs);
@@ -1515,9 +1513,7 @@ mod tests {
             ("f".to_string(), Sort::UInt()),
         ];
 
-        let cfg = Config::default();
-
-        let subset = get_subset_consts(consts, 3, &cfg);
+        let subset = get_subset_consts(consts, 3);
         assert_debug_snapshot!(subset);
     }
 
