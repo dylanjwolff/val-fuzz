@@ -26,6 +26,7 @@ const PROFILES: &'static str = "profiles";
 const FORMAT: &'static str = "format";
 const LIST_PROFILES: &'static str = "list-profiles";
 const TIMEOUT: &'static str = "timeout";
+const SOUNDNESS_ONLY: &'static str = "soundness-only";
 
 fn main() {
     let ecode = {
@@ -43,6 +44,11 @@ fn main() {
                     .help("Sets the level of verbosity"),
             )
             .arg(
+                Arg::with_name(SOUNDNESS_ONLY)
+                    .short("y")
+                    .long(SOUNDNESS_ONLY)
+                    .help("Only returns 0 if a soundness bug is detected")
+            ).arg(
                 Arg::with_name(CREDUCE_SCRIPT)
                     .short("s")
                     .help("Outputs a script for use with CReduce to the file named")
@@ -121,7 +127,9 @@ fn main() {
             if let Some(crs) = maybe_cr_script {
                 print_creduce(&results, crs, infile_name);
             }
-            ret_val = 0;
+            if !matches.is_present(SOUNDNESS_ONLY) {
+                ret_val = 0;
+            }
         }
 
         if !RSolve::differential_test(&results).is_ok() {
@@ -144,8 +152,11 @@ fn print_creduce(results: &Vec<RSolve>, crs: &str, infile_name: &str) {
         .iter()
         .position(|r| r.has_bug_error())
         .map(|p| fs::write(crs, format!("solver-cli -p {} {}", p, infile_name)).unwrap());
+
+    // Only report soundness if other bugs aren't present, as they are typically the cause of
+    // false positive soundness issues
     if eb.is_none() && !RSolve::differential_test(results).is_ok() {
-        fs::write(crs, format!("solver-cli {}", infile_name)).unwrap();
+        fs::write(crs, format!("solver-cli --soundness-only {}", infile_name)).unwrap();
     }
 }
 
