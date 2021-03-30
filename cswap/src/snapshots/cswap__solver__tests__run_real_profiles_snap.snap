@@ -1,24 +1,15 @@
 ---
 source: cswap/src/solver.rs
-expression: "profiles_solve(\"test/strings20.smt2\", &pis, Duration::from_secs(6))"
+expression: "profiles_solve(\"test/2548.smt2\", &pis, Duration::from_secs(6))"
 ---
 [
     RSolve {
         was_timeout: false,
         was_segv: false,
-        stdout: "sat\n(\n(define-fun s () String \"\\\"\")\n)\n",
+        stdout: "unsat\n",
         stderr: "",
         lines: [
-            Sat,
-            Generic(
-                "(",
-            ),
-            Generic(
-                "(define-fun s () String \"\\\"\")",
-            ),
-            Generic(
-                ")",
-            ),
+            Unsat,
         ],
         solver: CVC4(
             CVC4_Command_Builder {
@@ -38,12 +29,10 @@ expression: "profiles_solve(\"test/strings20.smt2\", &pis, Duration::from_secs(6
     RSolve {
         was_timeout: false,
         was_segv: false,
-        stdout: "(error \"line 16 column 1: unexpected end of string\")\n",
+        stdout: "unsat\n",
         stderr: "",
         lines: [
-            Error(
-                "line 16 column 1: unexpected end of string",
-            ),
+            Unsat,
         ],
         solver: Z3(
             Z3_Command_Builder {

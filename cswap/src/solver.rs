@@ -824,7 +824,7 @@ mod tests {
             .incremental()
             .dump_all()
             .check_unsat_cores()
-            .run_on(Path::new("test/strings20.smt2")));
+            .run_on(Path::new("test/2548.smt2")));
     }
 
     #[test]
@@ -843,7 +843,7 @@ mod tests {
             pis.insert(ProfileIndex::new(i));
         });
         assert_debug_snapshot!(profiles_solve(
-            "test/strings20.smt2",
+            "test/2548.smt2",
             &pis,
             Duration::from_secs(6)
         ));
