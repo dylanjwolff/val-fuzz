@@ -368,7 +368,6 @@ fn main() {
                 })
         })
         .collect::<Vec<std::io::Result<JoinHandle<()>>>>();
-    cfg.file_provider.cleanup_all(); // a bit hacky, but this cleans up the temporary directory created by Config::default()
 
     let mut backoff = MyBackoff::new();
     for h in handles {
@@ -381,6 +380,7 @@ fn main() {
         "Total Elapsed Time:{}",
         end.duration_since(start).unwrap().as_secs()
     );
+    cfg.file_provider.cleanup_all(); // a bit hacky, but this cleans up the temporary directory created by Config::default()
 }
 
 fn parse_workers(workern_str: &str) -> (u8, u8, u8) {
