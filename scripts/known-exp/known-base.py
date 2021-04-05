@@ -25,6 +25,9 @@ for zsh in tqdm(solv_hashes):
         o = sp.getoutput(cmdstr)
     else:
         sys.exit("didn't recognize solver version")
+    cmdstr = "ls -l ~/bin"
+    o = sp.getoutput(cmdstr)
+    print(o)
 
 
     cmdstr = "ls ~/known/repro/" + zsh[0] + "-" + zsh[1] + " | parallel solver-cli -v >> solver90.txt"
