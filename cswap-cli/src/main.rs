@@ -31,7 +31,10 @@ use std::collections::HashSet;
 use std::thread;
 use std::thread::JoinHandle;
 use std::time::SystemTime;
+use std::path::PathBuf;
 
+const Z3_SOLVER: &'static str = "z3-solver-path";
+const CVC4_SOLVER: &'static str = "cvc4-solver-path";
 const SKIP_SOLVE: &'static str = "skip-solve";
 const UQUALOGVARS: &'static str = "uqual-og-vars";
 const MFINAL: &'static str = "monitors-in-final";
@@ -81,6 +84,16 @@ fn main() {
                 .help("Use skeleton files from pre-processing or previous run"),
         )
         .arg(
+            Arg::with_name(Z3_SOLVER)
+                .long(Z3_SOLVER)
+                .help("Path to the Z3 solver")
+                .takes_value(true),
+        ).arg(
+            Arg::with_name(CVC4_SOLVER)
+                .long(CVC4_SOLVER)
+                .help("Path to the CVC4 solver")
+                .takes_value(true),
+        ).arg(
             Arg::with_name(TIMEOUT)
                 .long(TIMEOUT)
                 .help("Sets the default timeout for calls to the solver")
@@ -306,6 +319,8 @@ fn main() {
     );
 
     let cfg = Config {
+        path_to_z3: matches.value_of(Z3_SOLVER).map(|p| PathBuf::from(p)),
+        path_to_cvc4: matches.value_of(CVC4_SOLVER).map(|p| PathBuf::from(p)),
         max_iter: max_iter,
         stack_size: stack_size,
         remove_files: !matches.is_present(KEEP_FILES),
