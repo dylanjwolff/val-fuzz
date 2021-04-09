@@ -100,7 +100,7 @@ fn main() {
         };
 
         let results = match matches.value_of(PROFILES) {
-            Some(pstr) => profiles_solve(infile_name, &parse_profiles(pstr), timeout),
+            Some(pstr) => profiles_solve(&None, &None, infile_name, &parse_profiles(pstr), timeout),
             None => solve(infile_name, timeout),
         };
 

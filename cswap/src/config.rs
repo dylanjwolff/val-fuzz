@@ -20,6 +20,8 @@ use std::hash::Hasher;
 
 #[derive(Debug, Clone, Serialize)]
 pub struct Config {
+    pub path_to_z3: Option<PathBuf>,
+    pub path_to_cvc4: Option<PathBuf>,
     pub file_provider: FileProvider,
     pub remove_files: bool,
     pub max_iter: u32,
@@ -60,6 +62,8 @@ macro_rules! liftio_e {
 impl Config {
     pub fn default() -> Self {
         Config {
+            path_to_z3: None,
+            path_to_cvc4: None,
             file_provider: FileProvider::new_tmp(),
             rng_seed: 0,
             max_iter: 20,

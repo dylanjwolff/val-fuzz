@@ -117,6 +117,8 @@ pub fn rand_fuzz_solve(
     }
 
     let results = profiles_solve(
+        &cfg.path_to_z3,
+        &cfg.path_to_cvc4,
         iter_f.to_str().unwrap_or("defaultname"),
         &cfg.profiles,
         cfg.timeout,

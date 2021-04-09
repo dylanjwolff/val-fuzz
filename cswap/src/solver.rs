@@ -9,7 +9,7 @@ use subprocess::ExitStatus;
 use subprocess::Popen;
 use subprocess::PopenConfig;
 use subprocess::Redirection;
-
+use std::path::PathBuf;
 use std::time::Duration;
 
 use log::trace;
@@ -103,6 +103,8 @@ pub enum ProfileIndex {
 }
 
 pub fn profiles_solve(
+    z3_path: &Option<PathBuf>,
+    cvc4_path: &Option<PathBuf>,
     filename: &str,
     pis: &HashSet<ProfileIndex>,
     timeout: Duration,
@@ -113,14 +115,14 @@ pub fn profiles_solve(
         .iter()
         .zip(0..CVC4_PROFILES.len() - 1)
         .filter(|(_, i)| pis.contains(&ProfileIndex::CVC4(*i)))
-        .map(|(p, _)| p.clone().timeout(timeout))
+        .map(|(p, _)| p.clone().solver(cvc4_path).timeout(timeout))
         .map(|profile| profile.run_on(&filepath));
 
     let mr_z3 = Z3_PROFILES
         .iter()
         .zip(0..Z3_PROFILES.len() - 1)
         .filter(|(_, i)| pis.contains(&ProfileIndex::Z3(*i)))
-        .map(|(p, _)| p.clone().timeout(timeout))
+        .map(|(p, _)| p.clone().solver(z3_path).timeout(timeout))
         .map(|profile| profile.run_on(&filepath));
 
     mr_cvc4.chain(mr_z3).collect()
@@ -189,6 +191,13 @@ impl CVC4_Command_Builder {
                 .collect(),
             to: to,
         }
+    }
+
+    fn solver(&mut self, solver: &Option<PathBuf>) -> Self {
+        if let Some(solver_path) = solver {
+            self.cmd[0] = solver_path.to_str().unwrap().to_owned();
+        }
+        self.clone()
     }
 
     fn timeout(&mut self, duration: Duration) -> Self {
@@ -284,6 +293,13 @@ impl Z3_Command_Builder {
                 .collect(),
             to: to,
         }
+    }
+
+    fn solver(&mut self, solver: &Option<PathBuf>) -> Self {
+        if let Some(solver_path) = solver {
+            self.cmd[0] = solver_path.to_str().unwrap().to_owned();
+        }
+        self.clone()
     }
 
     fn timeout(&mut self, duration: Duration) -> Self {
@@ -843,6 +859,8 @@ mod tests {
             pis.insert(ProfileIndex::new(i));
         });
         assert_debug_snapshot!(profiles_solve(
+            &None,
+            &None,
             "test/2548.smt2",
             &pis,
             Duration::from_secs(6)
