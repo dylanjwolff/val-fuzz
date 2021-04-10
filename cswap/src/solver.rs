@@ -139,7 +139,7 @@ pub fn profiles_solve(
         pcss.wait().unwrap();
 
         if Path::new("total.info").exists() {
-            let cmd_str = format!("fastcov -C temp.info -C total.info -l -o total.info");
+            let cmd_str = format!("fastcov -C temp.info total.info -l -o total.info");
             let cmd_vec = cmd_str.split(" ").collect::<Vec<&str>>();
             let mut pcss = Popen::create(cmd_vec.as_slice(), PopenConfig::default()).unwrap();
             pcss.wait().unwrap();
