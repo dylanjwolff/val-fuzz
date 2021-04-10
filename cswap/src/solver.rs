@@ -7,6 +7,7 @@ use std::io::Write;
 use std::path::Path;
 use subprocess::ExitStatus;
 use subprocess::Popen;
+use subprocess::Exec;
 use subprocess::PopenConfig;
 use subprocess::Redirection;
 use std::path::PathBuf;
@@ -125,7 +126,50 @@ pub fn profiles_solve(
         .map(|(p, _)| p.clone().solver(z3_path).timeout(timeout))
         .map(|profile| profile.run_on(&filepath));
 
-    mr_cvc4.chain(mr_z3).collect()
+    let results = mr_cvc4.chain(mr_z3).collect();
+
+    if let Some(z3_dir) = z3_path {
+        let mut src_dir=z3_dir.clone();
+        src_dir.pop();
+        src_dir.push("..");
+
+        let cmd_str = format!("fastcov -b -l -d {} -o {} -X", src_dir.to_str().unwrap(), "temp.info");
+        let cmd_vec = cmd_str.split(" ").collect::<Vec<&str>>();
+        let mut pcss = Popen::create(cmd_vec.as_slice(), PopenConfig::default()).unwrap();
+        pcss.wait().unwrap();
+
+        if Path::new("total.info").exists() {
+            let cmd_str = format!("fastcov -C temp.info -C total.info -l -o total.info");
+            let cmd_vec = cmd_str.split(" ").collect::<Vec<&str>>();
+            let mut pcss = Popen::create(cmd_vec.as_slice(), PopenConfig::default()).unwrap();
+            pcss.wait().unwrap();
+
+            let r = pcss.communicate(None);
+            println!("{:?}", r);
+
+            let cmd_str = format!("rm temp.info");
+            let cmd_vec = cmd_str.split(" ").collect::<Vec<&str>>();
+            let mut pcss = Popen::create(cmd_vec.as_slice(), PopenConfig::default()).unwrap();
+            pcss.wait().unwrap();
+
+            let r = pcss.communicate(None);
+            println!("{:?}", r);
+        } else {
+            let cmd_str = format!("mv temp.info total.info");
+            let cmd_vec = cmd_str.split(" ").collect::<Vec<&str>>();
+            let mut pcss = Popen::create(cmd_vec.as_slice(), PopenConfig::default()).unwrap();
+            pcss.wait().unwrap();
+
+            let r = pcss.communicate(None);
+            println!("{:?}", r);
+        }
+
+        let cmd_str = format!("find {} -name '*.gcda' -type f -delete", src_dir.to_str().unwrap());
+        println!("{}", cmd_str);
+        Exec::shell(cmd_str).join().unwrap();
+    }
+
+    results
 }
 
 pub fn randomized_profiles_solve(
