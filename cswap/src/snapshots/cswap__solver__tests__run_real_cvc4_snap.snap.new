@@ -1,0 +1,38 @@
+---
+source: cswap/src/solver.rs
+expression: "CVC4_Command_Builder::new().timeout(Duration::from_secs(3)).strings_exp().incremental().dump_all().check_unsat_cores().run_on(Path::new(\"test/2548.smt2\"))"
+---
+RSolve {
+    was_timeout: false,
+    was_segv: false,
+    stdout: "unsat\n(\n(forall ((b Real)) (exists ((c Real)) (and (< c 4.0) (not (= c (/ (- 2) 1))) (not (= c 0.0)) (or (and (not (= (+ (* 8.0 b) (* 5.0 c)) 8.0)) (< (+ (* (/ (- 80) 1) b) (* (/ (- 6) 1) c)) 5.0)) (and (< (* (/ (- 3) 1) b) 1.0) (>= b 8.0)))) ) )\n)\n",
+    stderr: "",
+    lines: [
+        Unsat,
+        Generic(
+            "(",
+        ),
+        Generic(
+            "(forall ((b Real)) (exists ((c Real)) (and (< c 4.0) (not (= c (/ (- 2) 1))) (not (= c 0.0)) (or (and (not (= (+ (* 8.0 b) (* 5.0 c)) 8.0)) (< (+ (* (/ (- 80) 1) b) (* (/ (- 6) 1) c)) 5.0)) (and (< (* (/ (- 3) 1) b) 1.0) (>= b 8.0)))) ) )",
+        ),
+        Generic(
+            ")",
+        ),
+    ],
+    solver: CVC4(
+        CVC4_Command_Builder {
+            cmd: [
+                "cvc4",
+                "--tlimit",
+                "3000",
+                "--strings-exp",
+                "--incremental",
+                "--dump-models",
+                "--dump-unsat-cores",
+                "--dump-unsat-cores-full",
+                "--check-unsat-cores",
+            ],
+            to: 3s,
+        },
+    ),
+}

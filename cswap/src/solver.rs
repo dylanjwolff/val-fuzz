@@ -112,6 +112,7 @@ pub fn profiles_solve(
 ) -> Vec<RSolve> {
     let filepath = Path::new(filename);
 
+    println!("CVC4 {:?}", cvc4_path);
     let mr_cvc4 = CVC4_PROFILES
         .iter()
         .zip(0..CVC4_PROFILES.len() - 1)
@@ -128,11 +129,24 @@ pub fn profiles_solve(
 
     let results = mr_cvc4.chain(mr_z3).collect();
 
+    let mut src_dirs = Vec::new();
     if let Some(z3_dir) = z3_path {
         let mut src_dir=z3_dir.clone();
         src_dir.pop();
         src_dir.push("..");
+        src_dirs.push(src_dir);
+    }
 
+
+    if let Some(cvc4_dir) = cvc4_path {
+        let mut src_dir=cvc4_dir.clone();
+        src_dir.pop();
+        src_dir.push("..");
+        src_dir.push("..");
+        src_dirs.push(src_dir);
+    }
+
+    for src_dir in src_dirs {
         let cmd_str = format!("fastcov -b -l -d {} -o {} -X", src_dir.to_str().unwrap(), "temp.info");
         let cmd_vec = cmd_str.split(" ").collect::<Vec<&str>>();
         let mut pcss = Popen::create(cmd_vec.as_slice(), PopenConfig::default()).unwrap();
@@ -238,15 +252,18 @@ impl CVC4_Command_Builder {
     }
 
     fn solver(&mut self, solver: &Option<PathBuf>) -> Self {
+        println!("CVC4 solver {:?}", solver);
         if let Some(solver_path) = solver {
             self.cmd[0] = solver_path.to_str().unwrap().to_owned();
         }
+        println!("CVC4 solver cmd {:?}", self.cmd);
         self.clone()
     }
 
     fn timeout(&mut self, duration: Duration) -> Self {
         self.cmd[2] = duration.as_millis().to_string();
         self.to = duration;
+        println!("CVC4 to cmd {:?}", self.cmd);
         self.clone()
     }
     fn randomize(&self, seed: u64) -> Self {
@@ -316,6 +333,7 @@ impl CVC4_Command_Builder {
     fn run_on(&self, target: &Path) -> RSolve {
         let mut cmd = self.cmd.clone();
         cmd.push(target.to_str().unwrap().to_owned());
+        println!("CVC4 cmd {:?}", cmd);
         solve_intern(cmd, Solver::CVC4(self.clone()))
     }
 }

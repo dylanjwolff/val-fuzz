@@ -19,3 +19,4 @@
 (assert (xor b4 b2))
 
 (check-sat)
+(get-model)
